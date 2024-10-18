@@ -48,11 +48,6 @@ variable "existing_vpc_name" {
   type        = string
 }
 
-variable "existing_vpc_id" {
-  description = "The ID of the existing VPC"
-  type        = string
-}
-
 variable "existing_subnet_cidr" {
   description = "The CIDR range of the existing subnet"
   type        = string

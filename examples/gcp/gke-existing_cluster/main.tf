@@ -71,7 +71,7 @@ module "anyscale_firewall" {
   module_enabled = true
 
   vpc_name = var.existing_vpc_name
-  vpc_id   = var.existing_vpc_id
+  vpc_id   = data.google_compute_network.existing_vpc.id
 
   ingress_with_self_cidr_range = [var.existing_subnet_cidr]
   ingress_from_cidr_map = [
