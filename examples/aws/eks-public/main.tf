@@ -94,8 +94,8 @@ module "anyscale_iam_roles" {
 
   module_enabled = true
 
-  create_anyscale_access_role          = true
-  anyscale_trusted_role_arns           = var.anyscale_trusted_role_arns
+  create_anyscale_access_role = true
+  # anyscale_trusted_role_arns           = var.anyscale_trusted_role_arns
   create_cluster_node_instance_profile = false
 
   create_iam_s3_policy   = true
@@ -104,9 +104,9 @@ module "anyscale_iam_roles" {
   create_anyscale_eks_cluster_role = true
   anyscale_eks_cluster_role_name   = "anyscale-eks-public-cluster-role"
 
-  create_anyscale_eks_node_role = true
-  anyscale_eks_node_role_name   = "anyscale-eks-public-node-role"
-  anyscale_eks_cluster_name     = module.anyscale_eks_cluster.eks_cluster_name
+  create_anyscale_eks_node_role      = true
+  anyscale_eks_node_role_name_prefix = "anyscale-eks-public-operator-"
+  anyscale_eks_cluster_name          = module.anyscale_eks_cluster.eks_cluster_name
 
   create_eks_ebs_csi_driver_role = true
   eks_ebs_csi_role_name          = "anyscale-eks-public-ebs-csi-role"
@@ -419,40 +419,40 @@ module "anyscale_k8s_namespace" {
   depends_on = [module.anyscale_eks_cluster]
 }
 
-module "anyscale_k8s_configmap" {
-  source = "../../../modules/anyscale-k8s-configmap"
+# module "anyscale_k8s_configmap" {
+#   source = "../../../modules/anyscale-k8s-configmap"
 
-  module_enabled = true
-  cloud_provider = "aws"
+#   module_enabled = true
+#   cloud_provider = "aws"
 
-  anyscale_kubernetes_namespace = module.anyscale_k8s_namespace.anyscale_kubernetes_namespace_name
+#   anyscale_kubernetes_namespace = module.anyscale_k8s_namespace.anyscale_kubernetes_namespace_name
 
-  anyscale_instance_types = [
-    {
-      instanceType = "4CPU-16GB",
-      CPU          = 4,
-      memory       = "16Gi"
-    },
-    {
-      instanceType = "8CPU-32GB"
-      CPU          = 8
-      memory       = "32Gi"
-    },
-    {
-      instanceType     = "4CPU-16GB-1xA10"
-      CPU              = 4
-      GPU              = 1
-      memory           = "16Gi"
-      accelerator_type = { "A10G" = 1 }
-    },
-    {
-      instanceType     = "4CPU-16GB-1xT4"
-      CPU              = 4
-      GPU              = 1
-      memory           = "16Gi"
-      accelerator_type = { "T4" = 1 }
-    }
-  ]
+#   anyscale_instance_types = [
+#     {
+#       instanceType = "4CPU-16GB",
+#       CPU          = 4,
+#       memory       = "16Gi"
+#     },
+#     {
+#       instanceType = "8CPU-32GB"
+#       CPU          = 8
+#       memory       = "32Gi"
+#     },
+#     {
+#       instanceType     = "4CPU-16GB-1xA10"
+#       CPU              = 4
+#       GPU              = 1
+#       memory           = "16Gi"
+#       accelerator_type = { "A10G" = 1 }
+#     },
+#     {
+#       instanceType     = "4CPU-16GB-1xT4"
+#       CPU              = 4
+#       GPU              = 1
+#       memory           = "16Gi"
+#       accelerator_type = { "T4" = 1 }
+#     }
+#   ]
 
-  depends_on = [module.anyscale_eks_cluster, module.anyscale_k8s_helm]
-}
+#   depends_on = [module.anyscale_eks_cluster, module.anyscale_k8s_helm]
+# }
