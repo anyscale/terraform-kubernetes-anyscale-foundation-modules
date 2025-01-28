@@ -24,11 +24,10 @@ These modules are designed with best practices in mind, ensuring a secure, effic
 ### Examples
 The examples folder has a couple common use cases that have been tested. These include:
 * Anyscale - AWS & EKS
-  * [Build everything - use a common name for all resources, public networking](./examples/aws/eks-public)
-  * [Build everything - use a common name for all resources, private networking](./examples/aws/eks-private)
+  * [Build everything - use a common name for all resources, public networking](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/aws/eks-public)
+  * [Build everything - use a common name for all resources, private networking](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/aws/eks-private)
 * Anyscale - GCP & GKE
-  * [Build everything - use a common name for all resources, public networking](./examples/aws/gke-public/) ** Not Started **
-  * [Build everything - use a common name for all resources, private networking](./examples/aws/gke-private/) ** Not Started **
+  * [Run Anyscale on GCP GKE with an existing GKE cluster](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/gcp/gke-existing_cluster) ** Not Fully Tested **
 
 Additional examples can be requested via an [issues] ticket.
 
