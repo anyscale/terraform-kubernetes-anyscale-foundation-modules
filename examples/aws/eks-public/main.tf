@@ -195,7 +195,7 @@ module "anyscale_eks_cluster" {
 module "anyscale_eks_nodegroups" {
   #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
   #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
-  source = "../../../../terraform-aws-anyscale-cloudfoundation-modules/modules/aws-anyscale-eks-nodegroups"
+  source = "github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-eks-nodegroups"
 
   module_enabled = true
 
@@ -397,7 +397,9 @@ module "anyscale_eks_nodegroups" {
 }
 
 module "anyscale_k8s_helm" {
-  source = "../../../modules/anyscale-k8s-helm"
+  #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
+  #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
+  source = "github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules//modules/anyscale-k8s-helm"
 
   module_enabled = true
   cloud_provider = "aws"
@@ -409,7 +411,9 @@ module "anyscale_k8s_helm" {
 }
 
 module "anyscale_k8s_namespace" {
-  source = "../../../modules/anyscale-k8s-namespace"
+  #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
+  #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
+  source = "github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules//modules/anyscale-k8s-namespace"
 
   module_enabled = true
   cloud_provider = "aws"
@@ -418,41 +422,3 @@ module "anyscale_k8s_namespace" {
 
   depends_on = [module.anyscale_eks_cluster]
 }
-
-# module "anyscale_k8s_configmap" {
-#   source = "../../../modules/anyscale-k8s-configmap"
-
-#   module_enabled = true
-#   cloud_provider = "aws"
-
-#   anyscale_kubernetes_namespace = module.anyscale_k8s_namespace.anyscale_kubernetes_namespace_name
-
-#   anyscale_instance_types = [
-#     {
-#       instanceType = "4CPU-16GB",
-#       CPU          = 4,
-#       memory       = "16Gi"
-#     },
-#     {
-#       instanceType = "8CPU-32GB"
-#       CPU          = 8
-#       memory       = "32Gi"
-#     },
-#     {
-#       instanceType     = "4CPU-16GB-1xA10"
-#       CPU              = 4
-#       GPU              = 1
-#       memory           = "16Gi"
-#       accelerator_type = { "A10G" = 1 }
-#     },
-#     {
-#       instanceType     = "4CPU-16GB-1xT4"
-#       CPU              = 4
-#       GPU              = 1
-#       memory           = "16Gi"
-#       accelerator_type = { "T4" = 1 }
-#     }
-#   ]
-
-#   depends_on = [module.anyscale_eks_cluster, module.anyscale_k8s_helm]
-# }

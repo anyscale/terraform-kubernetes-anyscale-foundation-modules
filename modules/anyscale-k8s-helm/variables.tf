@@ -381,7 +381,7 @@ variable "anyscale_aws_loadbalancer_chart" {
     anyscale_aws_loadbalancer_chart = {
       enabled       = true
       name          = "aws-load-balancer-controller"
-      respository   = "https://aws.github.io/eks-charts"
+      repository   = "https://aws.github.io/eks-charts"
       chart         = "aws-load-balancer-controller"
       chart_version = "1.2.7"
       namespace     = "kube-system"
@@ -405,7 +405,7 @@ variable "anyscale_aws_loadbalancer_chart" {
     name          = "aws-load-balancer-controller"
     repository    = "https://aws.github.io/eks-charts"
     chart         = "aws-load-balancer-controller"
-    chart_version = "2.11.0"
+    chart_version = "1.11.0"
     namespace     = "kube-system"
     values        = {}
   }
