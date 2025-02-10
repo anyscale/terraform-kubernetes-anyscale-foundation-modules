@@ -52,7 +52,7 @@ variable "tags" {
   description = "(Optional) A map of tags to all resources that accept tags."
   type        = map(string)
   default = {
-    "test" : true,
+    "test" : "true",
     "environment" : "example"
     "repo" : "terraform-kubernetes-anyscale-foundation-modules",
     "example" : "aws/eks-public"

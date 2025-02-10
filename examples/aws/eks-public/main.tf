@@ -397,9 +397,7 @@ module "anyscale_eks_nodegroups" {
 }
 
 module "anyscale_k8s_helm" {
-  #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
-  #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
-  source = "github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules//modules/anyscale-k8s-helm"
+  source = "../../../modules/anyscale-k8s-helm"
 
   module_enabled = true
   cloud_provider = "aws"
@@ -411,9 +409,7 @@ module "anyscale_k8s_helm" {
 }
 
 module "anyscale_k8s_namespace" {
-  #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
-  #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
-  source = "github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules//modules/anyscale-k8s-namespace"
+  source = "../../../modules/anyscale-k8s-namespace"
 
   module_enabled = true
   cloud_provider = "aws"

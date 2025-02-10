@@ -31,8 +31,8 @@ No providers.
 | <a name="module_anyscale_eks_cluster"></a> [anyscale\_eks\_cluster](#module\_anyscale\_eks\_cluster) | github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-eks-cluster | n/a |
 | <a name="module_anyscale_eks_nodegroups"></a> [anyscale\_eks\_nodegroups](#module\_anyscale\_eks\_nodegroups) | github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-eks-nodegroups | n/a |
 | <a name="module_anyscale_iam_roles"></a> [anyscale\_iam\_roles](#module\_anyscale\_iam\_roles) | github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-iam | n/a |
-| <a name="module_anyscale_k8s_helm"></a> [anyscale\_k8s\_helm](#module\_anyscale\_k8s\_helm) | github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules//modules/anyscale-k8s-helm | n/a |
-| <a name="module_anyscale_k8s_namespace"></a> [anyscale\_k8s\_namespace](#module\_anyscale\_k8s\_namespace) | github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules//modules/anyscale-k8s-namespace | n/a |
+| <a name="module_anyscale_k8s_helm"></a> [anyscale\_k8s\_helm](#module\_anyscale\_k8s\_helm) | ../../../modules/anyscale-k8s-helm | n/a |
+| <a name="module_anyscale_k8s_namespace"></a> [anyscale\_k8s\_namespace](#module\_anyscale\_k8s\_namespace) | ../../../modules/anyscale-k8s-namespace | n/a |
 | <a name="module_anyscale_s3"></a> [anyscale\_s3](#module\_anyscale\_s3) | github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-s3 | n/a |
 | <a name="module_anyscale_securitygroup"></a> [anyscale\_securitygroup](#module\_anyscale\_securitygroup) | github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-securitygroups | n/a |
 | <a name="module_anyscale_vpc"></a> [anyscale\_vpc](#module\_anyscale\_vpc) | github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-vpc | n/a |
@@ -50,7 +50,7 @@ No resources.
 | <a name="input_anyscale_s3_cors_rule"></a> [anyscale\_s3\_cors\_rule](#input\_anyscale\_s3\_cors\_rule) | (Optional) A map of CORS rules for the S3 bucket.<br><br>Including here to override for Anyscale Staging. | `map(any)` | <pre>{<br>  "allowed_headers": [<br>    "*"<br>  ],<br>  "allowed_methods": [<br>    "GET",<br>    "POST",<br>    "PUT",<br>    "HEAD",<br>    "DELETE"<br>  ],<br>  "allowed_origins": [<br>    "https://*.anyscale.com"<br>  ],<br>  "expose_headers": []<br>}</pre> | no |
 | <a name="input_anyscale_trusted_role_arns"></a> [anyscale\_trusted\_role\_arns](#input\_anyscale\_trusted\_role\_arns) | (Optional) A list of ARNs of IAM roles that are trusted by the Anyscale IAM role.<br><br>Including here to override for Anyscale Staging. | `list(string)` | `[]` | no |
 | <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | The AWS region in which all resources will be created. | `string` | `"us-east-2"` | no |
-| <a name="input_tags"></a> [tags](#input\_tags) | (Optional) A map of tags to all resources that accept tags. | `map(string)` | <pre>{<br>  "environment": "example",<br>  "example": "aws/eks-public",<br>  "repo": "terraform-kubernetes-anyscale-foundation-modules",<br>  "test": true<br>}</pre> | no |
+| <a name="input_tags"></a> [tags](#input\_tags) | (Optional) A map of tags to all resources that accept tags. | `map(string)` | <pre>{<br>  "environment": "example",<br>  "example": "aws/eks-public",<br>  "repo": "terraform-kubernetes-anyscale-foundation-modules",<br>  "test": "true"<br>}</pre> | no |
 
 ## Outputs
 
