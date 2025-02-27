@@ -3,31 +3,36 @@
 [![AWS Provider Version][badge-tf-aws]](https://github.com/terraform-providers/terraform-provider-aws/releases)
 
 # Anyscale AWS EKS Example - Public Networking
-This example creates the resources to run Anyscale on AWS EKS with public networking.
+This example creates the resources to run Anyscale on existing AWS EKS.
 
 ## Getting Started
 
-### Prerequisites
+### Prerequisite
 
-* [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-* [AWS Credentials](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html)
-* [kubectl CLI](https://kubernetes.io/docs/tasks/tools/)
-* [helm CLI](https://helm.sh/docs/intro/install/)
+* AWS Credentials
+* kubectl CLI
+* helm CLI
+
+Ensure your EKS cluster:
+
+* Use the same VPC `module.anyscale_vpc.vpc_id`
+* Use the same private subnet `module.anyscale_vpc.private_subnet_ids` for Node Group
+* Attach the IAM policy `module.anyscale_iam_roles.anyscale_iam_s3_policy_arn` and `arn:aws:iam::aws:policy/AmazonElasticFileSystemClientReadWriteAccess` to the Node IAM role
 
 ### Creating Anyscale Resources
 
-Steps for deploying Anyscale resources via Terraform:
+Create `terraform.tfvars`:
 
-* Review variables.tf and (optionally) create a `local.tfvars` file to override any of the defaults.
-* Apply the terraform
+```hcl
+aws_region = "us-west-2"
+```
+
+Run:
 
 ```shell
 terraform init
-terraform plan
 terraform apply
 ```
-
-If you are using a `tfvars` file, you will need to update the above commands accordingly.
 
 ### Installing K8s Components
 
@@ -135,16 +140,12 @@ helm upgrade -i nvdp nvdp/nvidia-device-plugin \
 | <a name="module_anyscale_iam_roles"></a> [anyscale\_iam\_roles](#module\_anyscale\_iam\_roles) | github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-iam | n/a |
 | <a name="module_anyscale_s3"></a> [anyscale\_s3](#module\_anyscale\_s3) | github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-s3 | n/a |
 | <a name="module_anyscale_vpc"></a> [anyscale\_vpc](#module\_anyscale\_vpc) | github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-vpc | n/a |
-| <a name="module_eks"></a> [eks](#module\_eks) | terraform-aws-modules/eks/aws | 20.33.1 |
 
 ## Resources
 
 | Name | Type |
 |------|------|
-| [aws_iam_policy.autoscaler_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
-| [aws_iam_policy.elb_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
 | [aws_security_group.allow_all_vpc](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group) | resource |
-| [aws_iam_role.default_nodegroup](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_role) | data source |
 
 ## Inputs
 

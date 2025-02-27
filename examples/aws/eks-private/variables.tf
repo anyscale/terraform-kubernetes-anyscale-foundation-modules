@@ -11,69 +11,57 @@
 # These variables must be set when using this module.
 # ---------------------------------------------------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------------------------------------------------
+# OPTIONAL VARIABLES
+# These variables have defaults but must be included when using this module.
+# ---------------------------------------------------------------------------------------------------------------------
+
 variable "aws_region" {
-  description = "The AWS region in which all resources will be created."
+  description = <<-EOT
+    (Optional) The AWS region in which all resources will be created.
+
+    ex:
+    ```
+    aws_region = "us-east-2"
+    ```
+  EOT
   type        = string
   default     = "us-east-2"
 }
 
-variable "anyscale_cloud_id" {
-  description = "(Optional) Anyscale Cloud ID. Default is `null`."
-  type        = string
-  default     = null
-  validation {
-    condition = (
-      var.anyscale_cloud_id == null ? true : (
-        length(var.anyscale_cloud_id) > 4 &&
-        substr(var.anyscale_cloud_id, 0, 4) == "cld_"
-      )
-    )
-    error_message = "The anyscale_cloud_id value must start with \"cld_\"."
-  }
-}
-
-# ------------------------------------------------------------------------------
-# OPTIONAL PARAMETERS
-# These variables have defaults, but may be overridden.
-# ------------------------------------------------------------------------------
-variable "anyscale_deploy_env" {
-  description = "(Optional) Anyscale deploy environment. Used in resource names and tags."
-  type        = string
-  default     = "production"
-  validation {
-    condition = (
-      var.anyscale_deploy_env == "production" || var.anyscale_deploy_env == "development" || var.anyscale_deploy_env == "test"
-    )
-    error_message = "The anyscale_deploy_env only allows `production`, `test`, or `development`"
-  }
-}
-
 variable "tags" {
-  description = "(Optional) A map of tags to all resources that accept tags."
+  description = <<-EOT
+    (Optional) A map of tags to all resources that accept tags.
+
+    ex:
+    ```
+    tags = {
+      Environment = "dev"
+      Repo        = "terraform-kubernetes-anyscale-foundation-modules",
+    }
+    ```
+  EOT
   type        = map(string)
   default = {
-    "test" : true,
-    "environment" : "example",
-    "repo" : "terraform-kubernetes-anyscale-foundation-modules",
-    "example" : "aws/eks-private"
+    Test        = "true"
+    Environment = "dev"
+    Repo        = "terraform-kubernetes-anyscale-foundation-modules",
+    Example     = "aws/eks-private"
   }
-}
-
-variable "anyscale_trusted_role_arns" {
-  description = <<-EOT
-    (Optional) A list of ARNs of IAM roles that are trusted by the Anyscale IAM role.
-
-    Including here to override for Anyscale Staging.
-  EOT
-  type        = list(string)
-  default     = []
 }
 
 variable "anyscale_s3_cors_rule" {
   description = <<-EOT
     (Optional) A map of CORS rules for the S3 bucket.
 
-    Including here to override for Anyscale Staging.
+    ex:
+    ```
+    anyscale_s3_cors_rule = {
+      allowed_headers = ["*"]
+      allowed_methods = ["GET", "POST", "PUT", "HEAD", "DELETE"]
+      allowed_origins = ["https://*.anyscale.com"]
+    }
+    ```
   EOT
   type        = map(any)
   default = {
@@ -82,4 +70,32 @@ variable "anyscale_s3_cors_rule" {
     allowed_origins = ["https://*.anyscale.com"]
     expose_headers  = []
   }
+}
+
+variable "eks_cluster_name" {
+  description = <<-EOT
+    (Optional) The name of the EKS cluster.
+
+    This will be used for naming resources created by this module including the EKS cluster and the S3 bucket.
+
+    ex:
+    ```
+    eks_cluster_name = "anyscale-eks-public"
+    ```
+  EOT
+  type        = string
+  default     = "anyscale-eks-public"
+}
+
+variable "eks_cluster_version" {
+  description = <<-EOT
+    (Optional) The Kubernetes version of the EKS cluster.
+
+    ex:
+    ```
+    eks_cluster_version = "1.31"
+    ```
+  EOT
+  type        = string
+  default     = "1.31"
 }

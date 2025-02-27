@@ -2,7 +2,7 @@
 default_stages: [pre-commit]
 repos:
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.92.1
+    rev: v1.97.4
     hooks:
       - id: terraform_fmt
       - id: terraform_validate
@@ -13,6 +13,8 @@ repos:
       #   args:
       #     - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
       - id: terraform_trivy
+        args:
+          - --args=--skip-dirs=.terraform
       - id: terraform_checkov
         args:
           - --args=--quiet
@@ -37,7 +39,7 @@ repos:
       #     - --args=provider google
       #     - --args=--version "~> 5.0"
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
