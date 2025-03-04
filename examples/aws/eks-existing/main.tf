@@ -40,7 +40,7 @@ module "anyscale_s3" {
 
   module_enabled = true
 
-  anyscale_bucket_name = "${var.eks_cluster_name}-${var.aws_region}"
+  anyscale_bucket_name = "anyscale-eks-public-${var.aws_region}"
   force_destroy        = true
   cors_rule            = var.anyscale_s3_cors_rule
 
