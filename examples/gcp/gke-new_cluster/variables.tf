@@ -146,3 +146,18 @@ variable "anyscale_k8s_namespace" {
   type        = string
   default     = "anyscale-operator"
 }
+
+variable "enable_filestore" {
+  description = <<-EOT
+    (Optional) Enable the creation of a Google Filestore instance.
+
+    This is optional for Anyscale deployments. Filestore is used for shared storage between nodes.
+
+    ex:
+    ```
+    enable_filestore = true
+    ```
+  EOT
+  type        = bool
+  default     = false
+}

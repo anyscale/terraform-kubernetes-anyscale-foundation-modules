@@ -11,8 +11,8 @@ anyscale cloud register \
   --cloud-storage-bucket-name ${module.anyscale_cloudstorage.cloudstorage_bucket_name} \
   --project-id ${var.google_project_id} \
   --vpc-name ${google_compute_network.anyscale.name} \
-  --file-storage-id ${module.anyscale_filestore.anyscale_filestore_name} \
-  --filestore-location ${module.anyscale_filestore.anyscale_filestore_location}
+  ${var.enable_filestore ? "--file-storage-id ${module.anyscale_filestore.anyscale_filestore_name}" : ""} \
+  ${var.enable_filestore ? "--filestore-location ${module.anyscale_filestore.anyscale_filestore_location}" : ""}
   EOT
 }
 
