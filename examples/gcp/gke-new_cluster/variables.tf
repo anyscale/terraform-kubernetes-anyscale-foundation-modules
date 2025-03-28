@@ -34,28 +34,6 @@ variable "google_project_id" {
   type        = string
 }
 
-# Used to create the AWS IAM role to assume for GCP Identity Federation
-variable "anyscale_org_id" {
-  description = <<-EOT
-    (Required) Anyscale Organization ID
-
-    This value can be found under "Organization settings" in the Anyscale Console.
-
-    ex:
-    ```
-    anyscale_org_id = "org_12345abcdefghijklmnop67890"
-    ```
-  EOT
-  type        = string
-  validation {
-    condition = (
-      length(var.anyscale_org_id) > 4 &&
-      substr(var.anyscale_org_id, 0, 4) == "org_"
-    )
-    error_message = "The anyscale_org_id value must start with \"org_\"."
-  }
-}
-
 # ------------------------------------------------------------------------------
 # OPTIONAL PARAMETERS
 # These variables have defaults, but may be overridden.

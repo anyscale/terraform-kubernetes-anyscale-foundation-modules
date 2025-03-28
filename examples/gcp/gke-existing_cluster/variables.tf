@@ -9,90 +9,46 @@
 # These variables must be set when using this module.
 # ---------------------------------------------------------------------------------------------------------------------
 variable "google_region" {
-  description = "The Google region in which all resources will be created."
-  type        = string
-}
-
-variable "google_project_id" {
-  description = "ID of the Project to put these resources in"
-  type        = string
-}
-
-variable "anyscale_org_id" {
-  description = "(Required) Anyscale Organization ID"
-  type        = string
-  validation {
-    condition = (
-      length(var.anyscale_org_id) > 4 &&
-      substr(var.anyscale_org_id, 0, 4) == "org_"
-    )
-    error_message = "The anyscale_org_id value must start with \"org_\"."
-  }
-}
-
-
-variable "customer_ingress_cidr_ranges" {
   description = <<-EOT
-    The IPv4 CIDR blocks that allows access Anyscale clusters.
-    These are added to the firewall and allows port 443 (https) and 22 (ssh) access.
-    ex: `52.1.1.23/32,10.1.0.0/16'
+    (Required) The Google region in which all resources will be created.
+
+    ex:
+    ```
+    google_region = "us-central1"
+    ```
   EOT
   type        = string
 }
 
-# -----------------
-# Networking
-# -----------------
-variable "existing_vpc_name" {
-  description = "The name of the existing VPC"
+variable "google_project_id" {
+  description = <<-EOT
+    (Required) The Google Cloud Project ID
+
+    This value can be found in the Google Cloud Console under "Project info".
+
+    ex:
+    ```
+    google_project_id = "my-project-id"
+    ```
+  EOT
   type        = string
 }
-
-variable "existing_subnet_cidr" {
-  description = "The CIDR range of the existing subnet"
-  type        = string
-}
-
-# -----------------
-# GKE Cluster
-# -----------------
-variable "existing_gke_cluster_name" {
-  description = "The name of the existing GKE cluster"
-  type        = string
-}
-
-variable "existing_gke_cluster_region" {
-  description = "The region of the existing GKE cluster"
-  type        = string
-}
-
 
 # ------------------------------------------------------------------------------
 # OPTIONAL PARAMETERS
 # These variables have defaults, but may be overridden.
 # ------------------------------------------------------------------------------
-variable "anyscale_deploy_env" {
-  description = <<-EOT
-  (Optional) Anyscale deploy environment. Used in resource names and tags.
-
-  ex:
-  ```
-  anyscale_deploy_env = "production"
-  ```
-  EOT
-
-  type    = string
-  default = "production"
-  validation {
-    condition = (
-      var.anyscale_deploy_env == "production" || var.anyscale_deploy_env == "development" || var.anyscale_deploy_env == "test"
-    )
-    error_message = "The anyscale_deploy_env only allows `production`, `test`, or `development`"
-  }
-}
-
 variable "anyscale_cloud_id" {
-  description = "(Optional) Anyscale Cloud ID"
+  description = <<-EOT
+    (Optional) Anyscale Cloud ID
+
+    This value can be found under "Cloud settings" in the Anyscale Console This will be used for labeling resources.
+
+    ex:
+    ```
+    anyscale_cloud_id = "cld_12345abcdefghijklmnop67890"
+    ```
+  EOT
   type        = string
   default     = null
   validation {
@@ -107,16 +63,53 @@ variable "anyscale_cloud_id" {
 }
 
 variable "labels" {
-  description = "(Optional) A map of labels to all resources that accept labels."
+  description = <<-EOT
+    (Optional) A map of labels to all resources that accept labels.
+
+    ex:
+    ```
+    labels = {
+      "example" = true
+      "environment" = "example"
+    }
+    ```
+  EOT
   type        = map(string)
   default = {
-    "test" : true,
-    "environment" : "test"
+    "example" : true,
+    "environment" : "example"
   }
 }
 
-variable "anyscale_k8s_namespace" {
-  description = "The Anyscale namespace to deploy the workload"
+variable "existing_vpc_name" {
+  description = "The name of the existing VPC"
   type        = string
-  default     = "anyscale-k8s"
+}
+
+variable "ingress_cidr_ranges" {
+  description = <<-EOT
+    (Optional) The IPv4 CIDR blocks that allows access Anyscale clusters.
+
+    These are added to the firewall and allows port 443 (https) and 22 (ssh) access.
+
+    ex:
+    ```
+    ingress_cidr_ranges=["52.1.1.23/32","10.1.0.0/16"]
+    ```
+  EOT
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "anyscale_k8s_namespace" {
+  description = <<-EOT
+    (Optional) The Anyscale namespace to deploy the workload
+
+    ex:
+    ```
+    anyscale_k8s_namespace = "anyscale-operator"
+    ```
+  EOT
+  type        = string
+  default     = "anyscale-operator"
 }

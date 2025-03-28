@@ -95,7 +95,7 @@ controller:
 ```shell
 helm repo add nginx https://kubernetes.github.io/ingress-nginx
 helm upgrade ingress-nginx nginx/ingress-nginx \
-  --version 4.12.0 \
+  --version 4.12.1 \
   --namespace ingress-nginx \
   --values values_elb.yaml \
   --create-namespace \
