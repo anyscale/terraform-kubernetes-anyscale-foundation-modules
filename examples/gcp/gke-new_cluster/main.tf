@@ -85,4 +85,6 @@ resource "google_service_account_iam_binding" "workload_identity_bindings" {
   role               = "roles/iam.workloadIdentityUser"
   service_account_id = google_service_account.gke_nodes.id
   members            = ["serviceAccount:${var.google_project_id}.svc.id.goog[${var.anyscale_k8s_namespace}/anyscale-operator]"]
+
+  depends_on = [module.gke]
 }
