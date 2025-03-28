@@ -1,44 +1,21 @@
 # ---------------------------------------------------------------------------------------------------------------------# Example Anyscale K8s Resources - Public Networking
-#   This template cretes resources for Anyscale with existing GKE Cluster
+#   This template cretes resources for Anyscale.
+#
 #   It creates:
 #     - Storage Bucket
 #     - Filestore
-#     - IAM Service Accounts
-#     - Firewall Policy
-#     - Helm Charts
-#   It expects the following to be already created:
-#     - GCP Project
-#     - GKE Cluster
-#     - GKE Node Pool
-#     - VPC
+#     - GKE Node Service Account
+#     - Firewall Rules
 # ---------------------------------------------------------------------------------------------------------------------
 locals {
+  gke_nodes_service_account_name  = "anyscale-gke-nodes"
+  gke_nodes_service_account_email = "${local.gke_nodes_service_account_name}@${var.google_project_id}.iam.gserviceaccount.com"
+
   full_labels = merge(tomap({
-    anyscale-cloud-id           = var.anyscale_cloud_id,
-    anyscale-deploy-environment = var.anyscale_deploy_env
+    anyscale-cloud-id = var.anyscale_cloud_id,
     }),
     var.labels
   )
-}
-
-#trivy:ignore:AVD-GCP-0011
-module "anyscale_iam" {
-  #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
-  #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
-  source         = "github.com/anyscale/terraform-google-anyscale-cloudfoundation-modules//modules/google-anyscale-iam"
-  module_enabled = true
-
-  anyscale_org_id                           = var.anyscale_org_id
-  create_anyscale_access_role               = false
-  create_anyscale_access_service_acct       = true
-  create_anyscale_cluster_node_service_acct = true # Set to true to bind to a GKE Service Account
-  anyscale_cluster_node_service_acct_name   = "anyscale-dataplane-node"
-  anyscale_cluster_node_service_acct_permissions = [
-    "roles/iam.serviceAccountTokenCreator",
-    "roles/artifactregistry.reader"
-  ]
-
-  anyscale_project_id = var.google_project_id
 }
 
 module "anyscale_cloudstorage" {
@@ -48,12 +25,19 @@ module "anyscale_cloudstorage" {
   module_enabled = true
 
   bucket_iam_members = [
-    # module.anyscale_iam.iam_anyscale_access_service_acct_member,
-    module.anyscale_iam.iam_anyscale_cluster_node_service_acct_member
+    "serviceAccount:${google_service_account.gke_nodes.email}"
   ]
 
-  anyscale_project_id = var.google_project_id
-  labels              = local.full_labels
+  bucket_force_destroy = false # Set to true to delete non-empty bucket
+  anyscale_project_id  = var.google_project_id
+  labels               = local.full_labels
+}
+
+# Get available zones in the region
+data "google_compute_zones" "available" {
+  project = var.google_project_id
+  region  = var.google_region
+  status  = "UP"
 }
 
 module "anyscale_filestore" {
@@ -64,75 +48,64 @@ module "anyscale_filestore" {
 
   filestore_vpc_name = var.existing_vpc_name
   filestore_tier     = "STANDARD"
-  filestore_location = "us-central1-b"
+  filestore_location = data.google_compute_zones.available.names[0]
 
   anyscale_project_id = var.google_project_id
   labels              = local.full_labels
 }
 
-module "anyscale_firewall" {
-  #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
-  #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
-  source         = "github.com/anyscale/terraform-google-anyscale-cloudfoundation-modules//modules/google-anyscale-vpc-firewall"
-  module_enabled = true
-
-  vpc_name = var.existing_vpc_name
-  vpc_id   = data.google_compute_network.existing_vpc.id
-
-  ingress_with_self_cidr_range = [var.existing_subnet_cidr]
-  ingress_from_cidr_map = [
-    {
-      rule        = "https-443-tcp"
-      cidr_blocks = var.customer_ingress_cidr_ranges
-    },
-    {
-      rule        = "ssh-tcp"
-      cidr_blocks = var.customer_ingress_cidr_ranges
-    }
-  ]
-
-  anyscale_project_id = var.google_project_id
+# Create GKE node service account
+resource "google_service_account" "gke_nodes" {
+  account_id   = local.gke_nodes_service_account_name
+  display_name = "Service Account for GKE nodes"
+  project      = var.google_project_id
 }
 
+# Grant necessary roles to the service account
+#trivy:ignore:avd-gcp-0011
+resource "google_project_iam_member" "gke_nodes_roles" {
+  #checkov:skip=CKV_GCP_41: "assigned the Service Account User or Service Account Token Creator roles at project level"
+  #checkov:skip=CKV_GCP_49: "impersonate or manage Service Accounts used at project level"
 
-module "anyscale_k8s_namespace" {
-  source = "../../../modules/anyscale-k8s-namespace"
+  for_each = toset([
+    "roles/storage.objectViewer",           # Access to GCS buckets
+    "roles/file.editor",                    # Access to Filestore
+    "roles/iam.serviceAccountTokenCreator", # Generate presigned URL for Google Cloud Storage
+    "roles/logging.logWriter",              # Write logs
+    "roles/monitoring.metricWriter",        # Write metrics
+    "roles/monitoring.viewer",              # Read metrics
+    "roles/artifactregistry.reader"         # Pull container images
+  ])
 
-  module_enabled = true
-  cloud_provider = "gcp"
-
-  kubernetes_cluster_name       = var.existing_gke_cluster_name
-  anyscale_kubernetes_namespace = var.anyscale_k8s_namespace
+  project = var.google_project_id
+  role    = each.key
+  member  = "serviceAccount:${google_service_account.gke_nodes.email}"
 }
 
-// Optional for managing Kupernetes service account bindings to GCP IAM roles
-resource "kubernetes_service_account" "anyscale" {
-  metadata {
-    name      = "anyscale-service-account"
-    namespace = var.anyscale_k8s_namespace
+# Allow common external ingress traffic (HTTPS, SSH, ICMP)
+#trivy:ignore:avd-gcp-0027
+resource "google_compute_firewall" "allow-common-ingress" {
+  #checkov:skip=CKV_GCP_2: "Ensure Google compute firewall ingress does not allow unrestricted ssh access"
 
-    annotations = {
-      "iam.gke.io/gcp-service-account" = module.anyscale_iam.iam_anyscale_cluster_node_service_acct_email
-    }
+  name    = "anyscale-gke-allow-common-ingress"
+  network = var.existing_vpc_name
+
+  direction = "INGRESS"
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22", "443"] # SSH, HTTP, HTTPS
   }
 
-  depends_on = [module.anyscale_k8s_namespace]
+  allow {
+    protocol = "icmp"
+  }
+
+  source_ranges = var.ingress_cidr_ranges
 }
 
 resource "google_service_account_iam_binding" "workload_identity_bindings" {
   role               = "roles/iam.workloadIdentityUser"
-  service_account_id = module.anyscale_iam.iam_anyscale_cluster_node_service_acct_name
+  service_account_id = google_service_account.gke_nodes.id
   members            = ["serviceAccount:${var.google_project_id}.svc.id.goog[${var.anyscale_k8s_namespace}/anyscale-operator]"]
-}
-
-module "anyscale_k8s_helm" {
-  source = "../../../modules/anyscale-k8s-helm"
-
-  module_enabled = true
-  cloud_provider = "gcp"
-
-  kubernetes_cluster_name = data.google_container_cluster.anyscale.name
-
-  anyscale_cluster_autoscaler_chart = { enabled = false }
-  anyscale_metrics_server_chart     = { enabled = false }
 }

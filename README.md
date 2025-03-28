@@ -9,13 +9,6 @@
 
 **USE AT YOUR OWN RISK**
 
-## Kubernetes Resources
-
-To streamline long-term management and to enable customization, we've modularized the resources into the following Terraform sub-modules:
-* anyscale-k8s-helm - Required Helm Charts for Anyscale on Kubernetes
-* anyscale-k8s-configmap - A sample configmap for Anyscale. This can also be managed via the Anyscale Kubernetes Manager Helm Chart.
-* anyscale-k8s-namespace - The Namespace for Anyscale. This can also be managed via the Anyscale Kubernetes Manager Helm Chart.
-
 ### Customization
 
 These modules are designed with best practices in mind, ensuring a secure, efficient, and scalable Anyscale deployment. Each module is standalone, allowing you the flexibility to disable any you don't need. This is handy if you're looking to incorporate custom solutions for specific resources.

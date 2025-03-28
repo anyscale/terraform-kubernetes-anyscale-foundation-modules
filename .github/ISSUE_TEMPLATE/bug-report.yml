@@ -34,9 +34,6 @@ body:
       description: "Please select which module(s) this issue impacts."
       options:
         - label: Root Anyscale Module
-        - label: anyscale-k8s-configmap
-        - label: anyscale-k8s-helm
-        - label: anyscale-k8s-namespace
   - type: dropdown
     attributes:
       label: Anyscale Terraform Module version

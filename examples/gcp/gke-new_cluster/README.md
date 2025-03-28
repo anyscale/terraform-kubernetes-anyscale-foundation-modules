@@ -32,7 +32,6 @@ Steps for deploying Anyscale resources via Terraform:
     * Your Anyscale Organization ID can be found under Organization Settings.
 
     ```tf
-    anyscale_org_id = "<your_anyscale_org_id>"
     google_project_id = "<your_project_id>"
     google_region = "<your_google_region>"
     ```
@@ -91,7 +90,7 @@ Sample files, `sample-values_nginx_gke_private.yaml` and `sample-values_nginx_gk
     ```shell
     helm repo add nginx https://kubernetes.github.io/ingress-nginx
     helm upgrade ingress-nginx nginx/ingress-nginx \
-      --version 4.12.0 \
+      --version 4.12.1 \
       --namespace ingress-nginx \
       --values values_nginx_gke_<private|public>.yaml \
       --create-namespace \
@@ -194,7 +193,6 @@ anyscale cloud register \
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_anyscale_org_id"></a> [anyscale\_org\_id](#input\_anyscale\_org\_id) | (Required) Anyscale Organization ID<br><br>This value can be found under "Organization settings" in the Anyscale Console.<br><br>ex:<pre>anyscale_org_id = "org_12345abcdefghijklmnop67890"</pre> | `string` | n/a | yes |
 | <a name="input_google_project_id"></a> [google\_project\_id](#input\_google\_project\_id) | (Required) The Google Cloud Project ID<br><br>This value can be found in the Google Cloud Console under "Project info".<br><br>ex:<pre>google_project_id = "my-project-id"</pre> | `string` | n/a | yes |
 | <a name="input_google_region"></a> [google\_region](#input\_google\_region) | (Required) The Google region in which all resources will be created.<br><br>ex:<pre>google_region = "us-central1"</pre> | `string` | n/a | yes |
 | <a name="input_anyscale_cloud_id"></a> [anyscale\_cloud\_id](#input\_anyscale\_cloud\_id) | (Optional) Anyscale Cloud ID<br><br>This value can be found under "Cloud settings" in the Anyscale Console This will be used for labeling resources.<br><br>ex:<pre>anyscale_cloud_id = "cld_12345abcdefghijklmnop67890"</pre> | `string` | `null` | no |
