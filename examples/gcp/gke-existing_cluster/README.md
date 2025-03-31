@@ -124,7 +124,7 @@ anyscale cloud register \
 
 **Please note:** You must change the cloud name to a name that you choose. You will not be able to register a cloud with a name of `<CUSTOMER_DEFINED_NAME>`.
 
-2. Note the cloud deployment ID which will be used in the next step. The Anyscale CLI will return it as one of the outputs.
+1. After running the command, capture the Cloud Deployment ID from the output - you'll need this for subsequent steps.
 
 ### Install the Anyscale Operator
 
