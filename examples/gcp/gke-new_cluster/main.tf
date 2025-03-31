@@ -27,6 +27,8 @@ module "anyscale_cloudstorage" {
     "serviceAccount:${google_service_account.gke_nodes.email}"
   ]
 
+  anyscale_bucket_name = "${var.gke_cluster_name}-bucket"
+
   bucket_force_destroy = false # Set to true to delete non-empty bucket
   anyscale_project_id  = var.google_project_id
   labels               = local.full_labels

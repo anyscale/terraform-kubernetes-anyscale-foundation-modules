@@ -24,6 +24,8 @@ module "anyscale_cloudstorage" {
   source         = "github.com/anyscale/terraform-google-anyscale-cloudfoundation-modules//modules/google-anyscale-cloudstorage"
   module_enabled = true
 
+  anyscale_bucket_name = "anyscale-demo"
+
   bucket_iam_members = [
     "serviceAccount:${google_service_account.gke_nodes.email}"
   ]
