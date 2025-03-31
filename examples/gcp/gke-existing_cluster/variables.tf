@@ -63,6 +63,10 @@ variable "existing_gke_cluster_location" {
   type        = string
 }
 
+variable "existing_vpc_name" {
+  description = "(Required) The name of the existing VPC"
+  type        = string
+}
 
 # ------------------------------------------------------------------------------
 # OPTIONAL PARAMETERS
@@ -109,11 +113,6 @@ variable "labels" {
     "example" : true,
     "environment" : "example"
   }
-}
-
-variable "existing_vpc_name" {
-  description = "The name of the existing VPC"
-  type        = string
 }
 
 variable "ingress_cidr_ranges" {

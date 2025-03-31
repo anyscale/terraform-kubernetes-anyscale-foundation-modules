@@ -34,8 +34,9 @@ Steps for deploying Anyscale resources via Terraform:
     ```tf
     google_project_id = "<your_project_id>"
     google_region = "<your_google_region>"
+    existing_gke_cluster_name = "<your_gke_cluster_name>"
+    existing_gke_cluster_location = "<your_cluster_region_or_zone>"
     existing_vpc_name      = "<your_vpc_network>"
-    ingress_cidr_ranges    = ["0.0.0.0/0"]
     ```
 
 1. Apply the terraform:
@@ -193,16 +194,16 @@ anyscale cloud register \
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_existing_gke_cluster_location"></a> [existing\_gke\_cluster\_location](#input\_existing\_gke\_cluster\_location) | (Required) The location of the existing GKE cluster.<br/><br/>This value can be found in the Google Cloud Console under "Kubernetes Engine" > "Clusters".<br/>If the cluster is regional, this will be the region (e.g., "us-central1").<br/><br/>ex:<pre>existing_gke_cluster_location = "us-central1-a"</pre> | `string` | n/a | yes |
-| <a name="input_existing_gke_cluster_name"></a> [existing\_gke\_cluster\_name](#input\_existing\_gke\_cluster\_name) | (Required) The name of the existing GKE cluster.<br/><br/>This value can be found in the Google Cloud Console under "Kubernetes Engine" > "Clusters".<br/><br/>ex:<pre>existing_gke_cluster_name = "my-gke-cluster"</pre> | `string` | n/a | yes |
-| <a name="input_existing_vpc_name"></a> [existing\_vpc\_name](#input\_existing\_vpc\_name) | The name of the existing VPC | `string` | n/a | yes |
-| <a name="input_google_project_id"></a> [google\_project\_id](#input\_google\_project\_id) | (Required) The Google Cloud Project ID<br/><br/>This value can be found in the Google Cloud Console under "Project info".<br/><br/>ex:<pre>google_project_id = "my-project-id"</pre> | `string` | n/a | yes |
-| <a name="input_google_region"></a> [google\_region](#input\_google\_region) | (Required) The Google region in which all resources will be created.<br/><br/>ex:<pre>google_region = "us-central1"</pre> | `string` | n/a | yes |
-| <a name="input_anyscale_cloud_id"></a> [anyscale\_cloud\_id](#input\_anyscale\_cloud\_id) | (Optional) Anyscale Cloud ID<br/><br/>This value can be found under "Cloud settings" in the Anyscale Console This will be used for labeling resources.<br/><br/>ex:<pre>anyscale_cloud_id = "cld_12345abcdefghijklmnop67890"</pre> | `string` | `null` | no |
-| <a name="input_anyscale_k8s_namespace"></a> [anyscale\_k8s\_namespace](#input\_anyscale\_k8s\_namespace) | (Optional) The Anyscale namespace to deploy the workload<br/><br/>ex:<pre>anyscale_k8s_namespace = "anyscale-operator"</pre> | `string` | `"anyscale-operator"` | no |
-| <a name="input_enable_filestore"></a> [enable\_filestore](#input\_enable\_filestore) | (Optional) Enable the creation of a Google Filestore instance.<br/><br/>This is optional for Anyscale deployments. Filestore is used for shared storage between nodes.<br/><br/>ex:<pre>enable_filestore = true</pre> | `bool` | `false` | no |
-| <a name="input_ingress_cidr_ranges"></a> [ingress\_cidr\_ranges](#input\_ingress\_cidr\_ranges) | (Optional) The IPv4 CIDR blocks that allows access Anyscale clusters.<br/><br/>These are added to the firewall and allows port 443 (https) and 22 (ssh) access.<br/><br/>ex:<pre>ingress_cidr_ranges=["52.1.1.23/32","10.1.0.0/16"]</pre> | `list(string)` | <pre>[<br/>  "0.0.0.0/0"<br/>]</pre> | no |
-| <a name="input_labels"></a> [labels](#input\_labels) | (Optional) A map of labels to all resources that accept labels.<br/><br/>ex:<pre>labels = {<br/>  "example" = true<br/>  "environment" = "example"<br/>}</pre> | `map(string)` | <pre>{<br/>  "environment": "example",<br/>  "example": true<br/>}</pre> | no |
+| <a name="input_existing_gke_cluster_location"></a> [existing\_gke\_cluster\_location](#input\_existing\_gke\_cluster\_location) | (Required) The location of the existing GKE cluster.<br><br>This value can be found in the Google Cloud Console under "Kubernetes Engine" > "Clusters".<br>If the cluster is regional, this will be the region (e.g., "us-central1").<br><br>ex:<pre>existing_gke_cluster_location = "us-central1-a"</pre> | `string` | n/a | yes |
+| <a name="input_existing_gke_cluster_name"></a> [existing\_gke\_cluster\_name](#input\_existing\_gke\_cluster\_name) | (Required) The name of the existing GKE cluster.<br><br>This value can be found in the Google Cloud Console under "Kubernetes Engine" > "Clusters".<br><br>ex:<pre>existing_gke_cluster_name = "my-gke-cluster"</pre> | `string` | n/a | yes |
+| <a name="input_existing_vpc_name"></a> [existing\_vpc\_name](#input\_existing\_vpc\_name) | (Required) The name of the existing VPC | `string` | n/a | yes |
+| <a name="input_google_project_id"></a> [google\_project\_id](#input\_google\_project\_id) | (Required) The Google Cloud Project ID<br><br>This value can be found in the Google Cloud Console under "Project info".<br><br>ex:<pre>google_project_id = "my-project-id"</pre> | `string` | n/a | yes |
+| <a name="input_google_region"></a> [google\_region](#input\_google\_region) | (Required) The Google region in which all resources will be created.<br><br>ex:<pre>google_region = "us-central1"</pre> | `string` | n/a | yes |
+| <a name="input_anyscale_cloud_id"></a> [anyscale\_cloud\_id](#input\_anyscale\_cloud\_id) | (Optional) Anyscale Cloud ID<br><br>This value can be found under "Cloud settings" in the Anyscale Console This will be used for labeling resources.<br><br>ex:<pre>anyscale_cloud_id = "cld_12345abcdefghijklmnop67890"</pre> | `string` | `null` | no |
+| <a name="input_anyscale_k8s_namespace"></a> [anyscale\_k8s\_namespace](#input\_anyscale\_k8s\_namespace) | (Optional) The Anyscale namespace to deploy the workload<br><br>ex:<pre>anyscale_k8s_namespace = "anyscale-operator"</pre> | `string` | `"anyscale-operator"` | no |
+| <a name="input_enable_filestore"></a> [enable\_filestore](#input\_enable\_filestore) | (Optional) Enable the creation of a Google Filestore instance.<br><br>This is optional for Anyscale deployments. Filestore is used for shared storage between nodes.<br><br>ex:<pre>enable_filestore = true</pre> | `bool` | `false` | no |
+| <a name="input_ingress_cidr_ranges"></a> [ingress\_cidr\_ranges](#input\_ingress\_cidr\_ranges) | (Optional) The IPv4 CIDR blocks that allows access Anyscale clusters.<br><br>These are added to the firewall and allows port 443 (https) and 22 (ssh) access.<br><br>ex:<pre>ingress_cidr_ranges=["52.1.1.23/32","10.1.0.0/16"]</pre> | `list(string)` | <pre>[<br>  "0.0.0.0/0"<br>]</pre> | no |
+| <a name="input_labels"></a> [labels](#input\_labels) | (Optional) A map of labels to all resources that accept labels.<br><br>ex:<pre>labels = {<br>  "example" = true<br>  "environment" = "example"<br>}</pre> | `map(string)` | <pre>{<br>  "environment": "example",<br>  "example": true<br>}</pre> | no |
 
 ## Outputs
 
