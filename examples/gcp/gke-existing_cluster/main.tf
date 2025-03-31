@@ -44,7 +44,7 @@ module "anyscale_filestore" {
   #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
   #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
   source         = "github.com/anyscale/terraform-google-anyscale-cloudfoundation-modules//modules/google-anyscale-filestore"
-  module_enabled = true
+  module_enabled = var.enable_filestore
 
   filestore_vpc_name = var.existing_vpc_name
   filestore_tier     = "STANDARD"

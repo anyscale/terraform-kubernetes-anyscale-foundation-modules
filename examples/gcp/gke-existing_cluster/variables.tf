@@ -34,6 +34,36 @@ variable "google_project_id" {
   type        = string
 }
 
+variable "existing_gke_cluster_name" {
+  description = <<-EOT
+    (Required) The name of the existing GKE cluster.
+
+    This value can be found in the Google Cloud Console under "Kubernetes Engine" > "Clusters".
+
+    ex:
+    ```
+    existing_gke_cluster_name = "my-gke-cluster"
+    ```
+  EOT
+  type        = string
+}
+
+variable "existing_gke_cluster_location" {
+  description = <<-EOT
+    (Required) The location of the existing GKE cluster.
+
+    This value can be found in the Google Cloud Console under "Kubernetes Engine" > "Clusters".
+    If the cluster is regional, this will be the region (e.g., "us-central1").
+
+    ex:
+    ```
+    existing_gke_cluster_location = "us-central1-a"
+    ```
+  EOT
+  type        = string
+}
+
+
 # ------------------------------------------------------------------------------
 # OPTIONAL PARAMETERS
 # These variables have defaults, but may be overridden.
@@ -112,4 +142,19 @@ variable "anyscale_k8s_namespace" {
   EOT
   type        = string
   default     = "anyscale-operator"
+}
+
+variable "enable_filestore" {
+  description = <<-EOT
+    (Optional) Enable the creation of a Google Filestore instance.
+
+    This is optional for Anyscale deployments. Filestore is used for shared storage between nodes.
+
+    ex:
+    ```
+    enable_filestore = true
+    ```
+  EOT
+  type        = bool
+  default     = false
 }
