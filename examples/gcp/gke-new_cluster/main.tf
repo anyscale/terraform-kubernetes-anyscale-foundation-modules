@@ -67,7 +67,7 @@ resource "google_project_iam_member" "gke_nodes_roles" {
   #checkov:skip=CKV_GCP_49: "impersonate or manage Service Accounts used at project level"
 
   for_each = toset([
-    "roles/storage.objectViewer",           # Access to GCS buckets
+    "roles/storage.admin",                  # Access to GCS buckets
     "roles/file.editor",                    # Access to Filestore
     "roles/iam.serviceAccountTokenCreator", # Generate presigned URL for Google Cloud Storage
     "roles/logging.logWriter",              # Write logs
