@@ -34,6 +34,8 @@ Steps for deploying Anyscale resources via Terraform:
     ```tf
     google_project_id = "<your_project_id>"
     google_region = "<your_google_region>"
+    existing_gke_cluster_name = "<your_gke_cluster_name>"
+    existing_gke_cluster_location = "<your_cluster_region_or_zone>"
     existing_vpc_name      = "<your_vpc_network>"
     ```
 
@@ -186,11 +188,14 @@ anyscale cloud register \
 | [google_service_account.gke_nodes](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_account) | resource |
 | [google_service_account_iam_binding.workload_identity_bindings](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_account_iam_binding) | resource |
 | [google_compute_zones.available](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/compute_zones) | data source |
+| [google_container_cluster.existing_gke_cluster](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/container_cluster) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
+| <a name="input_existing_gke_cluster_location"></a> [existing\_gke\_cluster\_location](#input\_existing\_gke\_cluster\_location) | (Required) The location of the existing GKE cluster.<br><br>This value can be found in the Google Cloud Console under "Kubernetes Engine" > "Clusters".<br>If the cluster is regional, this will be the region (e.g., "us-central1").<br><br>ex:<pre>existing_gke_cluster_location = "us-central1-a"</pre> | `string` | n/a | yes |
+| <a name="input_existing_gke_cluster_name"></a> [existing\_gke\_cluster\_name](#input\_existing\_gke\_cluster\_name) | (Required) The name of the existing GKE cluster.<br><br>This value can be found in the Google Cloud Console under "Kubernetes Engine" > "Clusters".<br><br>ex:<pre>existing_gke_cluster_name = "my-gke-cluster"</pre> | `string` | n/a | yes |
 | <a name="input_existing_vpc_name"></a> [existing\_vpc\_name](#input\_existing\_vpc\_name) | (Required) The name of the existing VPC | `string` | n/a | yes |
 | <a name="input_google_project_id"></a> [google\_project\_id](#input\_google\_project\_id) | (Required) The Google Cloud Project ID<br><br>This value can be found in the Google Cloud Console under "Project info".<br><br>ex:<pre>google_project_id = "my-project-id"</pre> | `string` | n/a | yes |
 | <a name="input_google_region"></a> [google\_region](#input\_google\_region) | (Required) The Google region in which all resources will be created.<br><br>ex:<pre>google_region = "us-central1"</pre> | `string` | n/a | yes |

@@ -1,3 +1,9 @@
+data "google_container_cluster" "existing_gke_cluster" {
+  name     = var.existing_gke_cluster_name
+  location = var.existing_gke_cluster_location
+  project  = var.google_project_id
+}
+
 locals {
   registration_command_parts = compact([
     "anyscale cloud register",
@@ -5,7 +11,7 @@ locals {
     "--provider gcp",
     "--region ${var.google_region}",
     "--compute-stack k8s",
-    "--kubernetes-zones <gke_cluster_node_zones>",
+    "--kubernetes-zones ${join(",", data.google_container_cluster.existing_gke_cluster.node_locations)}",
     "--anyscale-operator-iam-identity ${google_service_account.gke_nodes.email}",
     "--cloud-storage-bucket-name ${module.anyscale_cloudstorage.cloudstorage_bucket_name}",
     "--project-id ${var.google_project_id}",
