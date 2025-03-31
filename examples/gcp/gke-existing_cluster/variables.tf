@@ -34,35 +34,6 @@ variable "google_project_id" {
   type        = string
 }
 
-variable "existing_gke_cluster_name" {
-  description = <<-EOT
-    (Required) The name of the existing GKE cluster.
-
-    This value can be found in the Google Cloud Console under "Kubernetes Engine" > "Clusters".
-
-    ex:
-    ```
-    existing_gke_cluster_name = "my-gke-cluster"
-    ```
-  EOT
-  type        = string
-}
-
-variable "existing_gke_cluster_location" {
-  description = <<-EOT
-    (Required) The location of the existing GKE cluster.
-
-    This value can be found in the Google Cloud Console under "Kubernetes Engine" > "Clusters".
-    If the cluster is regional, this will be the region (e.g., "us-central1").
-
-    ex:
-    ```
-    existing_gke_cluster_location = "us-central1-a"
-    ```
-  EOT
-  type        = string
-}
-
 variable "existing_vpc_name" {
   description = "(Required) The name of the existing VPC"
   type        = string
