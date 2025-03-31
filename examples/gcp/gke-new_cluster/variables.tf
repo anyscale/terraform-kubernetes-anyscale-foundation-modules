@@ -94,6 +94,10 @@ variable "gke_cluster_name" {
   EOF
   type        = string
   default     = "anyscale-gke"
+  validation {
+    condition     = can(regex("^\\D", var.gke_cluster_name)) && length(var.gke_cluster_name) < 23
+    error_message = "Cluster name must not start with a number and must be under 23 characters."
+  }
 }
 
 variable "ingress_cidr_ranges" {
