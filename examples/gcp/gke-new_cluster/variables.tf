@@ -99,6 +99,15 @@ variable "gke_cluster_name" {
     error_message = "Cluster name must not start with a number and must be under 23 characters."
   }
 }
+variable "node_group_gpu_types" {
+  description = <<-EOT
+    (Optional) The GPU types of the GKE nodes.
+    Possible values: ["V100", "P100", "T4", "L4", "A100-40G", "A100-80G", "H100", "H100-MEGA"]
+  EOT
+  type        = list(string)
+  default     = ["T4"]
+}
+
 
 variable "ingress_cidr_ranges" {
   description = <<-EOT

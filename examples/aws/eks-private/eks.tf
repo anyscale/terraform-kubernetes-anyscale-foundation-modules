@@ -21,6 +21,86 @@ locals {
     anyscale_s3_policy = module.anyscale_iam_roles.anyscale_iam_s3_policy_arn,
     efs_client_policy  = "arn:aws:iam::aws:policy/AmazonElasticFileSystemClientReadWriteAccess",
   }
+
+  # Map of GPU types to their product names
+  gpu_product_names = {
+    "T4"   = "Tesla-T4",
+    "A10G" = "NVIDIA-A10G"
+  }
+
+  gpu_instance_types = {
+    "T4"   = ["g4dn.4xlarge"]
+    "A10G" = ["g5.4xlarge"]
+  }
+
+  # Base configuration for GPU node groups
+  gpu_node_group_base = {
+    ami_type                     = "AL2_x86_64_GPU"
+    min_size                     = 0
+    max_size                     = 10
+    desired_size                 = 0
+    iam_role_additional_policies = local.anyscale_iam
+    taints = [
+      {
+        key    = "nvidia.com/gpu",
+        value  = "present",
+        effect = "NO_SCHEDULE",
+      },
+      {
+        key    = "node.anyscale.com/accelerator-type",
+        value  = "GPU",
+        effect = "NO_SCHEDULE",
+      }
+    ]
+  }
+
+  # Create a map of GPU node groups based on node_group_gpu_types
+  gpu_node_groups = {
+    for gpu_type in var.node_group_gpu_types : gpu_type => {
+      ondemand = merge(
+        local.gpu_node_group_base,
+        {
+          instance_types = local.gpu_instance_types[gpu_type]
+          capacity_type  = "ON_DEMAND"
+          labels = {
+            "nvidia.com/gpu.product" = local.gpu_product_names[gpu_type]
+            "nvidia.com/gpu.count"   = "1"
+          }
+          taints = concat(
+            local.gpu_node_group_base.taints,
+            [
+              {
+                key    = "node.anyscale.com/capacity-type",
+                value  = "ON_DEMAND",
+                effect = "NO_SCHEDULE",
+              }
+            ]
+          )
+        }
+      )
+      spot = merge(
+        local.gpu_node_group_base,
+        {
+          instance_types = local.gpu_instance_types[gpu_type]
+          capacity_type  = "SPOT"
+          labels = {
+            "nvidia.com/gpu.product" = local.gpu_product_names[gpu_type]
+            "nvidia.com/gpu.count"   = "1"
+          }
+          taints = concat(
+            local.gpu_node_group_base.taints,
+            [
+              {
+                key    = "node.anyscale.com/capacity-type",
+                value  = "SPOT",
+                effect = "NO_SCHEDULE",
+              }
+            ]
+          )
+        }
+      )
+    }
+  }
 }
 
 #trivy:ignore:avd-aws-0038
@@ -70,146 +150,82 @@ module "eks" {
   # Managed Node Groups configuration example
   #############################################################
 
-  eks_managed_node_groups = {
-    # This node group is for management components such as CoreDNS, Cluster Autoscaler, AWS-LB controller, ingress-nginx, Anyscale Operator, etc.
-    # Note that small instance types of Anyscale workloads can still be scheduled onto this node group.
-    default = {
-      ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.medium"]
+  eks_managed_node_groups = merge(
+    {
+      # This node group is for management components such as CoreDNS, Cluster Autoscaler, AWS-LB controller, ingress-nginx, Anyscale Operator, etc.
+      # Note that small instance types of Anyscale workloads can still be scheduled onto this node group.
+      default = {
+        ami_type       = "AL2023_x86_64_STANDARD"
+        instance_types = ["t3.medium"]
 
-      min_size     = 1
-      max_size     = 10
-      desired_size = 2
+        min_size     = 1
+        max_size     = 10
+        desired_size = 2
 
-      iam_role_additional_policies = merge(local.anyscale_iam, {
-        cluster_autoscaler_policy = aws_iam_policy.autoscaler_policy.arn
-        elb_policy                = aws_iam_policy.elb_policy.arn
-      })
-    }
-
-    ondemand_cpu = {
-      ami_type = "AL2023_x86_64_STANDARD"
-      instance_types = [
-        "m6a.4xlarge",
-        "m5a.4xlarge",
-        "m6i.4xlarge",
-        "m5.4xlarge",
-      ]
-
-      capacity_type = "ON_DEMAND"
-      min_size      = 0
-      max_size      = 10
-      desired_size  = 0
-
-      taints = [
-        {
-          key    = "node.anyscale.com/capacity-type",
-          value  = "ON_DEMAND",
-          effect = "NO_SCHEDULE",
-        }
-      ]
-
-      iam_role_additional_policies = local.anyscale_iam
-    }
-
-    spot_cpu = {
-      ami_type = "AL2023_x86_64_STANDARD"
-      instance_types = [
-        "m6a.4xlarge",
-        "m5a.4xlarge",
-        "m6i.4xlarge",
-        "m5.4xlarge",
-      ]
-
-      capacity_type = "SPOT"
-      min_size      = 0
-      max_size      = 10
-      desired_size  = 0
-
-      taints = [
-        {
-          key    = "node.anyscale.com/capacity-type",
-          value  = "SPOT",
-          effect = "NO_SCHEDULE",
-        }
-      ]
-
-      iam_role_additional_policies = local.anyscale_iam
-    }
-
-    ondemand_gpu = {
-      ami_type = "AL2_x86_64_GPU"
-      instance_types = [
-        "g5.4xlarge"
-      ]
-
-      capacity_type = "ON_DEMAND"
-      min_size      = 0
-      max_size      = 10
-      desired_size  = 0
-
-      labels = {
-        "nvidia.com/gpu.product" = "NVIDIA-A10G"
-        "nvidia.com/gpu.count"   = "1"
+        iam_role_additional_policies = merge(local.anyscale_iam, {
+          cluster_autoscaler_policy = aws_iam_policy.autoscaler_policy.arn
+          elb_policy                = aws_iam_policy.elb_policy.arn
+        })
       }
-      taints = [
-        {
-          key    = "nvidia.com/gpu",
-          value  = "present",
-          effect = "NO_SCHEDULE",
-        },
-        {
-          key    = "node.anyscale.com/capacity-type",
-          value  = "ON_DEMAND",
-          effect = "NO_SCHEDULE",
-        },
-        {
-          key    = "node.anyscale.com/accelerator-type",
-          value  = "GPU",
-          effect = "NO_SCHEDULE",
-        }
-      ]
 
-      iam_role_additional_policies = local.anyscale_iam
-    }
+      ondemand_cpu = {
+        ami_type = "AL2023_x86_64_STANDARD"
+        instance_types = [
+          "m6a.4xlarge",
+          "m5a.4xlarge",
+          "m6i.4xlarge",
+          "m5.4xlarge",
+        ]
 
-    spot_gpu = {
-      ami_type = "AL2_x86_64_GPU"
-      instance_types = [
-        "g5.4xlarge"
-      ]
+        capacity_type = "ON_DEMAND"
+        min_size      = 0
+        max_size      = 10
+        desired_size  = 0
 
-      capacity_type = "SPOT"
-      min_size      = 0
-      max_size      = 10
-      desired_size  = 0
+        taints = [
+          {
+            key    = "node.anyscale.com/capacity-type",
+            value  = "ON_DEMAND",
+            effect = "NO_SCHEDULE",
+          }
+        ]
 
-
-      labels = {
-        "nvidia.com/gpu.product" = "NVIDIA-A10G"
-        "nvidia.com/gpu.count"   = "1"
+        iam_role_additional_policies = local.anyscale_iam
       }
-      taints = [
-        {
-          key    = "nvidia.com/gpu",
-          value  = "present",
-          effect = "NO_SCHEDULE",
-        },
-        {
-          key    = "node.anyscale.com/capacity-type",
-          value  = "SPOT",
-          effect = "NO_SCHEDULE",
-        },
-        {
-          key    = "node.anyscale.com/accelerator-type",
-          value  = "GPU",
-          effect = "NO_SCHEDULE",
-        }
-      ]
 
-      iam_role_additional_policies = local.anyscale_iam
+      spot_cpu = {
+        ami_type = "AL2023_x86_64_STANDARD"
+        instance_types = [
+          "m6a.4xlarge",
+          "m5a.4xlarge",
+          "m6i.4xlarge",
+          "m5.4xlarge",
+        ]
+
+        capacity_type = "SPOT"
+        min_size      = 0
+        max_size      = 10
+        desired_size  = 0
+
+        taints = [
+          {
+            key    = "node.anyscale.com/capacity-type",
+            value  = "SPOT",
+            effect = "NO_SCHEDULE",
+          }
+        ]
+
+        iam_role_additional_policies = local.anyscale_iam
+      }
+    },
+    # Merge in GPU node groups based on node_group_gpu_types
+    {
+      for gpu_type in var.node_group_gpu_types : "ondemand_gpu_${lower(gpu_type)}" => local.gpu_node_groups[gpu_type].ondemand
+    },
+    {
+      for gpu_type in var.node_group_gpu_types : "spot_gpu_${lower(gpu_type)}" => local.gpu_node_groups[gpu_type].spot
     }
-  }
+  )
 
   tags = var.tags
 }

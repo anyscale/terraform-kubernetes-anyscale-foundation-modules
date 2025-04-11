@@ -201,6 +201,7 @@ anyscale cloud register \
 | <a name="input_gke_cluster_name"></a> [gke\_cluster\_name](#input\_gke\_cluster\_name) | (Optional) GKE Cluster Name<br><br>The name of the GKE cluster to create.<br><br>ex:<pre>cluster_name = "anyscale-cluster"</pre> | `string` | `"anyscale-gke"` | no |
 | <a name="input_ingress_cidr_ranges"></a> [ingress\_cidr\_ranges](#input\_ingress\_cidr\_ranges) | (Optional) The IPv4 CIDR blocks that allows access Anyscale clusters.<br><br>These are added to the firewall and allows port 443 (https) and 22 (ssh) access.<br><br>ex:<pre>ingress_cidr_ranges=["52.1.1.23/32","10.1.0.0/16"]</pre> | `list(string)` | <pre>[<br>  "0.0.0.0/0"<br>]</pre> | no |
 | <a name="input_labels"></a> [labels](#input\_labels) | (Optional) A map of labels to all resources that accept labels.<br><br>ex:<pre>labels = {<br>  "example" = true<br>  "environment" = "example"<br>}</pre> | `map(string)` | <pre>{<br>  "environment": "example",<br>  "example": true<br>}</pre> | no |
+| <a name="input_node_group_gpu_types"></a> [node\_group\_gpu\_types](#input\_node\_group\_gpu\_types) | (Optional) The GPU types of the GKE nodes.<br>Possible values: ["V100", "P100", "T4", "L4", "A100-40G", "A100-80G", "H100", "H100-MEGA"] | `list(string)` | <pre>[<br>  "T4"<br>]</pre> | no |
 
 ## Outputs
 
