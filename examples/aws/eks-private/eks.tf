@@ -22,15 +22,16 @@ locals {
     efs_client_policy  = "arn:aws:iam::aws:policy/AmazonElasticFileSystemClientReadWriteAccess",
   }
 
-  # Map of GPU types to their product names
-  gpu_product_names = {
-    "T4"   = "Tesla-T4",
-    "A10G" = "NVIDIA-A10G"
-  }
-
-  gpu_instance_types = {
-    "T4"   = ["g4dn.4xlarge"]
-    "A10G" = ["g5.4xlarge"]
+  # Map of GPU types to their product names and instance types
+  gpu_types = {
+    "T4" = {
+      product_name   = "Tesla-T4"
+      instance_types = ["g4dn.4xlarge"]
+    }
+    "A10G" = {
+      product_name   = "NVIDIA-A10G"
+      instance_types = ["g5.4xlarge"]
+    }
   }
 
   # Base configuration for GPU node groups
@@ -40,19 +41,36 @@ locals {
     max_size                     = 10
     desired_size                 = 0
     iam_role_additional_policies = local.anyscale_iam
-    taints = [
-      {
-        key    = "nvidia.com/gpu",
-        value  = "present",
-        effect = "NO_SCHEDULE",
-      },
-      {
-        key    = "node.anyscale.com/accelerator-type",
-        value  = "GPU",
-        effect = "NO_SCHEDULE",
-      }
-    ]
   }
+
+  gpu_node_taints_base = [
+    {
+      key    = "nvidia.com/gpu",
+      value  = "present",
+      effect = "NO_SCHEDULE",
+    },
+    {
+      key    = "node.anyscale.com/accelerator-type",
+      value  = "GPU",
+      effect = "NO_SCHEDULE",
+    }
+  ]
+
+  gpu_node_taints_ondemand = concat(local.gpu_node_taints_base, [
+    {
+      key    = "node.anyscale.com/capacity-type",
+      value  = "ON_DEMAND",
+      effect = "NO_SCHEDULE",
+    }
+  ])
+
+  gpu_node_taints_spot = concat(local.gpu_node_taints_base, [
+    {
+      key    = "node.anyscale.com/capacity-type",
+      value  = "SPOT",
+      effect = "NO_SCHEDULE",
+    }
+  ])
 
   # Create a map of GPU node groups based on node_group_gpu_types
   gpu_node_groups = {
@@ -60,43 +78,25 @@ locals {
       ondemand = merge(
         local.gpu_node_group_base,
         {
-          instance_types = local.gpu_instance_types[gpu_type]
+          instance_types = local.gpu_types[gpu_type].instance_types
           capacity_type  = "ON_DEMAND"
           labels = {
-            "nvidia.com/gpu.product" = local.gpu_product_names[gpu_type]
+            "nvidia.com/gpu.product" = local.gpu_types[gpu_type].product_name
             "nvidia.com/gpu.count"   = "1"
           }
-          taints = concat(
-            local.gpu_node_group_base.taints,
-            [
-              {
-                key    = "node.anyscale.com/capacity-type",
-                value  = "ON_DEMAND",
-                effect = "NO_SCHEDULE",
-              }
-            ]
-          )
+          taints = local.gpu_node_taints_ondemand
         }
       )
       spot = merge(
         local.gpu_node_group_base,
         {
-          instance_types = local.gpu_instance_types[gpu_type]
+          instance_types = local.gpu_types[gpu_type].instance_types
           capacity_type  = "SPOT"
           labels = {
-            "nvidia.com/gpu.product" = local.gpu_product_names[gpu_type]
+            "nvidia.com/gpu.product" = local.gpu_types[gpu_type].product_name
             "nvidia.com/gpu.count"   = "1"
           }
-          taints = concat(
-            local.gpu_node_group_base.taints,
-            [
-              {
-                key    = "node.anyscale.com/capacity-type",
-                value  = "SPOT",
-                effect = "NO_SCHEDULE",
-              }
-            ]
-          )
+          taints = local.gpu_node_taints_spot
         }
       )
     }

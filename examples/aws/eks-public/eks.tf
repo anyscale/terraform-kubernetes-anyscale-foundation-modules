@@ -22,15 +22,16 @@ locals {
     efs_client_policy  = "arn:aws:iam::aws:policy/AmazonElasticFileSystemClientReadWriteAccess",
   }
 
-  # Map of GPU types to their product names
-  gpu_product_names = {
-    "T4"   = "Tesla-T4",
-    "A10G" = "NVIDIA-A10G"
-  }
-
-  gpu_instance_types = {
-    "T4"   = ["g4dn.4xlarge"]
-    "A10G" = ["g5.4xlarge"]
+  # Map of GPU types to their product names and instance types
+  gpu_types = {
+    "T4" = {
+      product_name   = "Tesla-T4"
+      instance_types = ["g4dn.4xlarge"]
+    }
+    "A10G" = {
+      product_name   = "NVIDIA-A10G"
+      instance_types = ["g5.4xlarge"]
+    }
   }
 
   # Base configuration for GPU node groups
@@ -77,10 +78,10 @@ locals {
       ondemand = merge(
         local.gpu_node_group_base,
         {
-          instance_types = local.gpu_instance_types[gpu_type]
+          instance_types = local.gpu_types[gpu_type].instance_types
           capacity_type  = "ON_DEMAND"
           labels = {
-            "nvidia.com/gpu.product" = local.gpu_product_names[gpu_type]
+            "nvidia.com/gpu.product" = local.gpu_types[gpu_type].product_name
             "nvidia.com/gpu.count"   = "1"
           }
           taints = local.gpu_node_taints_ondemand
@@ -89,10 +90,10 @@ locals {
       spot = merge(
         local.gpu_node_group_base,
         {
-          instance_types = local.gpu_instance_types[gpu_type]
+          instance_types = local.gpu_types[gpu_type].instance_types
           capacity_type  = "SPOT"
           labels = {
-            "nvidia.com/gpu.product" = local.gpu_product_names[gpu_type]
+            "nvidia.com/gpu.product" = local.gpu_types[gpu_type].product_name
             "nvidia.com/gpu.count"   = "1"
           }
           taints = local.gpu_node_taints_spot
