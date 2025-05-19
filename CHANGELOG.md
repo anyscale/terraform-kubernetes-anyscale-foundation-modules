@@ -1,3 +1,13 @@
+## 0.4.1 (Released)
+FEATURES:
+- Update Azure example for latest Anyscale CLI.
+
+BUG FIXES:
+
+BREAKING CHANGES:
+
+NOTES:
+
 ## 0.4.0 (Released)
 FEATURES:
 - Add Azure example for new AKS cluster

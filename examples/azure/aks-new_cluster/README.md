@@ -15,7 +15,7 @@ requirements.
   * [Sign into the Azure CLI](https://learn.microsoft.com/en-us/cli/azure/get-started-with-azure-cli#sign-into-the-azure-cli)
 * [kubectl CLI](https://kubernetes.io/docs/tasks/tools/)
 * [helm CLI](https://helm.sh/docs/intro/install/)
-* [Anyscale CLI](https://docs.anyscale.com/reference/quickstart-cli/)
+* [Anyscale CLI](https://docs.anyscale.com/reference/quickstart-cli/) (> v0.26.24)
 
 ### Creating Anyscale Resources
 
@@ -111,7 +111,7 @@ You will need an Anyscale platform API Key for the helm chart installation. You 
 anyscale cloud register \
   --name <name> \
   --region <region> \
-  --provider generic \
+  --provider azure \
   --compute-stack k8s \
   --cloud-storage-bucket-name 'azure://<blog-storage-name>' \
   --cloud-storage-bucket-endpoint 'https://<storage-account>.blob.core.windows.net'
