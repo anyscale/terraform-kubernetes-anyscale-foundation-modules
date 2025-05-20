@@ -8,9 +8,6 @@ BREAKING CHANGES:
 NOTES:
 - Update Azure example README title
 
-## 0.4.1 (Released)
-FEATURES:
-
 BUG FIXES:
 
 BREAKING CHANGES:
