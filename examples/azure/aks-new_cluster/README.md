@@ -1,7 +1,7 @@
 [![Terraform Version][badge-terraform]](https://github.com/hashicorp/terraform/releases)
 [![AWS Provider Version][badge-tf-aws]](https://github.com/terraform-providers/terraform-provider-aws/releases)
 
-# Anyscale AWS EKS Example - Public Networking
+# Anyscale Azure AKS Example - Public Networking
 This example creates the resources to run Anyscale on Azure AKS with either public or private networking.
 
 The content of this module should be used as a starting point and modified to your own security and infrastructure
