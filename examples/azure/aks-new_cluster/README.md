@@ -56,6 +56,7 @@ helm upgrade ingress-nginx nginx/ingress-nginx \
   --set controller.service.type=LoadBalancer \
   --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-health-probe-request-path"=/healthz \
   --set controller.allowSnippetAnnotations=true \
+  --set controller.progressDeadlineSeconds=600 \
   --install
 ```
 
