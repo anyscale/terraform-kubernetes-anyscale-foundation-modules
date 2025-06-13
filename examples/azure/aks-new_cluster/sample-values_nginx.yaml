@@ -2,7 +2,7 @@ controller:
   service:
     type: LoadBalancer
     annotations:
-      cloud.google.com/load-balancer-type: "Internal"
+      service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: "/healthz"
   allowSnippetAnnotations: true
   config:
     enable-underscores-in-headers: true

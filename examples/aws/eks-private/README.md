@@ -72,32 +72,16 @@ helm upgrade aws-load-balancer-controller eks/aws-load-balancer-controller \
 
 #### Install the Nginx ingress controller
 
-A sample file, `sample-values_elb.yaml` has been provided in this repo. Please review for your requirements before using.
+A sample file, `sample-values_nginx.yaml` has been provided in this repo. Please review for your requirements before using.
 
-1. Create a YAML values file named: `values_elb.yaml`:
-2. Update the content with the following:
-
-```yaml
-controller:
-  service:
-    type: LoadBalancer
-    annotations:
-      service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
-      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
-      service.beta.kubernetes.io/aws-load-balancer-type: nlb
-  allowSnippetAnnotations: true
-  autoscaling:
-    enabled: true
-```
-
-3. Run:
+Run:
 
 ```shell
 helm repo add nginx https://kubernetes.github.io/ingress-nginx
 helm upgrade ingress-nginx nginx/ingress-nginx \
   --version 4.12.1 \
   --namespace ingress-nginx \
-  --values values_elb.yaml \
+  --values sample-values_elb.yaml \
   --create-namespace \
   --install
 ```

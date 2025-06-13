@@ -47,15 +47,17 @@ az aks get-credentials --resource-group <azure_resource_group_name> --name <aks_
 
 #### Install the Nginx ingress controller
 
+A sample file, `sample-values_nginx.yaml` has been provided in this repo. Please review for your requirements before using.
+
+Run:
+
 ```shell
 helm repo add nginx https://kubernetes.github.io/ingress-nginx
 helm upgrade ingress-nginx nginx/ingress-nginx \
   --version 4.12.1 \
   --namespace ingress-nginx \
+  --values sample-values_elb.yaml \
   --create-namespace \
-  --set controller.service.type=LoadBalancer \
-  --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-health-probe-request-path"=/healthz \
-  --set controller.allowSnippetAnnotations=true \
   --install
 ```
 
