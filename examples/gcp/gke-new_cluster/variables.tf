@@ -8,6 +8,12 @@
 # REQUIRED VARIABLES
 # These variables must be set when using this module.
 # ---------------------------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------------------------------
+# OPTIONAL VARIABLES
+# These variables have defaults but must be included when using this module.
+# ---------------------------------------------------------------------------------------------------------------------
+
 variable "google_region" {
   description = <<-EOT
     (Required) The Google region in which all resources will be created.

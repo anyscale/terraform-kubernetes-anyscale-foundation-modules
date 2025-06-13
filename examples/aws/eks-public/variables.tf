@@ -11,6 +11,11 @@
 # These variables must be set when using this module.
 # ---------------------------------------------------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------------------------------------------------
+# OPTIONAL VARIABLES
+# These variables have defaults but must be included when using this module.
+# ---------------------------------------------------------------------------------------------------------------------
+
 variable "aws_region" {
   description = <<-EOT
     (Optional) The AWS region in which all resources will be created.
@@ -66,11 +71,11 @@ variable "eks_cluster_version" {
 
     ex:
     ```
-    eks_cluster_version = "1.31"
+    eks_cluster_version = "1.32"
     ```
   EOT
   type        = string
-  default     = "1.31"
+  default     = "1.32"
 }
 
 variable "node_group_gpu_types" {
@@ -80,4 +85,19 @@ variable "node_group_gpu_types" {
   EOT
   type        = list(string)
   default     = ["T4"]
+}
+
+variable "enable_efs" {
+  description = <<-EOT
+    (Optional) Enable the creation of an EFS instance.
+
+    This is optional for Anyscale deployments. EFS is used for shared storage between nodes.
+
+    ex:
+    ```
+    enable_efs = true
+    ```
+  EOT
+  type        = bool
+  default     = false
 }
