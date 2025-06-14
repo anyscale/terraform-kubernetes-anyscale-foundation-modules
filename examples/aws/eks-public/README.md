@@ -63,7 +63,7 @@ helm upgrade cluster-autoscaler autoscaler/cluster-autoscaler \
 ```shell
 helm repo add eks https://aws.github.io/eks-charts
 helm upgrade aws-load-balancer-controller eks/aws-load-balancer-controller \
-  --version 1.11.0 \
+  --version 1.13.2 \
   --namespace kube-system \
   --set clusterName=<eks_cluster_name> \
   --install
