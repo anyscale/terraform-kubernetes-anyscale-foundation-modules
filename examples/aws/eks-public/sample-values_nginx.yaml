@@ -8,5 +8,6 @@ controller:
   allowSnippetAnnotations: true
   config:
     enable-underscores-in-headers: true
+    annotations-risk-level: "Critical"
   autoscaling:
     enabled: true
