@@ -33,6 +33,46 @@ terraform apply
 If you are using a `tfvars` file, you will need to update the above commands accordingly.
 Note the output from Terraform which includes example cloud registration and helm commands you will use below.
 
+If you need to make any change to `terraform.tfvars` file after apply, please run the following command to destroy the resources first. Otherwise, it may not work. 
+
+```shell
+terraform destroy
+```
+
+
+Here is one example output:
+```shell
+Apply complete! Resources: 0 added, 5 changed, 0 destroyed.
+
+Outputs:
+
+anyscale_operator_client_id = "0afdc55c-f6b3-4a58-a530-5cf75074d547"
+anyscale_registration_command = <<EOT
+anyscale cloud register \
+	--name <anyscale_cloud_name> \
+	--region westus2 \
+	--provider generic \
+	--compute-stack k8s \
+	--cloud-storage-bucket-name 'azure://cloud-gang-blob' \
+	--cloud-storage-bucket-endpoint 'https://cloudgangsa.blob.core.windows.net'
+EOT
+azure_aks_cluster_name = "cloud-gang"
+azure_resource_group_name = "cloud-gang-rg"
+azure_storage_account_name = "cloudgangsa"
+helm_upgrade_command = <<EOT
+helm upgrade anyscale-operator anyscale/anyscale-operator \
+	--set-string anyscaleCliToken=<anyscale-cli-token> \
+	--set-string cloudDeploymentId=<cloud-deployment-id> \
+	--set-string cloudProvider=azure \
+	--set-string operatorIamIdentity=0afdc55c-f6b3-4a58-a530-5cf75074d547 \
+	--set-string workloadServiceAccountName=anyscale-operator \
+	--namespace aks-tf-demo \
+	--create-namespace \
+	-i
+EOT
+```
+
+
 ### Install the Kubernetes Requirements
 
 The Anyscale Operator requires the following components:
