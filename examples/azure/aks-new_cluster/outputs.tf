@@ -27,7 +27,7 @@ locals {
     "anyscale cloud register",
     "--name <anyscale_cloud_name>",
     "--region ${data.azurerm_location.example.location}",
-    "--provider generic",
+    "--provider azure",
     "--compute-stack k8s",
     "--cloud-storage-bucket-name 'azure://${azurerm_storage_container.blob.name}'",
     "--cloud-storage-bucket-endpoint 'https://${azurerm_storage_account.sa.name}.blob.core.windows.net'",
