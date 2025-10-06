@@ -14,6 +14,13 @@ cd "$SCRIPT_DIR"
 
 echo "🔐 Setting up Nebius environment..."
 
+# Check if nebius CLI is available
+if ! command -v nebius &> /dev/null; then
+  echo "❌ Error: nebius CLI not found in PATH"
+  echo "   Install from: https://docs.nebius.ai/cli/"
+  return 1
+fi
+
 # Load config from config.yaml
 if [ ! -f config.yaml ]; then
   echo "❌ Error: config.yaml not found"
@@ -32,7 +39,7 @@ if [ -z "${NEBIUS_TENANT_ID}" ] || [ -z "${NEBIUS_PROJECT_ID}" ] || [ -z "${NEBI
 fi
 
 # Get IAM token
-export NEBIUS_IAM_TOKEN=$(~/.nebius/bin/nebius iam get-access-token)
+export NEBIUS_IAM_TOKEN=$(nebius iam get-access-token)
 if [ -z "${NEBIUS_IAM_TOKEN}" ]; then
   echo "❌ Error: Failed to get Nebius IAM token"
   echo "   Please run: nebius init"
@@ -43,14 +50,14 @@ fi
 export NEBIUS_BUCKET_NAME="tfstate-anyscale-$(echo -n "${NEBIUS_TENANT_ID}-${NEBIUS_PROJECT_ID}" | md5sum | awk '$0=$1' 2>/dev/null || echo -n "${NEBIUS_TENANT_ID}-${NEBIUS_PROJECT_ID}" | md5 | awk '$0=$1')"
 
 echo "📦 Checking terraform state bucket..."
-EXISTS=$(~/.nebius/bin/nebius storage bucket list \
+EXISTS=$(nebius storage bucket list \
   --parent-id "${NEBIUS_PROJECT_ID}" \
   --format json \
   | jq -r --arg BUCKET "${NEBIUS_BUCKET_NAME}" 'try .items[] | select(.metadata.name == $BUCKET) | .metadata.name')
 
 if [ -z "${EXISTS}" ]; then
   echo "   Creating bucket: ${NEBIUS_BUCKET_NAME}"
-  ~/.nebius/bin/nebius storage bucket create \
+  nebius storage bucket create \
     --name "${NEBIUS_BUCKET_NAME}" \
     --parent-id "${NEBIUS_PROJECT_ID}" \
     --versioning-policy 'enabled' >/dev/null
@@ -61,14 +68,14 @@ fi
 # Service account for terraform backend
 echo "🔑 Checking service account..."
 NEBIUS_SA_NAME="anyscale-sa"
-NEBIUS_SA_ID=$(~/.nebius/bin/nebius iam service-account list \
+NEBIUS_SA_ID=$(nebius iam service-account list \
   --parent-id "${NEBIUS_PROJECT_ID}" \
   --format json \
   | jq -r --arg SANAME "${NEBIUS_SA_NAME}" 'try .items[] | select(.metadata.name == $SANAME).metadata.id')
 
 if [ -z "$NEBIUS_SA_ID" ]; then
   echo "   Creating service account: ${NEBIUS_SA_NAME}"
-  NEBIUS_SA_ID=$(~/.nebius/bin/nebius iam service-account create \
+  NEBIUS_SA_ID=$(nebius iam service-account create \
     --parent-id "${NEBIUS_PROJECT_ID}" \
     --name "${NEBIUS_SA_NAME}" \
     --format json \
@@ -78,13 +85,13 @@ else
 fi
 
 # Add service account to editors group
-NEBIUS_GROUP_EDITORS_ID=$(~/.nebius/bin/nebius iam group get-by-name \
+NEBIUS_GROUP_EDITORS_ID=$(nebius iam group get-by-name \
   --parent-id "${NEBIUS_TENANT_ID}" \
   --name 'editors' \
   --format json \
   | jq -r '.metadata.id')
 
-IS_MEMBER=$(~/.nebius/bin/nebius iam group-membership list-members \
+IS_MEMBER=$(nebius iam group-membership list-members \
   --parent-id "${NEBIUS_GROUP_EDITORS_ID}" \
   --page-size 1000 \
   --format json \
@@ -92,7 +99,7 @@ IS_MEMBER=$(~/.nebius/bin/nebius iam group-membership list-members \
 
 if [ -z "${IS_MEMBER}" ]; then
   echo "   Adding service account to editors group..."
-  ~/.nebius/bin/nebius iam group-membership create \
+  nebius iam group-membership create \
     --parent-id "${NEBIUS_GROUP_EDITORS_ID}" \
     --member-id "${NEBIUS_SA_ID}" >/dev/null
 fi
@@ -106,7 +113,7 @@ else
   EXPIRATION_DATE=$(date -d '+1 day' "${DATE_FORMAT}")
 fi
 
-NEBIUS_SA_ACCESS_KEY_ID=$(~/.nebius/bin/nebius iam access-key create \
+NEBIUS_SA_ACCESS_KEY_ID=$(nebius iam access-key create \
   --parent-id "${NEBIUS_PROJECT_ID}" \
   --name "anyscale-tfstate-$(date +%s)" \
   --account-service-account-id "${NEBIUS_SA_ID}" \
@@ -116,10 +123,10 @@ NEBIUS_SA_ACCESS_KEY_ID=$(~/.nebius/bin/nebius iam access-key create \
   | jq -r '.resource_id')
 
 # Get AWS-compatible credentials
-export AWS_ACCESS_KEY_ID=$(~/.nebius/bin/nebius iam access-key get-by-id \
+export AWS_ACCESS_KEY_ID=$(nebius iam access-key get-by-id \
   --id "${NEBIUS_SA_ACCESS_KEY_ID}" \
   --format json | jq -r '.status.aws_access_key_id')
-export AWS_SECRET_ACCESS_KEY=$(~/.nebius/bin/nebius iam access-key get-secret-once \
+export AWS_SECRET_ACCESS_KEY=$(nebius iam access-key get-secret-once \
   --id "${NEBIUS_SA_ACCESS_KEY_ID}" \
   --format json \
   | jq -r '.secret')

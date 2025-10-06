@@ -13,6 +13,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Check if anyscale CLI is available
+if ! command -v anyscale &> /dev/null; then
+  echo "❌ Error: anyscale CLI not found in PATH"
+  echo "   Install from: https://docs.anyscale.com/cli/"
+  exit 1
+fi
+
 # Parse config.yaml for cloud name and region
 CLOUD_NAME=$(grep "cloud_name:" config.yaml | awk '{print $2}' | tr -d '"')
 REGION=$(grep "region:" config.yaml | awk '{print $2}' | tr -d '"')
