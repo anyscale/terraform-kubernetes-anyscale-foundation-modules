@@ -1,0 +1,52 @@
+# Customer configuration (contains secrets)
+config.yaml
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+*.tfvars
+.terraform.lock.hcl
+terraform_backend_override.tf
+*.backup
+
+# Terraform crash logs
+crash.log
+crash.*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+._*
+
+# Nebius CLI
+.nebius/
+
+# Temporary files
+*.tmp
+
+# Log files
+*.log
+
+# Python (if using helper scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Helm charts cache
+*.tgz
+charts/
+
+# kubeconfig files
+kubeconfig
+*.kubeconfig

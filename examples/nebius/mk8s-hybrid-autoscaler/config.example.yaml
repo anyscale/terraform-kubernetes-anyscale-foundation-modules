@@ -1,0 +1,60 @@
+# ============================================================================
+# ANYSCALE ON NEBIUS - CONFIGURATION TEMPLATE
+# ============================================================================
+#
+# INSTRUCTIONS:
+# 1. Copy this file: cp config.example.yaml config.yaml
+# 2. Fill in your Nebius and Anyscale details below
+# 3. Run: source environment.sh
+# 4. Deploy infrastructure: cd prepare && terraform init && terraform apply
+# 5. Deploy cluster: cd ../deploy && terraform init && terraform apply
+#
+# For detailed instructions, see: docs/DEPLOYMENT_GUIDE.md
+# ============================================================================
+
+nebius:
+  # Get these from Nebius Console (https://console.nebius.ai)
+  tenant_id: "tenant-YOUR_TENANT_ID"
+  project_id: "project-YOUR_PROJECT_ID"
+  region: "eu-north1"
+  vpc_subnet_id: "vpcsubnet-YOUR_SUBNET_ID"
+
+  # Kubernetes Cluster Configuration
+  cluster_name: "anyscale-cluster"  # Name of the MK8s cluster to create
+
+  # NFS Server Configuration (optional - for persistent storage)
+  nfs:
+    enabled: true
+    size_gb: 93  # Must be divisible by 93
+
+ssh:
+  username: "ubuntu"
+  public_key: "PASTE_YOUR_SSH_PUBLIC_KEY_HERE"  # Run: cat ~/.ssh/id_ed25519.pub
+
+anyscale:
+  # Get these from Anyscale Console (https://console.anyscale.com)
+  cloud_name: "my-nebius-cloud"
+  cloud_deployment_id: "PASTE_CLOUD_DEPLOYMENT_ID_HERE"  # From cloud registration
+  cli_token: "PASTE_CLI_TOKEN_HERE"  # From API keys page
+
+# Autoscaling configuration (optional - use defaults if unsure)
+autoscaling:
+  min_nodes: 0   # Scale to zero when idle (saves costs)
+  max_nodes: 10  # Maximum nodes per instance type
+
+# ============================================================================
+# INSTANCE TYPES (automatically configured - do not edit)
+# ============================================================================
+# This deployment includes:
+#
+# CPU Instances:
+#   - cpu-e2-8vcpu-32gb   (8 vCPU, 32 GB RAM)
+#   - cpu-e2-16vcpu-64gb  (16 vCPU, 64 GB RAM)
+#   - cpu-e2-32vcpu-128gb (32 vCPU, 128 GB RAM)
+#
+# GPU Instances:
+#   - gpu-h100-sxm-1gpu-16vcpu-200gb (1x H100, 16 vCPU, 200 GB RAM)
+#   - gpu-h200-sxm-1gpu-16vcpu-200gb (1x H200, 16 vCPU, 200 GB RAM)
+#   - gpu-l40s-a-1gpu-16vcpu-64gb    (1x L40S, 16 vCPU, 64 GB RAM)
+#
+# ============================================================================
