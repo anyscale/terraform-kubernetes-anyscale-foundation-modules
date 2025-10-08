@@ -114,6 +114,14 @@ resource "nebius_mk8s_v1_node_group" "instance_type" {
       }
     }
 
+    # Taint workload nodes to prevent system pods from landing here
+    # System pods should only run on the dedicated system node
+    taints = [{
+      key    = "workload"
+      value  = "true"
+      effect = "NO_SCHEDULE"
+    }]
+
     boot_disk = {
       type           = "NETWORK_SSD"
       size_gibibytes = each.value.disk_gb
@@ -155,14 +163,14 @@ resource "nebius_mk8s_v1_node_group" "system" {
   parent_id = nebius_mk8s_v1_cluster.anyscale.id
   name      = "ng-system"
 
-  # ALWAYS ON - no autoscaling
-  fixed_node_count = 1
+  # ALWAYS ON - 2 small nodes for HA (cilium-operator needs 2 nodes)
+  fixed_node_count = 2
 
   template = {
     metadata = {
       labels = {
         "anyscale.com/node-role"     = "system"
-        "anyscale.com/instance-type" = "cpu-e2-8vcpu-32gb"
+        "anyscale.com/instance-type" = "cpu-e2-2vcpu-8gb"
       }
     }
 
@@ -178,7 +186,7 @@ resource "nebius_mk8s_v1_node_group" "system" {
 
     resources = {
       platform = "cpu-e2"
-      preset   = "8vcpu-32gb"
+      preset   = "2vcpu-8gb"
     }
 
     service_account_id = nebius_iam_v1_service_account.node_sa.id
