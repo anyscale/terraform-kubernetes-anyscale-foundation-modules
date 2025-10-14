@@ -30,6 +30,11 @@ additionalInstanceTypes:
       memory: 30Gi
     nodeSelector:
       anyscale.com/instance-type: cpu-e2-8vcpu-32gb
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
 
   CPU-E2-16vcpu-64gb:
     resources:
@@ -37,6 +42,11 @@ additionalInstanceTypes:
       memory: 62Gi
     nodeSelector:
       anyscale.com/instance-type: cpu-e2-16vcpu-64gb
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
 
   CPU-E2-32vcpu-128gb:
     resources:
@@ -44,6 +54,11 @@ additionalInstanceTypes:
       memory: 126Gi
     nodeSelector:
       anyscale.com/instance-type: cpu-e2-32vcpu-128gb
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
 
   # ============================================================================
   # GPU INSTANCES - NVIDIA H100 SXM (gpu-h100-sxm)
@@ -57,6 +72,11 @@ additionalInstanceTypes:
       memory: 190Gi
     nodeSelector:
       anyscale.com/instance-type: gpu-h100-sxm-1gpu-16vcpu-200gb
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
 
   # ============================================================================
   # GPU INSTANCES - NVIDIA H200 SXM (gpu-h200-sxm)
@@ -70,6 +90,11 @@ additionalInstanceTypes:
       memory: 190Gi
     nodeSelector:
       anyscale.com/instance-type: gpu-h200-sxm-1gpu-16vcpu-200gb
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
 
   # ============================================================================
   # GPU INSTANCES - NVIDIA L40S PCIe Intel (gpu-l40s-a)
@@ -83,6 +108,11 @@ additionalInstanceTypes:
       memory: 62Gi
     nodeSelector:
       anyscale.com/instance-type: gpu-l40s-a-1gpu-16vcpu-64gb
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
 
 
   # ============================================================================
