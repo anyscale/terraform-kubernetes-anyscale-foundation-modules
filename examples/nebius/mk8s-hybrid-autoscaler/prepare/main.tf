@@ -16,7 +16,7 @@ data "nebius_vpc_v1_subnet" "subnet" {
 # Can be replaced with custom resources if needed
 module "nfs-server" {
   count  = local.nfs_enabled ? 1 : 0
-  source = "../../../shared/nebius-solution-library/nfs-server"
+  source = "../modules/nfs-server"
 
   providers = {
     nebius = nebius

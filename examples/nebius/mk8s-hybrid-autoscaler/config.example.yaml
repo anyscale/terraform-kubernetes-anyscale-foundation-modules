@@ -8,8 +8,8 @@
 # 3. Run: source environment.sh
 # 4. Deploy infrastructure: cd prepare && terraform init && terraform apply
 # 5. Deploy cluster: cd ../deploy && terraform init && terraform apply
+# 6. Install operator: ./deploy/install-operator.sh
 #
-# For detailed instructions, see: docs/DEPLOYMENT_GUIDE.md
 # ============================================================================
 
 nebius:
@@ -34,8 +34,7 @@ ssh:
 anyscale:
   # Get these from Anyscale Console (https://console.anyscale.com)
   cloud_name: "my-nebius-cloud"
-  cloud_deployment_id: "PASTE_CLOUD_DEPLOYMENT_ID_HERE"  # From cloud registration
-  cli_token: "PASTE_CLI_TOKEN_HERE"  # From API keys page
+  cli_token: "PASTE_CLI_TOKEN_HERE"  # From API keys page (optional if already logged in with `anyscale login`)
 
 # Autoscaling configuration (optional - use defaults if unsure)
 autoscaling:

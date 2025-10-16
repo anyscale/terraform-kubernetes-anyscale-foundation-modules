@@ -14,7 +14,7 @@ output "cluster_name" {
 
 output "cluster_endpoint" {
   description = "Kubernetes API endpoint"
-  value       = "Run: nebius mk8s cluster get-credentials ${nebius_mk8s_v1_cluster.anyscale.id} --parent-id ${local.nebius_project_id}"
+  value       = "Run: nebius mk8s cluster get-credentials --id ${nebius_mk8s_v1_cluster.anyscale.id} --external --force"
 }
 
 output "node_group_ids" {
@@ -24,14 +24,9 @@ output "node_group_ids" {
   }
 }
 
-output "anyscale_operator_release_id" {
-  description = "Anyscale operator Helm release ID"
-  value       = nebius_applications_v1alpha1_k8s_release.anyscale_operator.id
-}
-
 output "kubeconfig_command" {
   description = "Command to get kubeconfig"
-  value       = "nebius mk8s cluster get-credentials ${nebius_mk8s_v1_cluster.anyscale.id} --parent-id ${local.nebius_project_id}"
+  value       = "nebius mk8s cluster get-credentials --id ${nebius_mk8s_v1_cluster.anyscale.id} --external --force"
 }
 
 output "instance_types" {

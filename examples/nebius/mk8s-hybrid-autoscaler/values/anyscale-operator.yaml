@@ -13,7 +13,11 @@ operatorNodeSelection:
 
 # Pin ingress-nginx to dedicated system node (NOT used by Anyscale workloads)
 ingress-nginx:
+  enabled: true
   controller:
+    service:
+      annotations:
+        service.beta.kubernetes.io/nebius-load-balancer-name: anyscale-nebius-ingress
     nodeSelector:
       anyscale.com/node-role: system
 
@@ -113,15 +117,3 @@ additionalInstanceTypes:
         operator: Equal
         value: "true"
         effect: NoSchedule
-
-
-  # ============================================================================
-  # Nullify Nebius-packaged types we don't have in this configuration
-  # ============================================================================
-
-  # These types are provided by default by Nebius but are not a part of our deployment strategy
-  16CPU-200GB-1xH100: null
-  16CPU-200GB-1xH200: null
-  128CPU-1600GB-8xH100: null
-  128CPU-1600GB-8xH200: null
-  160CPU-1792GB-8xB200: null

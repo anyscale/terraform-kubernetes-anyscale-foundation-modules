@@ -21,9 +21,7 @@ locals {
   ssh_public_key = local.config.ssh.public_key
 
   # Anyscale configuration
-  anyscale_cloud_name    = local.config.anyscale.cloud_name
-  anyscale_deployment_id = local.config.anyscale.cloud_deployment_id
-  anyscale_cli_token     = local.config.anyscale.cli_token
+  anyscale_cloud_name = local.config.anyscale.cloud_name
 
   # Autoscaling configuration (with defaults)
   autoscaling_min = try(local.config.autoscaling.min_nodes, 0)
