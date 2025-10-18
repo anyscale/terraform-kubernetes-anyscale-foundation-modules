@@ -1,0 +1,65 @@
+# Custom Anyscale operator overrides for the AKS example cluster.
+# - Pin operator/system components to the smaller cpu8 pool.
+# - Expose two CPU-focused instance types aligned with the cpu8 and cpu16 node pools.
+
+enableAnyscaleRayHeadNodePDB: true
+
+operatorResources:
+  operator:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+  vector:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 250m
+      memory: 512Mi
+
+# Keep the operator on the cpu8 pool
+operatorNodeSelection:
+  nodeSelector:
+    kubernetes.azure.com/agentpool: cpu8
+    nodepool.anyscale.com/name: cpu8
+  tolerations:
+    - key: node.anyscale.com/capacity-type
+      operator: Equal
+      value: ON_DEMAND
+      effect: NoSchedule
+
+defaultInstanceTypes: null
+
+additionalInstanceTypes:
+  CPU-D8S:
+    resources:
+      CPU: 7
+      memory: 28Gi
+    nodeSelector:
+      kubernetes.azure.com/agentpool: cpu8
+      nodepool.anyscale.com/name: cpu8
+    tolerations:
+      - key: node.anyscale.com/capacity-type
+        operator: Equal
+        value: ON_DEMAND
+        effect: NoSchedule
+
+  CPU-D16S:
+    resources:
+      CPU: 14
+      memory: 56Gi
+    nodeSelector:
+      kubernetes.azure.com/agentpool: cpu16
+      nodepool.anyscale.com/name: cpu16
+    tolerations:
+      - key: node.anyscale.com/capacity-type
+        operator: Equal
+        value: ON_DEMAND
+        effect: NoSchedule
+
+# Ingress controller is deployed separately for this example.
+ingress-nginx:
+  enabled: false

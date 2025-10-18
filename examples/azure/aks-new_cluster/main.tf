@@ -1,13 +1,25 @@
+resource "random_string" "storage_suffix" {
+  length  = 6
+  upper   = false
+  lower   = true
+  numeric = true
+  special = false
+}
+
 locals {
-  vnet_cidr         = "10.42.0.0/16"
-  nodes_subnet_cidr = "10.42.1.0/24"
+  vnet_cidr              = "10.42.0.0/16"
+  nodes_subnet_cidr      = "10.42.1.0/24"
+  cluster_name           = var.aks_cluster_name
+  cluster_name_sanitized = join("", regexall("[a-z0-9]", lower(local.cluster_name)))
+  storage_account_name   = substr("${local.cluster_name_sanitized}${random_string.storage_suffix.result}", 0, 24)
+  storage_container_name = "${local.cluster_name}-blob"
 }
 
 ############################################
 # resource group
 ############################################
 resource "azurerm_resource_group" "rg" {
-  name     = "${var.aks_cluster_name}-rg"
+  name     = "${local.cluster_name}-rg"
   location = var.azure_location
   tags     = var.tags
 }
@@ -30,7 +42,7 @@ resource "azurerm_storage_account" "sa" {
   #checkov:skip=CKV2_AZURE_21: "Ensure Storage logging is enabled for Blob service for read requests"
   #checkov:skip=CKV2_AZURE_31: "Ensure VNET subnet is configured with a Network Security Group (NSG)"
 
-  name                     = replace("${var.aks_cluster_name}sa", "-", "") # demo-aks --> demoakssa
+  name                     = local.storage_account_name
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = azurerm_resource_group.rg.location
   account_tier             = "Standard"
@@ -46,7 +58,7 @@ resource "azurerm_storage_container" "blob" {
 
   #checkov:skip=CKV2_AZURE_21: "Ensure Storage logging is enabled for Blob service for read requests"
 
-  name                  = "${var.aks_cluster_name}-blob"
+  name                  = local.storage_container_name
   storage_account_id    = azurerm_storage_account.sa.id
   container_access_type = "private" # blobs are private but reachable via the public endpoint
 }
@@ -55,7 +67,7 @@ resource "azurerm_storage_container" "blob" {
 # networking (vnet and subnet)
 ############################################
 resource "azurerm_virtual_network" "vnet" {
-  name                = "${var.aks_cluster_name}-vnet"
+  name                = "${local.cluster_name}-vnet"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   address_space       = [local.vnet_cidr]

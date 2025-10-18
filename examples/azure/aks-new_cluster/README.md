@@ -7,6 +7,16 @@ This example creates the resources to run Anyscale on Azure AKS with either publ
 The content of this module should be used as a starting point and modified to your own security and infrastructure
 requirements.
 
+## Available Node Pools
+
+| Pool | VM Size | Capacity Type | Default Scale | Notes |
+|------|---------|---------------|---------------|-------|
+| `sys` | `Standard_D4s_v5` | On-demand | 3-5 nodes | Hosts system workloads and operator |
+| `cpu8` | `Standard_D8s_v5` | On-demand | 0-10 nodes | Balanced CPU pool for moderate workloads |
+| `cpu16` | `Standard_D16s_v5` | On-demand | 0-10 nodes | High-capacity CPU pool for larger workloads |
+
+An accompanying Helm values file (`values/anyscale-operator.yaml`) maps these node pools to Anyscale instance types and pins the operator to the `cpu8` nodes.
+
 ## Getting Started
 
 ### Prerequisites
@@ -107,6 +117,22 @@ Ensure that you are logged into Anyscale with valid CLI credentials. (`anyscale 
 
 You will need an Anyscale platform API Key for the helm chart installation. You can generate one from the [Anyscale Web UI](https://console.anyscale.com/api-keys).
 
+If you prefer to issue a key programmatically for a service account, use the Anyscale CLI:
+
+```shell
+anyscale service-account create-api-key --name <service-account-name>
+```
+
+The command returns the new token once; store it securely and then export it before running the Helm install (e.g. `export ANYSCALE_CLI_TOKEN=...`).
+
+To rotate keys later, run:
+
+```shell
+anyscale service-account rotate-api-keys --name <service-account-name>
+```
+
+After rotation, update any deployments that rely on the token (for example, rerun the Helm upgrade with the new `anyscaleCliToken` value).
+
 1. Using the output from the Terraform modules, register the Anyscale Cloud. It should look sonething like:
 
 ```shell
@@ -140,6 +166,7 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
 --set-string region=<region> \
 --set-string operatorIamIdentity=<anyscale_operator_client_id> \
 --set-string workloadServiceAccountName=anyscale-operator \
+-f values/anyscale-operator.yaml \
 --namespace anyscale-operator \
 --create-namespace \
 -i
@@ -169,10 +196,7 @@ No modules.
 |------|------|
 | [azurerm_federated_identity_credential.anyscale_operator_fic](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/federated_identity_credential) | resource |
 | [azurerm_kubernetes_cluster.aks](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/kubernetes_cluster) | resource |
-| [azurerm_kubernetes_cluster_node_pool.gpu_ondemand](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/kubernetes_cluster_node_pool) | resource |
-| [azurerm_kubernetes_cluster_node_pool.gpu_spot](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/kubernetes_cluster_node_pool) | resource |
-| [azurerm_kubernetes_cluster_node_pool.ondemand_cpu](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/kubernetes_cluster_node_pool) | resource |
-| [azurerm_kubernetes_cluster_node_pool.spot_cpu](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/kubernetes_cluster_node_pool) | resource |
+| [azurerm_kubernetes_cluster_node_pool.user](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/kubernetes_cluster_node_pool) | resource |
 | [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/resource_group) | resource |
 | [azurerm_role_assignment.anyscale_blob_contrib](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/role_assignment) | resource |
 | [azurerm_storage_account.sa](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/storage_account) | resource |
@@ -187,10 +211,9 @@ No modules.
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_azure_subscription_id"></a> [azure\_subscription\_id](#input\_azure\_subscription\_id) | (Required) Azure subscription ID | `string` | n/a | yes |
-| <a name="input_aks_cluster_name"></a> [aks\_cluster\_name](#input\_aks\_cluster\_name) | (Optional) Name of the AKS cluster (and related resources). | `string` | `"anyscale-demo"` | no |
+| <a name="input_aks_cluster_name"></a> [aks\_cluster\_name](#input\_aks\_cluster\_name) | (Optional) Name of the AKS cluster (and related resources). | `string` | `"anyscale-aks-k8s"` | no |
 | <a name="input_anyscale_operator_namespace"></a> [anyscale\_operator\_namespace](#input\_anyscale\_operator\_namespace) | (Optional) Kubernetes namespace for the Anyscale operator. | `string` | `"anyscale-operator"` | no |
 | <a name="input_azure_location"></a> [azure\_location](#input\_azure\_location) | (Optional) Azure region for all resources. | `string` | `"West US"` | no |
-| <a name="input_node_group_gpu_types"></a> [node\_group\_gpu\_types](#input\_node\_group\_gpu\_types) | (Optional) The GPU types of the AKS nodes.<br/>Possible values: ["T4", "A10", "A100", "H100"] | `list(string)` | <pre>[<br/>  "T4"<br/>]</pre> | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | (Optional) Tags applied to all taggable resources. | `map(string)` | <pre>{<br/>  "Environment": "dev",<br/>  "Test": "true"<br/>}</pre> | no |
 
 ## Outputs
