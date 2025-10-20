@@ -21,27 +21,11 @@ variable "tags" {
 variable "aks_cluster_name" {
   description = "(Optional) Name of the AKS cluster (and related resources)."
   type        = string
-  default     = "anyscale-demo"
+  default     = "anyscale-aks-k8s"
 }
 
 variable "anyscale_operator_namespace" {
   description = "(Optional) Kubernetes namespace for the Anyscale operator."
   type        = string
   default     = "anyscale-operator"
-}
-
-variable "node_group_gpu_types" {
-  description = <<-EOT
-    (Optional) The GPU types of the AKS nodes.
-    Possible values: ["T4", "A10", "A100", "H100"]
-  EOT
-  type        = list(string)
-  default     = ["T4"]
-
-  validation {
-    condition = alltrue(
-      [for g in var.node_group_gpu_types : contains(["T4", "A10", "A100", "H100"], g)]
-    )
-    error_message = "GPU type must be one of: T4, A10, A100, H100."
-  }
 }
