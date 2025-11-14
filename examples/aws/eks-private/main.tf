@@ -9,8 +9,8 @@
 # ---------------------------------------------------------------------------------------------------------------------
 
 locals {
-  public_subnets  = ["172.24.101.0/24", "172.24.102.0/24", "172.24.103.0/24"]
-  private_subnets = ["172.24.20.0/24", "172.24.21.0/24", "172.24.22.0/24"]
+  public_subnets  = ["172.24.101.0/24", "172.24.102.0/24"]
+  private_subnets = ["172.24.20.0/24", "172.24.21.0/24"]
 }
 
 module "anyscale_vpc" {
@@ -76,7 +76,7 @@ module "anyscale_efs" {
   #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
   source = "github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-efs"
 
-  module_enabled = true
+  module_enabled = var.enable_efs
 
   anyscale_efs_name          = "anyscale-${var.eks_cluster_name}"
   mount_targets_subnet_count = length(local.private_subnets)

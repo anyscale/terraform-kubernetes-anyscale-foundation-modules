@@ -27,7 +27,7 @@ locals {
     "anyscale cloud register",
     "--name <anyscale_cloud_name>",
     "--region ${data.azurerm_location.example.location}",
-    "--provider generic",
+    "--provider azure",
     "--compute-stack k8s",
     "--cloud-storage-bucket-name 'azure://${azurerm_storage_container.blob.name}'",
     "--cloud-storage-bucket-endpoint 'https://${azurerm_storage_account.sa.name}.blob.core.windows.net'",
@@ -35,8 +35,8 @@ locals {
 
   helm_upgrade_command_parts = compact([
     "helm upgrade anyscale-operator anyscale/anyscale-operator",
-    "--set-string anyscaleCliToken=<anyscale-cli-token>",
     "--set-string cloudDeploymentId=<cloud-deployment-id>",
+    "--set-string region=${data.azurerm_location.example.location}",
     "--set-string cloudProvider=azure",
     "--set-string operatorIamIdentity=${azurerm_user_assigned_identity.anyscale_operator.client_id}",
     "--set-string workloadServiceAccountName=anyscale-operator",

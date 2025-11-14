@@ -69,7 +69,7 @@ helm upgrade cluster-autoscaler autoscaler/cluster-autoscaler \
 ```shell
 helm repo add eks https://aws.github.io/eks-charts
 helm upgrade aws-load-balancer-controller eks/aws-load-balancer-controller \
-  --version 1.11.0 \
+  --version 1.13.2 \
   --namespace kube-system \
   --set clusterName=<eks_cluster_name> \
   --install
@@ -77,32 +77,16 @@ helm upgrade aws-load-balancer-controller eks/aws-load-balancer-controller \
 
 #### Install the Nginx ingress controller
 
-A sample file, `sample-values_elb.yaml` has been provided in this repo. Please review for your requirements before using.
+A sample file, `sample-values_nginx.yaml` has been provided in this repo. Please review for your requirements before using.
 
-1. Create a YAML values file named: `values_elb.yaml`:
-2. Update the content with the following:
-
-```yaml
-controller:
-  service:
-    type: LoadBalancer
-    annotations:
-      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
-      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
-      service.beta.kubernetes.io/aws-load-balancer-type: nlb
-  allowSnippetAnnotations: true
-  autoscaling:
-    enabled: true
-```
-
-3. Run:
+Run:
 
 ```shell
 helm repo add nginx https://kubernetes.github.io/ingress-nginx
 helm upgrade ingress-nginx nginx/ingress-nginx \
   --version 4.12.1 \
   --namespace ingress-nginx \
-  --values values_elb.yaml \
+  --values sample-values_nginx.yaml \
   --create-namespace \
   --install
 ```
@@ -225,6 +209,7 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
 | <a name="input_existing_subnet_ids"></a> [existing\_subnet\_ids](#input\_existing\_subnet\_ids) | (Required) Existing Subnet IDs.<br>The IDs of existing subnets to use. This should not be the entire ARN of the subnet, just the ID.<br>These subnets should be in the `existing_vpc_id`.<br>ex:<pre>existing_subnet_ids = ["subnet-1234567890", "subnet-0987654321"]</pre> | `list(string)` | n/a | yes |
 | <a name="input_existing_vpc_id"></a> [existing\_vpc\_id](#input\_existing\_vpc\_id) | (Required) Existing VPC ID.<br>The ID of an existing VPC to use. This should not be the entire ARN of the VPC, just the ID.<br>ex:<pre>existing_vpc_id = "vpc-1234567890"</pre><pre></pre> | `string` | n/a | yes |
 | <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | The AWS region in which all resources will be created. | `string` | `"us-east-2"` | no |
+| <a name="input_enable_efs"></a> [enable\_efs](#input\_enable\_efs) | (Optional) Enable the creation of an EFS instance.<br><br>This is optional for Anyscale deployments. EFS is used for shared storage between nodes.<br><br>ex:<pre>enable_efs = true</pre> | `bool` | `false` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | (Optional) A map of tags to all resources that accept tags. | `map(string)` | <pre>{<br>  "Environment": "dev",<br>  "Example": "aws/eks-existing",<br>  "Repo": "terraform-kubernetes-anyscale-foundation-modules",<br>  "Test": "true"<br>}</pre> | no |
 
 ## Outputs

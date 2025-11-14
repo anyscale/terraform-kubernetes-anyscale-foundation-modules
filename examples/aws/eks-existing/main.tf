@@ -54,7 +54,7 @@ module "anyscale_efs" {
   #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
   source = "github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-efs"
 
-  module_enabled = true
+  module_enabled = var.enable_efs
 
   anyscale_efs_name          = "anyscale-eks-public-efs"
   mount_targets_subnet_count = length(var.existing_subnet_ids)

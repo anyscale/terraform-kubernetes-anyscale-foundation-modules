@@ -47,11 +47,16 @@ az aks get-credentials --resource-group <azure_resource_group_name> --name <aks_
 
 #### Install the Nginx ingress controller
 
+A sample file, `sample-values_nginx.yaml` has been provided in this repo. Please review for your requirements before using.
+
+Run:
+
 ```shell
 helm repo add nginx https://kubernetes.github.io/ingress-nginx
 helm upgrade ingress-nginx nginx/ingress-nginx \
   --version 4.12.1 \
   --namespace ingress-nginx \
+  --values sample-values_nginx.yaml \
   --create-namespace \
   --set controller.service.type=LoadBalancer \
   --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-health-probe-request-path"=/healthz \
@@ -134,9 +139,9 @@ helm repo add anyscale https://anyscale.github.io/helm-charts
 helm repo update
 
 helm upgrade anyscale-operator anyscale/anyscale-operator \
---set-string anyscaleCliToken=<anyscale-cli-token> \
 --set-string cloudDeploymentId=<cloud-deployment-id> \
 --set-string cloudProvider=azure \
+--set-string region=<region> \
 --set-string operatorIamIdentity=<anyscale_operator_client_id> \
 --set-string workloadServiceAccountName=anyscale-operator \
 --namespace anyscale-operator \
@@ -189,8 +194,8 @@ No modules.
 | <a name="input_aks_cluster_name"></a> [aks\_cluster\_name](#input\_aks\_cluster\_name) | (Optional) Name of the AKS cluster (and related resources). | `string` | `"anyscale-demo"` | no |
 | <a name="input_anyscale_operator_namespace"></a> [anyscale\_operator\_namespace](#input\_anyscale\_operator\_namespace) | (Optional) Kubernetes namespace for the Anyscale operator. | `string` | `"anyscale-operator"` | no |
 | <a name="input_azure_location"></a> [azure\_location](#input\_azure\_location) | (Optional) Azure region for all resources. | `string` | `"West US"` | no |
-| <a name="input_node_group_gpu_types"></a> [node\_group\_gpu\_types](#input\_node\_group\_gpu\_types) | (Optional) The GPU types of the AKS nodes.<br>Possible values: ["T4", "A10", "A100", "H100"] | `list(string)` | <pre>[<br>  "T4"<br>]</pre> | no |
-| <a name="input_tags"></a> [tags](#input\_tags) | (Optional) Tags applied to all taggable resources. | `map(string)` | <pre>{<br>  "Environment": "dev",<br>  "Test": "true"<br>}</pre> | no |
+| <a name="input_node_group_gpu_types"></a> [node\_group\_gpu\_types](#input\_node\_group\_gpu\_types) | (Optional) The GPU types of the AKS nodes.<br/>Possible values: ["T4", "A10", "A100", "H100"] | `list(string)` | <pre>[<br/>  "T4"<br/>]</pre> | no |
+| <a name="input_tags"></a> [tags](#input\_tags) | (Optional) Tags applied to all taggable resources. | `map(string)` | <pre>{<br/>  "Environment": "dev",<br/>  "Test": "true"<br/>}</pre> | no |
 
 ## Outputs
 

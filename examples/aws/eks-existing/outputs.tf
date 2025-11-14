@@ -16,7 +16,7 @@ locals {
     "--compute-stack k8s",
     "--kubernetes-zones ${local.kubernetes_zones}",
     "--s3-bucket-id ${module.anyscale_s3.s3_bucket_id}",
-    "--efs-id ${module.anyscale_efs.efs_id}",
+    var.enable_efs ? "--efs-id ${module.anyscale_efs.efs_id}" : null,
     "--anyscale-operator-iam-identity <node_IAM_role_arn>",
   ])
 

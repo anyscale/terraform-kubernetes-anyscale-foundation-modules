@@ -4,5 +4,8 @@ controller:
     annotations:
       cloud.google.com/load-balancer-type: "External"
   allowSnippetAnnotations: true
+  config:
+    enable-underscores-in-headers: true
+    annotations-risk-level: "Critical"
   autoscaling:
     enabled: true

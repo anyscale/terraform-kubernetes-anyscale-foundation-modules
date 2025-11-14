@@ -11,6 +11,11 @@
 # These variables must be set when using this module.
 # ---------------------------------------------------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------------------------------------------------
+# OPTIONAL VARIABLES
+# These variables have defaults but must be included when using this module.
+# ---------------------------------------------------------------------------------------------------------------------
+
 variable "aws_region" {
   description = "The AWS region in which all resources will be created."
   type        = string
@@ -75,4 +80,19 @@ variable "customer_ingress_cidr_ranges" {
     ex: `52.1.1.23/32,10.1.0.0/16'
   EOT
   type        = string
+}
+
+variable "enable_efs" {
+  description = <<-EOT
+    (Optional) Enable the creation of an EFS instance.
+
+    This is optional for Anyscale deployments. EFS is used for shared storage between nodes.
+
+    ex:
+    ```
+    enable_efs = true
+    ```
+  EOT
+  type        = bool
+  default     = false
 }

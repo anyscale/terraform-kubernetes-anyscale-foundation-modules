@@ -17,10 +17,14 @@
 #################################################################
 
 locals {
-  anyscale_iam = {
-    anyscale_s3_policy = module.anyscale_iam_roles.anyscale_iam_s3_policy_arn,
-    efs_client_policy  = "arn:aws:iam::aws:policy/AmazonElasticFileSystemClientReadWriteAccess",
-  }
+  anyscale_iam = merge(
+    {
+      anyscale_s3_policy = module.anyscale_iam_roles.anyscale_iam_s3_policy_arn,
+    },
+    var.enable_efs ? {
+      efs_client_policy = "arn:aws:iam::aws:policy/AmazonElasticFileSystemClientReadWriteAccess",
+    } : {}
+  )
 
   # Map of GPU types to their product names and instance types
   gpu_types = {
@@ -234,7 +238,7 @@ module "eks" {
 resource "aws_iam_policy" "autoscaler_policy" {
   #checkov:skip=CKV_AWS_290: Ensure IAM policies does not allow write access without constraints
   #checkov:skip=CKV_AWS_355: Ensure no IAM policies documents allow "*" as a statement's resource for restrictable actions
-  name        = "anyscale-eks-private-autoscaler-policy"
+  name        = "${var.eks_cluster_name}-autoscaler-policy"
   description = "Policy that allows autoscaling and EC2 describe actions for EKS nodegroups."
   policy = jsonencode({
     Version = "2012-10-17"
@@ -274,7 +278,7 @@ resource "aws_iam_policy" "autoscaler_policy" {
 resource "aws_iam_policy" "elb_policy" {
   #checkov:skip=CKV_AWS_290: Ensure IAM policies does not allow write access without constraints
   #checkov:skip=CKV_AWS_355: Ensure no IAM policies documents allow "*" as a statement's resource for restrictable actions
-  name        = "anyscale-eks-private-elb-policy"
+  name        = "${var.eks_cluster_name}-elb-policy"
   description = "IAM policy for AWS Load Balancer Controller in Kubernetes"
   policy = jsonencode({
     Version = "2012-10-17"
