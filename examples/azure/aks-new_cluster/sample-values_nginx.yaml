@@ -1,4 +1,5 @@
 controller:
+  progressDeadlineSeconds: 600
   service:
     type: LoadBalancer
     annotations:
