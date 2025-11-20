@@ -27,7 +27,7 @@ e.g.
 aks_cluster_name = ""
 azure_subscription_id = ""
 azure_location = ""
-node_group_gpu_types = [""]
+node_group_gpu_types = [""] # if you need types beyond the default list
 ```
 
 * Apply the terraform
