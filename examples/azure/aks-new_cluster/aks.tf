@@ -139,7 +139,7 @@ locals {
       gpu_count    = "1"
     }
     H100 = {
-      name         = "gpuh100x8"
+      name         = "h100x8"
       vm_size      = "Standard_ND96isr_H100_v5"
       product_name = "NVIDIA-H100"
       gpu_count    = "8"
