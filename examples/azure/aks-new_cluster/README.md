@@ -22,6 +22,14 @@ requirements.
 Steps for deploying Anyscale resources via Terraform:
 
 * Review variables.tf and (optionally) create a `terraform.tfvars` file to override any of the defaults.
+e.g. 
+```sh
+aks_cluster_name = ""
+azure_subscription_id = ""
+azure_location = ""
+node_group_gpu_types = [""]
+```
+
 * Apply the terraform
 
 ```shell
@@ -141,6 +149,22 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
 --set-string operatorIamIdentity=<anyscale_operator_client_id> \
 --set-string workloadServiceAccountName=anyscale-operator \
 --namespace anyscale-operator \
+--create-namespace \
+-i
+```
+
+[optional] If you are using GPU types other than T4 follow these steps:
+A sample file, `sample-custom_values.yaml` has been provided in this repo. Make a copy `custom_values.yaml` and update based on your GPU types before using.
+
+```shell
+helm upgrade anyscale-operator anyscale/anyscale-operator \
+--set-string anyscaleCliToken=<anyscale-cli-token> \
+--set-string cloudDeploymentId=<cloud-deployment-id> \
+--set-string cloudProvider=azure \
+--set-string operatorIamIdentity=<anyscale_operator_client_id> \
+--set-string workloadServiceAccountName=anyscale-operator \
+--namespace anyscale-operator \
+-f custom_values.yaml \
 --create-namespace \
 -i
 ```
