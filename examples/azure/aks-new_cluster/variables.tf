@@ -36,7 +36,7 @@ variable "node_group_gpu_types" {
     Possible values: ["T4", "A10", "A100", "H100"]
   EOT
   type        = list(string)
-  default     = ["T4", "A100", "H100"]
+  default     = ["T4", "A100"]
 
   validation {
     condition = alltrue(
