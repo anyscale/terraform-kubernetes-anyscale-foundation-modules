@@ -25,11 +25,11 @@ locals {
 
   helm_upgrade_command_parts = compact([
     "helm upgrade anyscale-operator anyscale/anyscale-operator",
-    "--set-string cloudDeploymentId=<cloud-deployment-id>",
-    "--set-string cloudProvider=gcp",
-    "--set-string region=${var.google_region}",
-    "--set-string operatorIamIdentity=${google_service_account.gke_nodes.email}",
-    "--set-string workloadServiceAccountName=anyscale-operator",
+    "--set-string global.cloudDeploymentId=<cloud-deployment-id>",
+    "--set-string global.cloudProvider=gcp",
+    "--set-string global.gcp.region=${var.google_region}",
+    "--set-string global.auth.iamIdentity=${google_service_account.gke_nodes.email}",
+    "--set-string workloads.serviceAccount.name=anyscale-operator",
     "--namespace ${var.anyscale_k8s_namespace}",
     "--create-namespace",
     "-i"

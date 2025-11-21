@@ -143,11 +143,11 @@ helm repo add anyscale https://anyscale.github.io/helm-charts
 helm repo update
 
 helm upgrade anyscale-operator anyscale/anyscale-operator \
---set-string cloudDeploymentId=<cloud-deployment-id> \
---set-string cloudProvider=azure \
---set-string region=<region> \
---set-string operatorIamIdentity=<anyscale_operator_client_id> \
---set-string workloadServiceAccountName=anyscale-operator \
+--set-string global.cloudDeploymentId=<cloud-deployment-id> \
+--set-string global.cloudProvider=azure \
+--set-string global.azure.region=<region> \
+--set-string global.auth.iamIdentity=<anyscale_operator_client_id> \
+--set-string workloads.serviceAccount.name=anyscale-operator \
 --namespace anyscale-operator \
 --create-namespace \
 -i
@@ -158,11 +158,11 @@ A sample file, `sample-custom_values.yaml` has been provided in this repo. Make 
 
 ```shell
 helm upgrade anyscale-operator anyscale/anyscale-operator \
---set-string anyscaleCliToken=<anyscale-cli-token> \
---set-string cloudDeploymentId=<cloud-deployment-id> \
---set-string cloudProvider=azure \
---set-string operatorIamIdentity=<anyscale_operator_client_id> \
---set-string workloadServiceAccountName=anyscale-operator \
+--set-string global.auth.anyscaleCliToken=<anyscale-cli-token> \
+--set-string global.cloudDeploymentId=<cloud-deployment-id> \
+--set-string global.cloudProvider=azure \
+--set-string global.auth.iamIdentity=<anyscale_operator_client_id> \
+--set-string workloads.serviceAccount.name=anyscale-operator \
 --namespace anyscale-operator \
 -f custom_values.yaml \
 --create-namespace \
