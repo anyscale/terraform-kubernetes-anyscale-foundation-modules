@@ -158,10 +158,10 @@ Output
 ```shell
 helm repo add anyscale https://anyscale.github.io/helm-charts
 helm upgrade anyscale-operator anyscale/anyscale-operator \
-  --set-string cloudDeploymentId=<cloud-deployment-id> \
-  --set-string cloudProvider=aws \
-  --set-string region=<aws_region> \
-  --set-string workloadServiceAccountName=anyscale-operator \
+  --set-string global.cloudDeploymentId=<cloud-deployment-id> \
+  --set-string global.cloudProvider=aws \
+  --set-string global.aws.region=<aws_region> \
+  --set-string workloads.serviceAccount.name=anyscale-operator \
   --namespace anyscale-operator \
   --create-namespace \
   --install

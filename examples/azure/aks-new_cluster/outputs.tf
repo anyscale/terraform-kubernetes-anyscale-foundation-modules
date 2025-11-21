@@ -35,11 +35,11 @@ locals {
 
   helm_upgrade_command_parts = compact([
     "helm upgrade anyscale-operator anyscale/anyscale-operator",
-    "--set-string cloudDeploymentId=<cloud-deployment-id>",
-    "--set-string region=${data.azurerm_location.example.location}",
-    "--set-string cloudProvider=azure",
-    "--set-string operatorIamIdentity=${azurerm_user_assigned_identity.anyscale_operator.client_id}",
-    "--set-string workloadServiceAccountName=anyscale-operator",
+    "--set-string global.cloudDeploymentId=<cloud-deployment-id>",
+    "--set-string global.azure.region=${data.azurerm_location.example.location}",
+    "--set-string global.cloudProvider=azure",
+    "--set-string global.auth.iamIdentity=${azurerm_user_assigned_identity.anyscale_operator.client_id}",
+    "--set-string workloads.serviceAccount.name=anyscale-operator",
     "--namespace ${var.anyscale_operator_namespace}",
     "--create-namespace",
     "-i"

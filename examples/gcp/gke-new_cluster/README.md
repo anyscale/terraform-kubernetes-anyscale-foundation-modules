@@ -131,11 +131,11 @@ anyscale cloud register \
     ```shell
     helm repo add anyscale https://anyscale.github.io/helm-charts
     helm upgrade anyscale-operator anyscale/anyscale-operator \
-      --set-string cloudDeploymentId=<cloud_deployment_id> \
-      --set-string cloudProvider=gcp \
-      --set-string region=<gke_region> \
-      --set-string operatorIamIdentity=<service_account_email> \
-      --set-string workloadServiceAccountName=anyscale-operator \
+      --set-string global.cloudDeploymentId=<cloud_deployment_id> \
+      --set-string global.cloudProvider=gcp \
+      --set-string global.gcp.region=<gke_region> \
+      --set-string global.auth.iamIdentity=<service_account_email> \
+      --set-string workloads.serviceAccount.name=anyscale-operator \
       --namespace anyscale-operator \
       --create-namespace \
       --install

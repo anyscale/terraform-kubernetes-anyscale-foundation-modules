@@ -32,10 +32,10 @@ locals {
 
   helm_upgrade_command_parts = compact([
     "helm upgrade anyscale-operator anyscale/anyscale-operator",
-    "--set-string cloudDeploymentId=<cloud-deployment-id>",
-    "--set-string cloudProvider=aws",
-    "--set-string region=${var.aws_region}",
-    "--set-string workloadServiceAccountName=anyscale-operator",
+    "--set-string global.cloudDeploymentId=<cloud-deployment-id>",
+    "--set-string global.cloudProvider=aws",
+    "--set-string global.aws.region=${var.aws_region}",
+    "--set-string workloads.serviceAccount.name=anyscale-operator",
     "--namespace anyscale-operator",
     "--create-namespace",
     "-i"
