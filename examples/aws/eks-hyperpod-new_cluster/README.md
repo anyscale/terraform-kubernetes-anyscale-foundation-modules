@@ -55,7 +55,7 @@ This flow shows distribution and execution of user-submitted jobs across the ava
 
 ## Set up SageMaker HyperPod
 
-> **_NOTE:_** For more information on how to set up SageMaker HyperPod with Amazon EKS orchestration see [Amazon SageMaker HyperPod quickstart](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-quickstart.html). You can also refer to Amazon EKS Support in [Amazon SageMaker HyperPod workshop](https://catalog.workshops.aws/sagemaker-hyperpod-eks/en-US), or [Using CloudFormation](https://catalog.workshops.aws/sagemaker-hyperpod-eks/en-US/00-setup/00-workshop-infra-cfn) for additional ways to create your cluster.
+> **_NOTE:_** The steps below walk you through setting up hyperpod with [Using CloudFormation](https://catalog.workshops.aws/sagemaker-hyperpod-eks/en-US/00-setup/00-workshop-infra-cfn). For more information on how to set up SageMaker HyperPod with Amazon EKS orchestration see [Amazon SageMaker HyperPod quickstart](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-quickstart.html). You can also refer to Amazon EKS Support in [Amazon SageMaker HyperPod workshop](https://catalog.workshops.aws/sagemaker-hyperpod-eks/en-US) for additional ways to create your cluster.
 
 The instructions below follow the [Using Terraform](https://catalog.workshops.aws/sagemaker-hyperpod-eks/en-US/00-setup/01-workshop-infra-tf) guide to setup a HyperPod cluster.
 
