@@ -81,10 +81,10 @@ variable "eks_cluster_version" {
 variable "node_group_gpu_types" {
   description = <<-EOT
     (Optional) The GPU types of the EKS nodes.
-    Possible values: ["T4", "A10G"]
+    Possible values: ["T4", "T4-4x", "A10G", "L4", "L4-4x"]
   EOT
   type        = list(string)
-  default     = ["T4"]
+  default     = ["T4", "T4-4x", "A10G", "L4", "L4-4x"]
 }
 
 variable "enable_efs" {

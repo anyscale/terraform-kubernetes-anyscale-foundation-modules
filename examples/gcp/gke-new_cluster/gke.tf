@@ -155,6 +155,63 @@ locals {
         "nvidia.com/gpu.count"   = "8"
       }
     }
+
+    "T4-highcpu" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 1
+        accelerator_type   = "nvidia-tesla-t4"
+        machine_type       = "n1-highcpu-4"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-tesla-t4"
+        "nvidia.com/gpu.count"   = "1"
+      }
+    }
+
+    "T4-4x" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 4
+        accelerator_type   = "nvidia-tesla-t4"
+        machine_type       = "n1-standard-32"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-tesla-t4"
+        "nvidia.com/gpu.count"   = "4"
+      }
+    }
+    
+    "L4-medium" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 1
+        accelerator_type   = "nvidia-l4"
+        machine_type       = "g2-standard-16"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-l4"
+        "nvidia.com/gpu.count"   = "1"
+      }
+    }
+
+    "L4-4x" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 4
+        accelerator_type   = "nvidia-l4"
+        machine_type       = "g2-standard-48"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-l4"
+        "nvidia.com/gpu.count"   = "4"
+      }
+    }
+
   }
 
   # Common taint configurations

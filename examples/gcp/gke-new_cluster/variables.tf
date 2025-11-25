@@ -108,10 +108,10 @@ variable "gke_cluster_name" {
 variable "node_group_gpu_types" {
   description = <<-EOT
     (Optional) The GPU types of the GKE nodes.
-    Possible values: ["V100", "P100", "T4", "L4", "A100-40G", "A100-80G", "H100", "H100-MEGA"]
+    Possible values: ["V100", "P100", "T4", "T4-highcpu", "T4-4x", "L4", "L4-medium", "L4-4x", "A100-40G", "A100-80G", "H100", "H100-MEGA"]
   EOT
   type        = list(string)
-  default     = ["T4"]
+  default     = ["T4", "T4-highcpu", "T4-4x", "L4", "L4-medium", "L4-4x"]
 }
 
 
