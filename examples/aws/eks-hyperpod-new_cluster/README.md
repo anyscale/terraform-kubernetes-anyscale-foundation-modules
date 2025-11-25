@@ -112,7 +112,7 @@ instance_groups = {
 EOL
 ```
 
-> Note: Setting the enable_stress_check and enable_connectivity_check to true causes a failure with `instance_count` > 0.
+> Note: Setting the `enable_stress_check` and `enable_connectivity_check` to `true` causes a failure with `instance_count` > 0.
 
 ### Deployment
 
