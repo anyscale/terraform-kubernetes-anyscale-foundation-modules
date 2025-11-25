@@ -76,32 +76,32 @@ For example, the following `custom.tfvars` file would enable the creation of all
 ```shell
 cat > custom.tfvars << EOL
 kubernetes_version = "1.32"
-eks_cluster_name = "my-eks-cluster"
-hyperpod_cluster_name = "my-hp-cluster"
-resource_name_prefix = "hp-eks-test"
+eks_cluster_name = "<my-eks-cluster>"
+hyperpod_cluster_name = "<my-hyperpod-cluster>"
+resource_name_prefix = "<hyperpod-prefix-name>"
 availability_zone_id  = "usw2-az2"
 instance_groups = {
-    2CPU-8GB-instance-group = {
+    instance-group-2CPU-8GB = {
         instance_type = "ml.m5.large",
         instance_count = 2,
         ebs_volume_size_in_gb = 100,
-        threads_per_core = 2,
+        threads_per_core = 1,
         enable_stress_check = true,
         enable_connectivity_check = true,
         lifecycle_script = "on_create.sh"
     },
-    4CPU-16GB-instance-group = {
+    instance-group-4CPU-16GB = {
         instance_type = "ml.m5.xlarge",
-        instance_count = 2,
+        instance_count = 1,
         ebs_volume_size_in_gb = 100,
         threads_per_core = 2,
         enable_stress_check = true,
         enable_connectivity_check = true,
         lifecycle_script = "on_create.sh"
     },
-    8CPU-32GB-instance-group = {
+    instance-group-8CPU-32GB = {
         instance_type = "ml.m5.2xlarge",
-        instance_count = 2,
+        instance_count = 1,
         ebs_volume_size_in_gb = 100,
         threads_per_core = 2,
         enable_stress_check = true,
@@ -111,6 +111,8 @@ instance_groups = {
 }
 EOL
 ```
+
+> Note: Setting the enable_stress_check and enable_connectivity_check to true causes a failure with `instance_count` > 0.
 
 ### Deployment
 
@@ -198,11 +200,11 @@ Ensure that you are logged into Anyscale with valid CLI credentials. (`anyscale 
 
 ```shell
 anyscale cloud register --provider aws \
-  --name my_kubernetes_cloud \
+  --name <anyscale-cloud-name> \
   --compute-stack k8s \
-  --region us-east-2 \
-  --s3-bucket-id anyscale_example_bucket \
-  --kubernetes-zones us-east-2a,us-east-2b,us-east-2c \
+  --region us-west-2 \
+  --s3-bucket-id <anyscale_example_bucket> \
+  --kubernetes-zones us-west-2a,us-west-2b,us-west-2c \
   --anyscale-operator-iam-identity arn:aws:iam::123456789012:role/my-kubernetes-cloud-node-group-role
 ```
 **Please note:** You must change the cloud name to a name that you choose. You will not be able to register a cloud with a name of `<CUSTOMER_DEFINED_NAME>`.
@@ -232,5 +234,5 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
 
 ### Verify your Anyscale Cloud
 ```shell
-anyscale job submit --cloud <your_cloud_name> --working-dir https://github.com/anyscale/docs_examples/archive/refs/heads/main.zip -- python hello_world.py
+anyscale job submit --cloud <anyscale-cloud-name> --working-dir https://github.com/anyscale/docs_examples/archive/refs/heads/main.zip -- python hello_world.py
 ```
