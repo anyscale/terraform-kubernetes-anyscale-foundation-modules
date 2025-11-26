@@ -1,4 +1,4 @@
-resource_name_prefix = "sagemaker-hyperpod-eks"
+resource_name_prefix = "hyperpod-prefix-name"
 aws_region           = "us-west-2"
 
 # VPC Module Variables
@@ -22,7 +22,7 @@ existing_security_group_id   = ""
 # EKS Cluster Module Variables
 create_eks_module            = true
 kubernetes_version           = "1.31"
-eks_cluster_name             = "sagemaker-hyperpod-eks-cluster"
+eks_cluster_name             = "my-eks-cluster"
 eks_private_subnet_1_cidr    = "10.192.7.0/28"
 eks_private_subnet_2_cidr    = "10.192.8.0/28"
 eks_private_node_subnet_cidr = "10.192.9.0/24"
@@ -51,19 +51,19 @@ helm_release_name        = "hyperpod-dependencies"
 
 # HyperPod Cluster Module Variables
 create_hyperpod_module = true
-hyperpod_cluster_name  = "ml-cluster"
+hyperpod_cluster_name  = "my-hyperpod-cluster"
 node_recovery          = "Automatic"
 node_provisioning_mode = "Continuous"
 
 # For the instance_groups variable, you'll need to define specific groups. Here's an example:
 instance_groups = {
   instance-group-1 = {
-    instance_type             = "ml.g5.8xlarge"
-    instance_count            = 8
+    instance_type             = "ml.m5.8xlarge"
+    instance_count            = 1
     ebs_volume_size_in_gb     = 100
     threads_per_core          = 2
-    enable_stress_check       = true
-    enable_connectivity_check = true
+    enable_stress_check       = false
+    enable_connectivity_check = false
     lifecycle_script          = "on_create.sh"
   }
 }
