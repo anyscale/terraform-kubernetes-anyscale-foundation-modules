@@ -263,3 +263,8 @@ variable "restricted_instance_groups" {
   }))
   default = {}
 }
+
+variable "anyscale_new_cloud_name" {
+  type = string
+  description = "Name of the new Anyscale cloud"
+}

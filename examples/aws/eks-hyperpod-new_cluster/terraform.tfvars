@@ -1,4 +1,5 @@
-resource_name_prefix = "hyperpod-prefix-name"
+anyscale_new_cloud_name = "my-new-cloud"
+resource_name_prefix = "my_prefix"
 aws_region           = "us-west-2"
 
 # VPC Module Variables

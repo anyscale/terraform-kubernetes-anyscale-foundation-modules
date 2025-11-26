@@ -22,20 +22,22 @@ See [here](details.md) for more details on this architecture.
 1. **Anyscale Account Setup**
     1. **Anyscale CLI** installed on your local laptop via `pip install anyscale --upgrade`.
     1. An **Anyscale organization** (account).
-    1. Authenticate local environment with Anyscale. Run `anyscale login`, follow the link, and click approve.
+    1. Authenticate local environment with Anyscale. Run `anyscale login`, open the link which is output in your browser, and click approve.
 
 ## Set up SageMaker HyperPod
 ### Customize HyperPod Deployment Configuration
 
-Review the default configurations in the `terraform.tfvars` file and make modifications to customize your deployment as needed.
+Review the default configurations in the existing `terraform.tfvars` file and make modifications to customize your deployment as needed.
 
 * Variables you will likely want to update
 
     ```tf
+    anyscale_new_cloud_name = "my-new-cloud-name"
     kubernetes_version = "1.31"
     eks_cluster_name = "my-eks-cluster"
     hyperpod_cluster_name = "my-hyperpod-cluster"
     resource_name_prefix = "hyperpod-prefix-name"
+    aws_region = "us-west-2"
     availability_zone_id  = "usw2-az2"
     ```
 
@@ -58,9 +60,7 @@ terraform apply
 ```
 ### Verify your connection to the HyperPod cluster
 
-Update with the name of your EKS cluster (not HyperPod cluster).
-If you do not know the name then bbtain the name of the EKS cluster on the SageMaker HyperPod console.
-In your cluster details, you will see your EKS cluster orchestrator.
+Using the output from the Terraform modules, verify a connection to the HyperPod cluster. It should look sonething:
 
 ```shell
 aws eks update-kubeconfig --region <region> --name <my-eks-cluster>
@@ -124,8 +124,20 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
   --create-namespace \
   --install
 ```
+3. Verify operator is installed:
+```shell
+helm list -n anyscale-operator
+```
 
 ### Verify your Anyscale Cloud
 ```shell
 anyscale job submit --cloud <anyscale-cloud-name> --working-dir https://github.com/anyscale/docs_examples/archive/refs/heads/main.zip -- python hello_world.py
+```
+
+### Clean up
+
+```shell
+kubectl delete deployment anyscale-operator -n anyscale
+kubectl delete deployment ingress-nginx-controller -n ingress-nginx
+kubectl delete pods --all -n ingress-nginx
 ```
