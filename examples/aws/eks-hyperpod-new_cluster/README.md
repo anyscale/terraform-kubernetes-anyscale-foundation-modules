@@ -128,6 +128,13 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
 ```shell
 helm list -n anyscale-operator
 ```
+### Add label to HyperPod node group(s)
+```shell
+kubectl label nodes --all eks.amazonaws.com/capacityType=ON_DEMAND
+```
+> Note: You need to wait until the HyperPod node group is available in your EKS cluster. And re-run this if you add new instance groups in the HyperPod cluster. You can check if the HyperPod node group is available by re-running this command: 
+
+`kubectl get nodes -L node.kubernetes.io/instance-type -L sagemaker.amazonaws.com/node-health-status -L sagemaker.amazonaws.com/deep-health-check-status $@`
 
 ### Verify your Anyscale Cloud
 ```shell
@@ -139,5 +146,5 @@ anyscale job submit --cloud <anyscale-cloud-name> --working-dir https://github.c
 ```shell
 kubectl delete deployment anyscale-operator -n anyscale
 kubectl delete deployment ingress-nginx-controller -n ingress-nginx
-kubectl delete pods --all -n ingress-nginx
+terraform -destroy
 ```
