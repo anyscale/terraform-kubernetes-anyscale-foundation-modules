@@ -14,6 +14,16 @@ resource "aws_iam_role" "sagemaker_execution_role" {
           Service = "sagemaker.amazonaws.com"
         }
         Action = "sts:AssumeRole"
+      },
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "pods.eks.amazonaws.com"
+        }
+        Action = [
+          "sts:AssumeRole",
+          "sts:TagSession"
+        ]
       }
     ]
   })
@@ -61,7 +71,12 @@ resource "aws_iam_policy" "sagemaker_execution_policy" {
           "ecr:GetAuthorizationToken",
           "ecr:GetDownloadUrlForLayer",
           "eks-auth:AssumeRoleForPodIdentity",
-          "cloudwatch:DescribeAlarms"
+          "cloudwatch:DescribeAlarms",
+          "ec2:DescribeInstances",
+          "ec2:DescribeInstanceTypes",
+          "ec2:DescribeImages",
+          "ec2:DescribeVolumes",
+          "ec2:DescribeAvailabilityZones"
         ]
         Resource = "*"
       },
@@ -76,7 +91,10 @@ resource "aws_iam_policy" "sagemaker_execution_policy" {
         Effect = "Allow"
         Action = [
           "s3:ListBucket",
-          "s3:GetObject"
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:GetBucketLocation"
         ]
         Resource = [
           "arn:aws:s3:::${var.s3_bucket_name}",

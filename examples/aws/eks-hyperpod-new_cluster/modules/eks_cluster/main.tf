@@ -45,11 +45,6 @@ resource "aws_iam_role_policy_attachment" "eks_cluster_policy_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
-resource "aws_cloudwatch_log_group" "eks_cluster" {
-  name              = "/aws/eks/${var.eks_cluster_name}/cluster"
-  retention_in_days = 7
-}
-
 resource "aws_eks_cluster" "cluster" {
   name     = var.eks_cluster_name
   version  = var.kubernetes_version
@@ -75,7 +70,6 @@ resource "aws_eks_cluster" "cluster" {
   ]
 
   depends_on = [
-    aws_cloudwatch_log_group.eks_cluster,
     aws_iam_role_policy_attachment.cluster_policy,
     aws_subnet.private
   ]

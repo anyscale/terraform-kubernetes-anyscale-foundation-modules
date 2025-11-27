@@ -135,3 +135,17 @@ module "hyperpod_cluster" {
   sagemaker_iam_role_name    = local.sagemaker_iam_role_name
 
 }
+
+# EKS Pod Identity Association for Anyscale Operator
+resource "aws_eks_pod_identity_association" "anyscale_operator" {
+  count           = var.create_eks_module && var.create_sagemaker_iam_role_module ? 1 : 0
+  cluster_name    = local.eks_cluster_name
+  namespace       = "anyscale-operator"
+  service_account = "anyscale-operator"
+  role_arn        = module.sagemaker_iam_role[0].sagemaker_iam_role_arn
+
+  depends_on = [
+    module.eks_cluster,
+    module.sagemaker_iam_role
+  ]
+}

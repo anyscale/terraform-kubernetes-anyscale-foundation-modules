@@ -190,7 +190,7 @@ locals {
 
 output "z_verify_hyperpod_cluster_connection" {
   description = "Verify connection to the HyperPod Cluster."
-  value = <<EOT
+  value       = <<EOT
 
 # =====================================================
 #  Verify connection to your HyperPod EKS Cluster
