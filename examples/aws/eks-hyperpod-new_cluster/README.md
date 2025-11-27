@@ -100,7 +100,6 @@ anyscale cloud register --provider aws \
   --kubernetes-zones us-west-2a,us-west-2b,us-west-2c \
   --anyscale-operator-iam-identity arn:aws:iam::123456789012:role/my-kubernetes-cloud-node-group-role
 ```
-**Please note:** You must change the cloud name to a name that you choose. You will not be able to register a cloud with a name of `<CUSTOMER_DEFINED_NAME>`.
 
 2. Note the Cloud Deployment ID which will be used in the next step. The Anyscale CLI will return it as one of the outputs. Example:
 ```shell
@@ -132,9 +131,10 @@ helm list -n anyscale-operator
 ```shell
 kubectl label nodes --all eks.amazonaws.com/capacityType=ON_DEMAND
 ```
-> Note: You need to wait until the HyperPod node group is available in your EKS cluster. And re-run this if you add new instance groups in the HyperPod cluster. You can check if the HyperPod node group is available by re-running this command: 
-
-`kubectl get nodes -L node.kubernetes.io/instance-type -L sagemaker.amazonaws.com/node-health-status -L sagemaker.amazonaws.com/deep-health-check-status $@`
+You need to wait until the HyperPod node group is available in your EKS cluster. And re-run this if you add new instance groups in the HyperPod cluster. You can check if the HyperPod node group is available by re-running this command: 
+```shell
+kubectl get nodes -L node.kubernetes.io/instance-type -L sagemaker.amazonaws.com/node-health-status -L sagemaker.amazonaws.com/deep-health-check-status $@
+```
 
 ### Verify your Anyscale Cloud
 ```shell
