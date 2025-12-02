@@ -78,7 +78,21 @@ locals {
         gpu_driver_version = "LATEST"
         accelerator_count  = 1
         accelerator_type   = "nvidia-tesla-t4"
-        machine_type       = "n1-standard-16"
+        machine_type       = "n1-standard-8"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-tesla-t4"
+        "nvidia.com/gpu.count"   = "1"
+      }
+    }
+
+    "T4-lowcpu" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 1
+        accelerator_type   = "nvidia-tesla-t4"
+        machine_type       = "n1-standard-4"
       }
       node_labels = {
         "nvidia.com/gpu.product" = "nvidia-tesla-t4"
@@ -162,7 +176,7 @@ locals {
         gpu_driver_version = "LATEST"
         accelerator_count  = 1
         accelerator_type   = "nvidia-tesla-t4"
-        machine_type       = "n1-highcpu-4"
+        machine_type       = "n1-standard-16"
       }
       node_labels = {
         "nvidia.com/gpu.product" = "nvidia-tesla-t4"
