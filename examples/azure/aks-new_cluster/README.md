@@ -71,7 +71,7 @@ helm upgrade ingress-nginx nginx/ingress-nginx \
 
 #### (Optional) Install the Nvidia device plugin
 
-A sample file, `sample-values_nvdp.yaml` has been provided in this repo. Please review for your requirements before using.
+A sample file, `sample-values_nvdp.yaml` has been provided in this repo. Please review for AKS requirements before using.
 
 1. Create a YAML values file named: `values_nvdp.yaml`
 2. Update the content with the following:
@@ -82,8 +82,7 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        # We allow a GPU deployment to be forced by setting the following label to "true"
-        - key: "nvidia.com/gpu.product"
+        - key: "kubernetes.azure.com/accelerator"
           operator: Exists
 tolerations:
   - key: nvidia.com/gpu
@@ -93,6 +92,9 @@ tolerations:
     operator: Exists
     effect: NoSchedule
   - key: node.anyscale.com/accelerator-type
+    operator: Exists
+    effect: NoSchedule
+  - key: kubernetes.azure.com/scalesetpriority
     operator: Exists
     effect: NoSchedule
 ```
