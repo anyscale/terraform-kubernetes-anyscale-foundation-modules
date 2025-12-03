@@ -138,6 +138,10 @@ Output
 Using the output from the Terraform modules, install the Anyscale Operator on the AKS Cluster. It should look someting like:
 
 ```shell
+export ANYSCALE_CLI_TOKEN=$(cat ~/.anyscale/credentials.json | jq .cli_token)
+```
+
+```shell
 
 helm repo add anyscale https://anyscale.github.io/helm-charts
 helm repo update
@@ -146,6 +150,7 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
 --set-string global.cloudDeploymentId=<cloud-deployment-id> \
 --set-string global.cloudProvider=azure \
 --set-string global.azure.region=<region> \
+--set-string global.auth.anyscaleCliToken=$ANYSCALE_CLI_TOKEN \
 --set-string global.auth.iamIdentity=<anyscale_operator_client_id> \
 --set-string workloads.serviceAccount.name=anyscale-operator \
 --namespace anyscale-operator \
@@ -161,6 +166,7 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
 --set-string global.auth.anyscaleCliToken=<anyscale-cli-token> \
 --set-string global.cloudDeploymentId=<cloud-deployment-id> \
 --set-string global.cloudProvider=azure \
+--set-string global.auth.anyscaleCliToken=$ANYSCALE_CLI_TOKEN \
 --set-string global.auth.iamIdentity=<anyscale_operator_client_id> \
 --set-string workloads.serviceAccount.name=anyscale-operator \
 --namespace anyscale-operator \
