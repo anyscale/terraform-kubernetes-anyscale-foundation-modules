@@ -3,8 +3,7 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        # We allow a GPU deployment to be forced by setting the following label to "true"
-        - key: "nvidia.com/gpu.product"
+        - key: "kubernetes.azure.com/accelerator"
           operator: Exists
 tolerations:
   - key: nvidia.com/gpu
@@ -14,5 +13,8 @@ tolerations:
     operator: Exists
     effect: NoSchedule
   - key: node.anyscale.com/accelerator-type
+    operator: Exists
+    effect: NoSchedule
+  - key: kubernetes.azure.com/scalesetpriority
     operator: Exists
     effect: NoSchedule
