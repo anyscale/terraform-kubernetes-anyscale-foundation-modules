@@ -81,10 +81,39 @@ variable "eks_cluster_version" {
 variable "node_group_gpu_types" {
   description = <<-EOT
     (Optional) The GPU types of the EKS nodes.
-    Possible values: ["T4", "T4-4x", "A10G", "L4", "L4-4x"]
+    Possible values: ["T4", "A10G"] plus any keys defined in additional_gpu_types
   EOT
   type        = list(string)
-  default     = ["T4", "T4-4x", "A10G", "L4", "L4-4x"]
+  default     = ["T4"]
+}
+
+variable "additional_gpu_types" {
+  description = <<-EOT
+    (Optional) Additional GPU types to add or override in the EKS cluster.
+    Entries with the same key as a default (e.g., "T4") will override the default entirely.
+    See gpu_instances.tfvars for examples.
+
+    ex:
+    ```
+    additional_gpu_types = {
+      # Override default T4 with more instance types
+      "T4" = {
+        product_name   = "Tesla-T4"
+        instance_types = ["g4dn.xlarge", "g4dn.2xlarge", "g4dn.4xlarge"]
+      }
+      # Add new GPU type
+      "L4" = {
+        product_name   = "NVIDIA-L4"
+        instance_types = ["g6.2xlarge", "g6.4xlarge"]
+      }
+    }
+    ```
+  EOT
+  type = map(object({
+    product_name   = string
+    instance_types = list(string)
+  }))
+  default = {}
 }
 
 variable "enable_efs" {

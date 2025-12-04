@@ -108,10 +108,61 @@ variable "gke_cluster_name" {
 variable "node_group_gpu_types" {
   description = <<-EOT
     (Optional) The GPU types of the GKE nodes.
-    Possible values: ["V100", "P100", "T4", "T4-highcpu", "T4-4x", "L4", "L4-medium", "L4-4x", "A100-40G", "A100-80G", "H100", "H100-MEGA"]
+    Possible values: ["V100", "P100", "T4", "L4", "A100-40G", "A100-80G", "H100", "H100-MEGA"] plus any keys defined in additional_gpu_configs
   EOT
   type        = list(string)
-  default     = ["T4", "T4-highcpu", "T4-4x", "L4", "L4-medium", "L4-4x"]
+  default     = ["T4"]
+}
+
+variable "additional_gpu_configs" {
+  description = <<-EOT
+    (Optional) Additional GPU configurations to add or override in the GKE cluster.
+    Entries with the same key as a default (e.g., "T4") will override the default entirely.
+    See gpu_instances.tfvars for examples.
+
+    ex:
+    ```
+    additional_gpu_configs = {
+      # Override default T4 with different machine type
+      "T4" = {
+        instance = {
+          disk_type          = "pd-ssd"
+          gpu_driver_version = "LATEST"
+          accelerator_count  = 1
+          accelerator_type   = "nvidia-tesla-t4"
+          machine_type       = "n1-standard-8"
+        }
+        node_labels = {
+          "nvidia.com/gpu.product" = "nvidia-tesla-t4"
+        }
+      }
+      # Add new GPU type
+      "T4-4x" = {
+        instance = {
+          disk_type          = "pd-ssd"
+          gpu_driver_version = "LATEST"
+          accelerator_count  = 4
+          accelerator_type   = "nvidia-tesla-t4"
+          machine_type       = "n1-standard-32"
+        }
+        node_labels = {
+          "nvidia.com/gpu.product" = "nvidia-tesla-t4"
+        }
+      }
+    }
+    ```
+  EOT
+  type = map(object({
+    instance = object({
+      disk_type          = string
+      gpu_driver_version = string
+      accelerator_count  = number
+      accelerator_type   = string
+      machine_type       = string
+    })
+    node_labels = map(string)
+  }))
+  default = {}
 }
 
 

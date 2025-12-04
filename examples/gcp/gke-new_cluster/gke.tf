@@ -43,190 +43,115 @@ locals {
   }
 
   # GPU configurations mapping
-  gpu_configs = {
-    "V100" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-tesla-v100"
-        machine_type       = "n1-standard-16"
+  # Additional GPU types can be added via gpu_instances.tfvars
+  gpu_configs = merge(
+    {
+      "V100" = {
+        instance = {
+          disk_type          = "pd-ssd"
+          gpu_driver_version = "LATEST"
+          accelerator_count  = 1
+          accelerator_type   = "nvidia-tesla-v100"
+          machine_type       = "n1-standard-16"
+        }
+        node_labels = {
+          "nvidia.com/gpu.product" = "nvidia-tesla-v100"
+        }
       }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-tesla-v100"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
 
-    "P100" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-tesla-p100"
-        machine_type       = "n1-standard-16"
+      "P100" = {
+        instance = {
+          disk_type          = "pd-ssd"
+          gpu_driver_version = "LATEST"
+          accelerator_count  = 1
+          accelerator_type   = "nvidia-tesla-p100"
+          machine_type       = "n1-standard-16"
+        }
+        node_labels = {
+          "nvidia.com/gpu.product" = "nvidia-tesla-p100"
+        }
       }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-tesla-p100"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
 
-    "T4" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-tesla-t4"
-        machine_type       = "n1-standard-8"
+      "T4" = {
+        instance = {
+          disk_type          = "pd-ssd"
+          gpu_driver_version = "LATEST"
+          accelerator_count  = 1
+          accelerator_type   = "nvidia-tesla-t4"
+          machine_type       = "n1-standard-16"
+        }
+        node_labels = {
+          "nvidia.com/gpu.product" = "nvidia-tesla-t4"
+        }
       }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-tesla-t4"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
 
-    "T4-lowcpu" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-tesla-t4"
-        machine_type       = "n1-standard-4"
+      "L4" = {
+        instance = {
+          disk_type          = "pd-ssd"
+          gpu_driver_version = "LATEST"
+          accelerator_count  = 1
+          accelerator_type   = "nvidia-l4"
+          machine_type       = "g2-standard-16"
+        }
+        node_labels = {
+          "nvidia.com/gpu.product" = "nvidia-l4"
+        }
       }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-tesla-t4"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
 
-    "L4" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-l4"
-        machine_type       = "g2-standard-16"
+      "A100-40G" = {
+        instance = {
+          disk_type          = "pd-ssd"
+          gpu_driver_version = "LATEST"
+          accelerator_count  = 1
+          accelerator_type   = "nvidia-tesla-a100"
+          machine_type       = "a2-highgpu-1g"
+        }
+        node_labels = {
+          "nvidia.com/gpu.product" = "nvidia-tesla-a100"
+        }
       }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-l4"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
 
-    "A100-40G" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-tesla-a100"
-        machine_type       = "a2-highgpu-1g"
+      "A100-80G" = {
+        instance = {
+          disk_type          = "pd-ssd"
+          gpu_driver_version = "LATEST"
+          accelerator_count  = 1
+          accelerator_type   = "nvidia-a100-80gb"
+          machine_type       = "a2-ultragpu-1g"
+        }
+        node_labels = {
+          "nvidia.com/gpu.product" = "nvidia-a100-80gb"
+        }
       }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-tesla-a100"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
 
-    "A100-80G" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-a100-80gb"
-        machine_type       = "a2-ultragpu-1g"
+      "H100" = {
+        instance = {
+          disk_type          = "pd-ssd"
+          gpu_driver_version = "LATEST"
+          accelerator_count  = 1
+          accelerator_type   = "nvidia-h100-80gb"
+          machine_type       = "a3-highgpu-1g"
+        }
+        node_labels = {
+          "nvidia.com/gpu.product" = "nvidia-h100-80gb"
+        }
       }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-a100-80gb"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
 
-    "H100" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-h100-80gb"
-        machine_type       = "a3-highgpu-1g"
+      "H100-MEGA" = {
+        instance = {
+          disk_type          = "pd-ssd"
+          gpu_driver_version = "LATEST"
+          accelerator_count  = 1
+          accelerator_type   = "nvidia-h100-mega-80gb"
+          machine_type       = "a3-megagpu-8g"
+        }
+        node_labels = {
+          "nvidia.com/gpu.product" = "nvidia-h100-mega-80gb"
+        }
       }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-h100-80gb"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
-
-    "H100-MEGA" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-h100-mega-80gb"
-        machine_type       = "a3-megagpu-8g"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-h100-mega-80gb"
-        "nvidia.com/gpu.count"   = "8"
-      }
-    }
-
-    "T4-highcpu" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-tesla-t4"
-        machine_type       = "n1-standard-16"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-tesla-t4"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
-
-    "T4-4x" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 4
-        accelerator_type   = "nvidia-tesla-t4"
-        machine_type       = "n1-standard-32"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-tesla-t4"
-        "nvidia.com/gpu.count"   = "4"
-      }
-    }
-    
-    "L4-medium" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-l4"
-        machine_type       = "g2-standard-16"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-l4"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
-
-    "L4-4x" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 4
-        accelerator_type   = "nvidia-l4"
-        machine_type       = "g2-standard-48"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-l4"
-        "nvidia.com/gpu.count"   = "4"
-      }
-    }
-
-  }
+    },
+    var.additional_gpu_configs
+  )
 
   # Common taint configurations
   capacity_type_taint = {

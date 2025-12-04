@@ -33,6 +33,17 @@ terraform apply
 If you are using a `tfvars` file, you will need to update the above commands accordingly.
 Note the output from Terraform which includes an example cloud registration command you will use below.
 
+#### Using Additional GPU Instance Types
+
+To enable additional GPU instance types beyond the defaults (T4, A10G), use the provided `gpu_instances.tfvars` file:
+
+```shell
+terraform plan -var-file="gpu_instances.tfvars"
+terraform apply -var-file="gpu_instances.tfvars"
+```
+
+This will enable additional GPU types including T4-4x, L4, and L4-4x. You can also customize which GPU types to enable by modifying the `node_group_gpu_types` variable in the tfvars file.
+
 ### Install the Kubernetes Requirements
 
 The Anyscale Operator requires the following components:
