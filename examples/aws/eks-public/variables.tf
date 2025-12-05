@@ -78,13 +78,35 @@ variable "eks_cluster_version" {
   default     = "1.32"
 }
 
-variable "node_group_gpu_types" {
+variable "gpu_instance_types" {
   description = <<-EOT
-    (Optional) The GPU types of the EKS nodes.
-    Possible values: ["T4", "A10G"]
+    (Optional) GPU types configuration for the EKS cluster.
+    See gpu_instances.tfvars.example for additional GPU types.
+
+    ex:
+    ```
+    gpu_instance_types = {
+      "T4" = {
+        product_name   = "Tesla-T4"
+        instance_types = ["g4dn.xlarge", "g4dn.2xlarge", "g4dn.4xlarge"]
+      }
+      "A10G" = {
+        product_name   = "NVIDIA-A10G"
+        instance_types = ["g5.4xlarge"]
+      }
+    }
+    ```
   EOT
-  type        = list(string)
-  default     = ["T4"]
+  type = map(object({
+    product_name   = string
+    instance_types = list(string)
+  }))
+  default = {
+    "T4" = {
+      product_name   = "Tesla-T4"
+      instance_types = ["g4dn.4xlarge"]
+    }
+  }
 }
 
 variable "enable_efs" {
