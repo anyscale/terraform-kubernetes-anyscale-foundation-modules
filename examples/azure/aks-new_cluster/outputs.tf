@@ -18,6 +18,11 @@ output "anyscale_operator_client_id" {
   description = "Client ID of the Azure User Assigned Identity created for the cluster."
 }
 
+output "anyscale_operator_principal_id" {
+  value       = azurerm_user_assigned_identity.anyscale_operator.principal_id
+  description = "Principal ID of the Azure User Assigned Identity created for the cluster."
+}
+
 data "azurerm_location" "example" {
   location = var.azure_location
 }
