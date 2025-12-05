@@ -20,9 +20,6 @@ crash.*.log
 *.tfvars
 *.tfvars.json
 
-# Allow gpu_instances.tfvars files (these contain example GPU configurations, not secrets)
-!**/gpu_instances.tfvars
-
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
 override.tf

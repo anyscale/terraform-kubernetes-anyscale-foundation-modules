@@ -27,20 +27,7 @@ locals {
   )
 
   # Map of GPU types to their product names and instance types
-  # Additional GPU types can be added via gpu_instances.tfvars
-  gpu_types = merge(
-    {
-      "T4" = {
-        product_name   = "Tesla-T4"
-        instance_types = ["g4dn.4xlarge"]
-      }
-      "A10G" = {
-        product_name   = "NVIDIA-A10G"
-        instance_types = ["g5.4xlarge"]
-      }
-    },
-    var.additional_gpu_types
-  )
+  gpu_types = var.gpu_instance_types
 
   # Base configuration for GPU node groups
   gpu_node_group_base = {

@@ -81,27 +81,28 @@ variable "eks_cluster_version" {
 variable "node_group_gpu_types" {
   description = <<-EOT
     (Optional) The GPU types of the EKS nodes.
-    Possible values: ["T4", "A10G"] plus any keys defined in additional_gpu_types
+    Possible values: Any keys defined in gpu_instance_types (default: ["T4", "A10G"])
   EOT
   type        = list(string)
   default     = ["T4"]
 }
 
-variable "additional_gpu_types" {
+variable "gpu_instance_types" {
   description = <<-EOT
-    (Optional) Additional GPU types to add or override in the EKS cluster.
-    Entries with the same key as a default (e.g., "T4") will override the default entirely.
-    See gpu_instances.tfvars for examples.
+    (Optional) GPU types configuration for the EKS cluster.
+    See gpu_instances.tfvars.example for examples.
 
     ex:
     ```
-    additional_gpu_types = {
-      # Override default T4 with more instance types
+    gpu_instance_types = {
       "T4" = {
         product_name   = "Tesla-T4"
         instance_types = ["g4dn.xlarge", "g4dn.2xlarge", "g4dn.4xlarge"]
       }
-      # Add new GPU type
+      "A10G" = {
+        product_name   = "NVIDIA-A10G"
+        instance_types = ["g5.4xlarge"]
+      }
       "L4" = {
         product_name   = "NVIDIA-L4"
         instance_types = ["g6.2xlarge", "g6.4xlarge"]
@@ -113,7 +114,16 @@ variable "additional_gpu_types" {
     product_name   = string
     instance_types = list(string)
   }))
-  default = {}
+  default = {
+    "T4" = {
+      product_name   = "Tesla-T4"
+      instance_types = ["g4dn.4xlarge"]
+    }
+    "A10G" = {
+      product_name   = "NVIDIA-A10G"
+      instance_types = ["g5.4xlarge"]
+    }
+  }
 }
 
 variable "enable_efs" {

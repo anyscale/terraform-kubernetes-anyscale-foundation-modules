@@ -108,35 +108,32 @@ variable "gke_cluster_name" {
 variable "node_group_gpu_types" {
   description = <<-EOT
     (Optional) The GPU types of the GKE nodes.
-    Possible values: ["V100", "P100", "T4", "L4", "A100-40G", "A100-80G", "H100", "H100-MEGA"] plus any keys defined in additional_gpu_configs
+    Possible values: Any keys defined in gpu_instance_configs (default: ["V100", "P100", "T4", "L4", "A100-40G", "A100-80G", "H100", "H100-MEGA"])
   EOT
   type        = list(string)
   default     = ["T4"]
 }
 
-variable "additional_gpu_configs" {
+variable "gpu_instance_configs" {
   description = <<-EOT
-    (Optional) Additional GPU configurations to add or override in the GKE cluster.
-    Entries with the same key as a default (e.g., "T4") will override the default entirely.
-    See gpu_instances.tfvars for examples.
+    (Optional) GPU configurations for the GKE cluster.
+    See gpu_instances.tfvars.example for examples.
 
     ex:
     ```
-    additional_gpu_configs = {
-      # Override default T4 with different machine type
+    gpu_instance_configs = {
       "T4" = {
         instance = {
           disk_type          = "pd-ssd"
           gpu_driver_version = "LATEST"
           accelerator_count  = 1
           accelerator_type   = "nvidia-tesla-t4"
-          machine_type       = "n1-standard-8"
+          machine_type       = "n1-standard-16"
         }
         node_labels = {
           "nvidia.com/gpu.product" = "nvidia-tesla-t4"
         }
       }
-      # Add new GPU type
       "T4-4x" = {
         instance = {
           disk_type          = "pd-ssd"
@@ -162,7 +159,104 @@ variable "additional_gpu_configs" {
     })
     node_labels = map(string)
   }))
-  default = {}
+  default = {
+    "V100" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 1
+        accelerator_type   = "nvidia-tesla-v100"
+        machine_type       = "n1-standard-16"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-tesla-v100"
+      }
+    }
+    "P100" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 1
+        accelerator_type   = "nvidia-tesla-p100"
+        machine_type       = "n1-standard-16"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-tesla-p100"
+      }
+    }
+    "T4" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 1
+        accelerator_type   = "nvidia-tesla-t4"
+        machine_type       = "n1-standard-16"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-tesla-t4"
+      }
+    }
+    "L4" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 1
+        accelerator_type   = "nvidia-l4"
+        machine_type       = "g2-standard-16"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-l4"
+      }
+    }
+    "A100-40G" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 1
+        accelerator_type   = "nvidia-tesla-a100"
+        machine_type       = "a2-highgpu-1g"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-tesla-a100"
+      }
+    }
+    "A100-80G" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 1
+        accelerator_type   = "nvidia-a100-80gb"
+        machine_type       = "a2-ultragpu-1g"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-a100-80gb"
+      }
+    }
+    "H100" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 1
+        accelerator_type   = "nvidia-h100-80gb"
+        machine_type       = "a3-highgpu-1g"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-h100-80gb"
+      }
+    }
+    "H100-MEGA" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 1
+        accelerator_type   = "nvidia-h100-mega-80gb"
+        machine_type       = "a3-megagpu-8g"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-h100-mega-80gb"
+      }
+    }
+  }
 }
 
 
