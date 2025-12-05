@@ -35,15 +35,20 @@ Note the output from Terraform which includes an example cloud registration comm
 
 #### Using Additional GPU Instance Types
 
-To customize GPU instance types, copy the provided example file and modify as needed:
+To enable additional GPU instance types, use the provided example file directly:
+
+```shell
+terraform plan -var-file="gpu_instances.tfvars.example"
+terraform apply -var-file="gpu_instances.tfvars.example"
+```
+
+This will enable additional GPU types including T4-4x, L4, and L4-4x. To customize, copy the file and modify as needed:
 
 ```shell
 cp gpu_instances.tfvars.example gpu_instances.tfvars
-terraform plan -var-file="gpu_instances.tfvars"
+# Edit gpu_instances.tfvars as needed
 terraform apply -var-file="gpu_instances.tfvars"
 ```
-
-This will enable additional GPU types including T4-4x, L4, and L4-4x. You can also customize which GPU types to enable by modifying the `node_group_gpu_types` and `gpu_instance_types` variables in the tfvars file.
 
 ### Install the Kubernetes Requirements
 

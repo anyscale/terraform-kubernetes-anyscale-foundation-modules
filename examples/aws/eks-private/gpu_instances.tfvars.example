@@ -1,14 +1,12 @@
 # GPU Instance Types for EKS
 #
 # This file contains GPU instance configurations that can be used
-# with the EKS cluster. To use these configurations, copy this file to
-# gpu_instances.tfvars and include it when running terraform:
+# with the EKS cluster. Use this file directly or copy and modify as needed:
 #
-#   cp gpu_instances.tfvars.example gpu_instances.tfvars
-#   terraform plan -var-file="gpu_instances.tfvars"
-#   terraform apply -var-file="gpu_instances.tfvars"
+#   terraform plan -var-file="gpu_instances.tfvars.example"
+#   terraform apply -var-file="gpu_instances.tfvars.example"
 #
-# You can also selectively enable specific GPU types by setting the
+# You can selectively enable specific GPU types by setting the
 # node_group_gpu_types variable.
 
 # GPU types configuration
