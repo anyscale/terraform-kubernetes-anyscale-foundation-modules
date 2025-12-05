@@ -1,42 +1,13 @@
 # GPU Instance Types for GKE
 #
-# This file contains GPU instance configurations that can be used
-# with the GKE cluster. Use this file directly or copy and modify as needed:
+# This file contains additional GPU instance configurations beyond the default (T4).
+# Use this file directly or copy and modify as needed:
 #
 #   terraform plan -var-file="gpu_instances.tfvars.example"
 #   terraform apply -var-file="gpu_instances.tfvars.example"
-#
-# You can selectively enable specific GPU types by setting the
-# node_group_gpu_types variable.
 
-# GPU configurations
+# GPU types configuration - node pools will be created for each entry
 gpu_instance_configs = {
-  "V100" = {
-    instance = {
-      disk_type          = "pd-ssd"
-      gpu_driver_version = "LATEST"
-      accelerator_count  = 1
-      accelerator_type   = "nvidia-tesla-v100"
-      machine_type       = "n1-standard-16"
-    }
-    node_labels = {
-      "nvidia.com/gpu.product" = "nvidia-tesla-v100"
-    }
-  }
-
-  "P100" = {
-    instance = {
-      disk_type          = "pd-ssd"
-      gpu_driver_version = "LATEST"
-      accelerator_count  = 1
-      accelerator_type   = "nvidia-tesla-p100"
-      machine_type       = "n1-standard-16"
-    }
-    node_labels = {
-      "nvidia.com/gpu.product" = "nvidia-tesla-p100"
-    }
-  }
-
   "T4" = {
     instance = {
       disk_type          = "pd-ssd"
@@ -63,19 +34,6 @@ gpu_instance_configs = {
     }
   }
 
-  "T4-highcpu" = {
-    instance = {
-      disk_type          = "pd-ssd"
-      gpu_driver_version = "LATEST"
-      accelerator_count  = 1
-      accelerator_type   = "nvidia-tesla-t4"
-      machine_type       = "n1-standard-16"
-    }
-    node_labels = {
-      "nvidia.com/gpu.product" = "nvidia-tesla-t4"
-    }
-  }
-
   "T4-4x" = {
     instance = {
       disk_type          = "pd-ssd"
@@ -89,20 +47,33 @@ gpu_instance_configs = {
     }
   }
 
-  "L4" = {
+  "V100" = {
     instance = {
       disk_type          = "pd-ssd"
       gpu_driver_version = "LATEST"
       accelerator_count  = 1
-      accelerator_type   = "nvidia-l4"
-      machine_type       = "g2-standard-16"
+      accelerator_type   = "nvidia-tesla-v100"
+      machine_type       = "n1-standard-16"
     }
     node_labels = {
-      "nvidia.com/gpu.product" = "nvidia-l4"
+      "nvidia.com/gpu.product" = "nvidia-tesla-v100"
     }
   }
 
-  "L4-medium" = {
+  "P100" = {
+    instance = {
+      disk_type          = "pd-ssd"
+      gpu_driver_version = "LATEST"
+      accelerator_count  = 1
+      accelerator_type   = "nvidia-tesla-p100"
+      machine_type       = "n1-standard-16"
+    }
+    node_labels = {
+      "nvidia.com/gpu.product" = "nvidia-tesla-p100"
+    }
+  }
+
+  "L4" = {
     instance = {
       disk_type          = "pd-ssd"
       gpu_driver_version = "LATEST"
@@ -180,6 +151,3 @@ gpu_instance_configs = {
     }
   }
 }
-
-# Enable all GPU types defined above
-node_group_gpu_types = ["V100", "P100", "T4", "T4-lowcpu", "T4-highcpu", "T4-4x", "L4", "L4-medium", "L4-4x", "A100-40G", "A100-80G", "H100", "H100-MEGA"]

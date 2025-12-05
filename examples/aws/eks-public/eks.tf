@@ -67,9 +67,9 @@ locals {
     }
   ])
 
-  # Create a map of GPU node groups based on node_group_gpu_types
+  # Create a map of GPU node groups based on gpu_instance_types
   gpu_node_groups = {
-    for gpu_type in var.node_group_gpu_types : gpu_type => {
+    for gpu_type in keys(var.gpu_instance_types) : gpu_type => {
       ondemand = merge(
         local.gpu_node_group_base,
         {
@@ -213,12 +213,12 @@ module "eks" {
         iam_role_additional_policies = local.anyscale_iam
       }
     },
-    # Merge in GPU node groups based on node_group_gpu_types
+    # Merge in GPU node groups based on gpu_instance_types
     {
-      for gpu_type in var.node_group_gpu_types : "ondemand_gpu_${lower(gpu_type)}" => local.gpu_node_groups[gpu_type].ondemand
+      for gpu_type in keys(var.gpu_instance_types) : "ondemand_gpu_${lower(gpu_type)}" => local.gpu_node_groups[gpu_type].ondemand
     },
     {
-      for gpu_type in var.node_group_gpu_types : "spot_gpu_${lower(gpu_type)}" => local.gpu_node_groups[gpu_type].spot
+      for gpu_type in keys(var.gpu_instance_types) : "spot_gpu_${lower(gpu_type)}" => local.gpu_node_groups[gpu_type].spot
     }
   )
 

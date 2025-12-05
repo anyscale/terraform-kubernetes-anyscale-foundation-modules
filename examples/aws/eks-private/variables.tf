@@ -78,19 +78,10 @@ variable "eks_cluster_version" {
   default     = "1.32"
 }
 
-variable "node_group_gpu_types" {
-  description = <<-EOT
-    (Optional) The GPU types of the EKS nodes.
-    Possible values: Any keys defined in gpu_instance_types (default: ["T4", "A10G"])
-  EOT
-  type        = list(string)
-  default     = ["T4"]
-}
-
 variable "gpu_instance_types" {
   description = <<-EOT
     (Optional) GPU types configuration for the EKS cluster.
-    See gpu_instances.tfvars.example for examples.
+    See gpu_instances.tfvars.example for additional GPU types.
 
     ex:
     ```
@@ -103,10 +94,6 @@ variable "gpu_instance_types" {
         product_name   = "NVIDIA-A10G"
         instance_types = ["g5.4xlarge"]
       }
-      "L4" = {
-        product_name   = "NVIDIA-L4"
-        instance_types = ["g6.2xlarge", "g6.4xlarge"]
-      }
     }
     ```
   EOT
@@ -118,10 +105,6 @@ variable "gpu_instance_types" {
     "T4" = {
       product_name   = "Tesla-T4"
       instance_types = ["g4dn.4xlarge"]
-    }
-    "A10G" = {
-      product_name   = "NVIDIA-A10G"
-      instance_types = ["g5.4xlarge"]
     }
   }
 }

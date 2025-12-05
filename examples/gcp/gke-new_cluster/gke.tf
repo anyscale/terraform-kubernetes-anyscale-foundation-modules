@@ -82,9 +82,9 @@ locals {
     local.gpu_taints
   )
 
-  # Generate GPU node pools based on node_group_gpu_types
+  # Generate GPU node pools based on gpu_instance_configs
   gpu_node_pools = flatten([
-    for gpu_type in var.node_group_gpu_types : [
+    for gpu_type in keys(var.gpu_instance_configs) : [
       merge(local.base_node_pool,
         merge(local.gpu_configs[gpu_type].instance, {
           name = "ondemand-gpu-${lower(gpu_type)}"
@@ -127,10 +127,10 @@ locals {
   node_pools_labels = merge(
     { all = {} },
     {
-      for gpu_type in var.node_group_gpu_types : "ondemand-gpu-${lower(gpu_type)}" => local.gpu_configs[gpu_type].node_labels
+      for gpu_type in keys(var.gpu_instance_configs) : "ondemand-gpu-${lower(gpu_type)}" => local.gpu_configs[gpu_type].node_labels
     },
     {
-      for gpu_type in var.node_group_gpu_types : "spot-gpu-${lower(gpu_type)}" => local.gpu_configs[gpu_type].node_labels
+      for gpu_type in keys(var.gpu_instance_configs) : "spot-gpu-${lower(gpu_type)}" => local.gpu_configs[gpu_type].node_labels
     }
   )
 
@@ -142,10 +142,10 @@ locals {
       "spot-cpu"     = [local.capacity_type_taint.spot]
     },
     {
-      for gpu_type in var.node_group_gpu_types : "ondemand-gpu-${lower(gpu_type)}" => local.gpu_taints_ondemand
+      for gpu_type in keys(var.gpu_instance_configs) : "ondemand-gpu-${lower(gpu_type)}" => local.gpu_taints_ondemand
     },
     {
-      for gpu_type in var.node_group_gpu_types : "spot-gpu-${lower(gpu_type)}" => local.gpu_taints_spot
+      for gpu_type in keys(var.gpu_instance_configs) : "spot-gpu-${lower(gpu_type)}" => local.gpu_taints_spot
     }
   )
 }
