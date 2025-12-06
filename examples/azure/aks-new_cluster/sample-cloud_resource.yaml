@@ -1,0 +1,10 @@
+name: <resource-name>
+provider: AZURE
+compute_stack: K8S
+region: <region>
+object_storage:
+   bucket_name: azure://<blog-storage-name>
+file_storage:
+  file_storage_id: https://<storage-account>.blob.core.windows.net
+kubernetes_config:
+  anyscale_operator_iam_identity: <anyscale_operator_client_id>

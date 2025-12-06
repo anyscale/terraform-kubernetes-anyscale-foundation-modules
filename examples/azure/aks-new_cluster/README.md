@@ -133,6 +133,11 @@ Output
 (anyscale +22.5s) For registering this cloud's Kubernetes Manager, use cloud deployment ID 'cldrsrc_12345abcdefgh67890ijklmnop'.
 ```
 
+3. Add new cluster to existing Anyscale cloud
+```shell
+anyscale cloud resource create --cloud <name> -f sample-cloud_resource.yaml
+```
+
 ### Install the Anyscale Operator
 
 Using the output from the Terraform modules, install the Anyscale Operator on the AKS Cluster. It should look someting like:
