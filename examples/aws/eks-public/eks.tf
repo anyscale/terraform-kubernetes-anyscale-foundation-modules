@@ -44,7 +44,7 @@ locals {
     min_size                     = 0
     max_size                     = 10
     desired_size                 = 0
-    disk_size                    = 1000
+    disk_size                    = var.node_group_disk_size
     use_custom_launch_template   = false
     iam_role_additional_policies = local.anyscale_iam
   }
@@ -191,7 +191,7 @@ module "eks" {
         min_size                   = 0
         max_size                   = 10
         desired_size               = 0
-        disk_size                  = 500
+        disk_size                  = var.node_group_disk_size
         use_custom_launch_template = false
 
         taints = [

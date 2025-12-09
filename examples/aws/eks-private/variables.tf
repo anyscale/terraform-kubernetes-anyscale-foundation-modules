@@ -87,6 +87,20 @@ variable "node_group_gpu_types" {
   default     = ["T4"]
 }
 
+variable "node_group_disk_size" {
+  description = <<-EOT
+    (Optional) The disk size of the EKS nodes.
+    Possible values: [500, 1000]
+
+    ex:
+    ```
+    node_group_disk_size = 1000
+    ```
+  EOT
+  type        = number
+  default     = 500
+}
+
 variable "enable_efs" {
   description = <<-EOT
     (Optional) Enable the creation of an EFS instance.
