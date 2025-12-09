@@ -83,13 +83,13 @@ locals {
   gpu_node_pools = flatten([
     for gpu_type in keys(var.gpu_instance_configs) : [
       merge(local.base_node_pool,
-        merge(var.gpu_instance_types[gpu_type].instance, {
+        merge(var.gpu_instance_configs[gpu_type].instance, {
           name = "ondemand-gpu-${lower(gpu_type)}"
         })
       ),
 
       merge(local.base_node_pool,
-        merge(var.gpu_instance_types[gpu_type].instance, {
+        merge(var.gpu_instance_configs[gpu_type].instance, {
           name = "spot-gpu-${lower(gpu_type)}"
           spot = true
         })
@@ -124,10 +124,10 @@ locals {
   node_pools_labels = merge(
     { all = {} },
     {
-      for gpu_type in keys(var.gpu_instance_configs) : "ondemand-gpu-${lower(gpu_type)}" => var.gpu_instance_types[gpu_type].node_labels
+      for gpu_type in keys(var.gpu_instance_configs) : "ondemand-gpu-${lower(gpu_type)}" => var.gpu_instance_configs[gpu_type].node_labels
     },
     {
-      for gpu_type in keys(var.gpu_instance_configs) : "spot-gpu-${lower(gpu_type)}" => var.gpu_instance_types[gpu_type].node_labels
+      for gpu_type in keys(var.gpu_instance_configs) : "spot-gpu-${lower(gpu_type)}" => var.gpu_instance_configs[gpu_type].node_labels
     }
   )
 

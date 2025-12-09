@@ -47,29 +47,16 @@ gpu_instance_configs = {
     }
   }
 
-  "V100" = {
+  "A100" = {
     instance = {
       disk_type          = "pd-ssd"
       gpu_driver_version = "LATEST"
       accelerator_count  = 1
-      accelerator_type   = "nvidia-tesla-v100"
-      machine_type       = "n1-standard-16"
+      accelerator_type   = "nvidia-tesla-a100"
+      machine_type       = "a2-highgpu-1g"
     }
     node_labels = {
-      "nvidia.com/gpu.product" = "nvidia-tesla-v100"
-    }
-  }
-
-  "P100" = {
-    instance = {
-      disk_type          = "pd-ssd"
-      gpu_driver_version = "LATEST"
-      accelerator_count  = 1
-      accelerator_type   = "nvidia-tesla-p100"
-      machine_type       = "n1-standard-16"
-    }
-    node_labels = {
-      "nvidia.com/gpu.product" = "nvidia-tesla-p100"
+      "nvidia.com/gpu.product" = "nvidia-tesla-a100"
     }
   }
 
@@ -99,55 +86,4 @@ gpu_instance_configs = {
     }
   }
 
-  "A100-40G" = {
-    instance = {
-      disk_type          = "pd-ssd"
-      gpu_driver_version = "LATEST"
-      accelerator_count  = 1
-      accelerator_type   = "nvidia-tesla-a100"
-      machine_type       = "a2-highgpu-1g"
-    }
-    node_labels = {
-      "nvidia.com/gpu.product" = "nvidia-tesla-a100"
-    }
-  }
-
-  "A100-80G" = {
-    instance = {
-      disk_type          = "pd-ssd"
-      gpu_driver_version = "LATEST"
-      accelerator_count  = 1
-      accelerator_type   = "nvidia-a100-80gb"
-      machine_type       = "a2-ultragpu-1g"
-    }
-    node_labels = {
-      "nvidia.com/gpu.product" = "nvidia-a100-80gb"
-    }
-  }
-
-  "H100" = {
-    instance = {
-      disk_type          = "pd-ssd"
-      gpu_driver_version = "LATEST"
-      accelerator_count  = 1
-      accelerator_type   = "nvidia-h100-80gb"
-      machine_type       = "a3-highgpu-1g"
-    }
-    node_labels = {
-      "nvidia.com/gpu.product" = "nvidia-h100-80gb"
-    }
-  }
-
-  "H100-MEGA" = {
-    instance = {
-      disk_type          = "pd-ssd"
-      gpu_driver_version = "LATEST"
-      accelerator_count  = 1
-      accelerator_type   = "nvidia-h100-mega-80gb"
-      machine_type       = "a3-megagpu-8g"
-    }
-    node_labels = {
-      "nvidia.com/gpu.product" = "nvidia-h100-mega-80gb"
-    }
-  }
 }
