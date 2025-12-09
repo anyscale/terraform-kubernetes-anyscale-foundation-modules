@@ -48,6 +48,7 @@ module "anyscale_s3" {
 #trivy:ignore:avd-aws-0104
 resource "aws_security_group" "allow_all_vpc" {
   #checkov:skip=CKV2_AWS_5: "Ensure that Security Groups are attached to another resource"
+  #checkov:skip=CKV_AWS_382: "Egress is allowed to the internet for the Anyscale Control Plane and other services."
   name        = "allow-all-vpc"
   description = "Allow all traffic within the VPC"
   vpc_id      = module.anyscale_vpc.vpc_id

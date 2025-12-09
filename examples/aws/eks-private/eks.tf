@@ -28,10 +28,12 @@ locals {
 
   # Base configuration for GPU node groups
   gpu_node_group_base = {
-    ami_type                     = "AL2_x86_64_GPU"
+    ami_type                     = "AL2023_x86_64_NVIDIA"
     min_size                     = 0
     max_size                     = 10
     desired_size                 = 0
+    disk_size                    = 1000
+    use_custom_launch_template   = false
     iam_role_additional_policies = local.anyscale_iam
   }
 
@@ -163,16 +165,20 @@ module "eks" {
       ondemand_cpu = {
         ami_type = "AL2023_x86_64_STANDARD"
         instance_types = [
+          "m7i.8xlarge",
+          "m7a.8xlarge",
           "m6a.4xlarge",
           "m5a.4xlarge",
           "m6i.4xlarge",
           "m5.4xlarge",
         ]
 
-        capacity_type = "ON_DEMAND"
-        min_size      = 0
-        max_size      = 10
-        desired_size  = 0
+        capacity_type              = "ON_DEMAND"
+        min_size                   = 0
+        max_size                   = 10
+        desired_size               = 0
+        disk_size                  = var.node_group_disk_size
+        use_custom_launch_template = false
 
         taints = [
           {
@@ -188,6 +194,8 @@ module "eks" {
       spot_cpu = {
         ami_type = "AL2023_x86_64_STANDARD"
         instance_types = [
+          "m7i.8xlarge",
+          "m7a.8xlarge",
           "m6a.4xlarge",
           "m5a.4xlarge",
           "m6i.4xlarge",
@@ -198,6 +206,7 @@ module "eks" {
         min_size      = 0
         max_size      = 10
         desired_size  = 0
+        disk_size     = var.node_group_disk_size
 
         taints = [
           {
