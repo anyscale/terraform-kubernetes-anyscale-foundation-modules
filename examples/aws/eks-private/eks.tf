@@ -218,7 +218,7 @@ module "eks" {
         min_size      = 0
         max_size      = 10
         desired_size  = 0
-        disk_size     = 500
+        disk_size     = var.node_group_disk_size
 
         taints = [
           {
