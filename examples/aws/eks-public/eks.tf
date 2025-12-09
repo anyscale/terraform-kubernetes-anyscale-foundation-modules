@@ -26,9 +26,6 @@ locals {
     } : {}
   )
 
-  # Map of GPU types to their product names and instance types
-  gpu_types = var.gpu_instance_types
-
   # Base configuration for GPU node groups
   gpu_node_group_base = {
     ami_type                     = "AL2_x86_64_GPU"
@@ -73,10 +70,10 @@ locals {
       ondemand = merge(
         local.gpu_node_group_base,
         {
-          instance_types = local.gpu_types[gpu_type].instance_types
+          instance_types = var.gpu_instance_types[gpu_type].instance_types
           capacity_type  = "ON_DEMAND"
           labels = {
-            "nvidia.com/gpu.product" = local.gpu_types[gpu_type].product_name
+            "nvidia.com/gpu.product" = var.gpu_instance_types[gpu_type].product_name
             "nvidia.com/gpu.count"   = "1"
           }
           taints = local.gpu_node_taints_ondemand
@@ -85,10 +82,10 @@ locals {
       spot = merge(
         local.gpu_node_group_base,
         {
-          instance_types = local.gpu_types[gpu_type].instance_types
+          instance_types = var.gpu_instance_types[gpu_type].instance_types
           capacity_type  = "SPOT"
           labels = {
-            "nvidia.com/gpu.product" = local.gpu_types[gpu_type].product_name
+            "nvidia.com/gpu.product" = var.gpu_instance_types[gpu_type].product_name
             "nvidia.com/gpu.count"   = "1"
           }
           taints = local.gpu_node_taints_spot

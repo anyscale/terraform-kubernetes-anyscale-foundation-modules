@@ -47,17 +47,6 @@ Steps for deploying Anyscale resources via Terraform:
 If you are using a `tfvars` file, you will need to update the above commands accordingly.
 Note the output from Terraform which includes an example cloud registration command you will use below.
 
-#### Using Additional GPU Instance Types
-
-The default configuration includes only T4. To use additional GPU types (L4, A100, H100, etc.), use the provided example file which defines additional GPU configurations:
-
-```shell
-terraform plan -var-file="gpu_instances.tfvars.example"
-terraform apply -var-file="gpu_instances.tfvars.example"
-```
-
-Node pools will be created automatically for each GPU type defined in `gpu_instance_configs`.
-
 ### Install the Kubernetes Requirements
 
 The Anyscale Operator requires the following components:
