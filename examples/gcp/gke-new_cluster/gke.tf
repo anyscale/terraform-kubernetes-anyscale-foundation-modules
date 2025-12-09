@@ -42,121 +42,6 @@ locals {
     disk_type = "pd-ssd"
   }
 
-  # GPU configurations mapping
-  gpu_configs = {
-    "V100" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-tesla-v100"
-        machine_type       = "n1-standard-16"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-tesla-v100"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
-
-    "P100" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-tesla-p100"
-        machine_type       = "n1-standard-16"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-tesla-p100"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
-
-    "T4" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-tesla-t4"
-        machine_type       = "n1-standard-16"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-tesla-t4"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
-
-    "L4" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-l4"
-        machine_type       = "g2-standard-16"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-l4"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
-
-    "A100-40G" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-tesla-a100"
-        machine_type       = "a2-highgpu-1g"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-tesla-a100"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
-
-    "A100-80G" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-a100-80gb"
-        machine_type       = "a2-ultragpu-1g"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-a100-80gb"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
-
-    "H100" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-h100-80gb"
-        machine_type       = "a3-highgpu-1g"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-h100-80gb"
-        "nvidia.com/gpu.count"   = "1"
-      }
-    }
-
-    "H100-MEGA" = {
-      instance = {
-        disk_type          = "pd-ssd"
-        gpu_driver_version = "LATEST"
-        accelerator_count  = 1
-        accelerator_type   = "nvidia-h100-mega-80gb"
-        machine_type       = "a3-megagpu-8g"
-      }
-      node_labels = {
-        "nvidia.com/gpu.product" = "nvidia-h100-mega-80gb"
-        "nvidia.com/gpu.count"   = "8"
-      }
-    }
-  }
-
   # Common taint configurations
   capacity_type_taint = {
     on_demand = {
@@ -194,17 +79,17 @@ locals {
     local.gpu_taints
   )
 
-  # Generate GPU node pools based on node_group_gpu_types
+  # Generate GPU node pools based on gpu_instance_configs
   gpu_node_pools = flatten([
-    for gpu_type in var.node_group_gpu_types : [
+    for gpu_type in keys(var.gpu_instance_configs) : [
       merge(local.base_node_pool,
-        merge(local.gpu_configs[gpu_type].instance, {
+        merge(var.gpu_instance_configs[gpu_type].instance, {
           name = "ondemand-gpu-${lower(gpu_type)}"
         })
       ),
 
       merge(local.base_node_pool,
-        merge(local.gpu_configs[gpu_type].instance, {
+        merge(var.gpu_instance_configs[gpu_type].instance, {
           name = "spot-gpu-${lower(gpu_type)}"
           spot = true
         })
@@ -239,10 +124,10 @@ locals {
   node_pools_labels = merge(
     { all = {} },
     {
-      for gpu_type in var.node_group_gpu_types : "ondemand-gpu-${lower(gpu_type)}" => local.gpu_configs[gpu_type].node_labels
+      for gpu_type in keys(var.gpu_instance_configs) : "ondemand-gpu-${lower(gpu_type)}" => var.gpu_instance_configs[gpu_type].node_labels
     },
     {
-      for gpu_type in var.node_group_gpu_types : "spot-gpu-${lower(gpu_type)}" => local.gpu_configs[gpu_type].node_labels
+      for gpu_type in keys(var.gpu_instance_configs) : "spot-gpu-${lower(gpu_type)}" => var.gpu_instance_configs[gpu_type].node_labels
     }
   )
 
@@ -254,10 +139,10 @@ locals {
       "spot-cpu"     = [local.capacity_type_taint.spot]
     },
     {
-      for gpu_type in var.node_group_gpu_types : "ondemand-gpu-${lower(gpu_type)}" => local.gpu_taints_ondemand
+      for gpu_type in keys(var.gpu_instance_configs) : "ondemand-gpu-${lower(gpu_type)}" => local.gpu_taints_ondemand
     },
     {
-      for gpu_type in var.node_group_gpu_types : "spot-gpu-${lower(gpu_type)}" => local.gpu_taints_spot
+      for gpu_type in keys(var.gpu_instance_configs) : "spot-gpu-${lower(gpu_type)}" => local.gpu_taints_spot
     }
   )
 }

@@ -1,0 +1,89 @@
+# GPU Instance Types for GKE
+#
+# This file contains additional GPU instance configurations beyond the default (T4).
+# Use this file directly or copy and modify as needed:
+#
+#   terraform plan -var-file="gpu_instances.tfvars.example"
+#   terraform apply -var-file="gpu_instances.tfvars.example"
+
+# GPU types configuration - node pools will be created for each entry
+gpu_instance_configs = {
+  "T4" = {
+    instance = {
+      disk_type          = "pd-ssd"
+      gpu_driver_version = "LATEST"
+      accelerator_count  = 1
+      accelerator_type   = "nvidia-tesla-t4"
+      machine_type       = "n1-standard-16"
+    }
+    node_labels = {
+      "nvidia.com/gpu.product" = "nvidia-tesla-t4"
+    }
+  }
+
+  "T4-lowcpu" = {
+    instance = {
+      disk_type          = "pd-ssd"
+      gpu_driver_version = "LATEST"
+      accelerator_count  = 1
+      accelerator_type   = "nvidia-tesla-t4"
+      machine_type       = "n1-standard-4"
+    }
+    node_labels = {
+      "nvidia.com/gpu.product" = "nvidia-tesla-t4"
+    }
+  }
+
+  "T4-4x" = {
+    instance = {
+      disk_type          = "pd-ssd"
+      gpu_driver_version = "LATEST"
+      accelerator_count  = 4
+      accelerator_type   = "nvidia-tesla-t4"
+      machine_type       = "n1-standard-32"
+    }
+    node_labels = {
+      "nvidia.com/gpu.product" = "nvidia-tesla-t4"
+    }
+  }
+
+  "A100" = {
+    instance = {
+      disk_type          = "pd-ssd"
+      gpu_driver_version = "LATEST"
+      accelerator_count  = 1
+      accelerator_type   = "nvidia-tesla-a100"
+      machine_type       = "a2-highgpu-1g"
+    }
+    node_labels = {
+      "nvidia.com/gpu.product" = "nvidia-tesla-a100"
+    }
+  }
+
+  "L4" = {
+    instance = {
+      disk_type          = "pd-ssd"
+      gpu_driver_version = "LATEST"
+      accelerator_count  = 1
+      accelerator_type   = "nvidia-l4"
+      machine_type       = "g2-standard-16"
+    }
+    node_labels = {
+      "nvidia.com/gpu.product" = "nvidia-l4"
+    }
+  }
+
+  "L4-4x" = {
+    instance = {
+      disk_type          = "pd-ssd"
+      gpu_driver_version = "LATEST"
+      accelerator_count  = 4
+      accelerator_type   = "nvidia-l4"
+      machine_type       = "g2-standard-48"
+    }
+    node_labels = {
+      "nvidia.com/gpu.product" = "nvidia-l4"
+    }
+  }
+
+}

@@ -26,18 +26,6 @@ locals {
     } : {}
   )
 
-  # Map of GPU types to their product names and instance types
-  gpu_types = {
-    "T4" = {
-      product_name   = "Tesla-T4"
-      instance_types = ["g4dn.4xlarge"]
-    }
-    "A10G" = {
-      product_name   = "NVIDIA-A10G"
-      instance_types = ["g5.4xlarge"]
-    }
-  }
-
   # Base configuration for GPU node groups
   gpu_node_group_base = {
     ami_type                     = "AL2_x86_64_GPU"
@@ -76,16 +64,16 @@ locals {
     }
   ])
 
-  # Create a map of GPU node groups based on node_group_gpu_types
+  # Create a map of GPU node groups based on gpu_instance_types
   gpu_node_groups = {
-    for gpu_type in var.node_group_gpu_types : gpu_type => {
+    for gpu_type in keys(var.gpu_instance_types) : gpu_type => {
       ondemand = merge(
         local.gpu_node_group_base,
         {
-          instance_types = local.gpu_types[gpu_type].instance_types
+          instance_types = var.gpu_instance_types[gpu_type].instance_types
           capacity_type  = "ON_DEMAND"
           labels = {
-            "nvidia.com/gpu.product" = local.gpu_types[gpu_type].product_name
+            "nvidia.com/gpu.product" = var.gpu_instance_types[gpu_type].product_name
             "nvidia.com/gpu.count"   = "1"
           }
           taints = local.gpu_node_taints_ondemand
@@ -94,10 +82,10 @@ locals {
       spot = merge(
         local.gpu_node_group_base,
         {
-          instance_types = local.gpu_types[gpu_type].instance_types
+          instance_types = var.gpu_instance_types[gpu_type].instance_types
           capacity_type  = "SPOT"
           labels = {
-            "nvidia.com/gpu.product" = local.gpu_types[gpu_type].product_name
+            "nvidia.com/gpu.product" = var.gpu_instance_types[gpu_type].product_name
             "nvidia.com/gpu.count"   = "1"
           }
           taints = local.gpu_node_taints_spot
@@ -222,12 +210,12 @@ module "eks" {
         iam_role_additional_policies = local.anyscale_iam
       }
     },
-    # Merge in GPU node groups based on node_group_gpu_types
+    # Merge in GPU node groups based on gpu_instance_types
     {
-      for gpu_type in var.node_group_gpu_types : "ondemand_gpu_${lower(gpu_type)}" => local.gpu_node_groups[gpu_type].ondemand
+      for gpu_type in keys(var.gpu_instance_types) : "ondemand_gpu_${lower(gpu_type)}" => local.gpu_node_groups[gpu_type].ondemand
     },
     {
-      for gpu_type in var.node_group_gpu_types : "spot_gpu_${lower(gpu_type)}" => local.gpu_node_groups[gpu_type].spot
+      for gpu_type in keys(var.gpu_instance_types) : "spot_gpu_${lower(gpu_type)}" => local.gpu_node_groups[gpu_type].spot
     }
   )
 

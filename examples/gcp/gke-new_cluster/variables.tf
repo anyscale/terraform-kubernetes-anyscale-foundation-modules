@@ -105,13 +105,53 @@ variable "gke_cluster_name" {
     error_message = "Cluster name must not start with a number and must be under 23 characters."
   }
 }
-variable "node_group_gpu_types" {
+variable "gpu_instance_configs" {
   description = <<-EOT
-    (Optional) The GPU types of the GKE nodes.
-    Possible values: ["V100", "P100", "T4", "L4", "A100-40G", "A100-80G", "H100", "H100-MEGA"]
+    (Optional) GPU configurations for the GKE cluster.
+    See gpu_instances.tfvars.example for additional GPU types.
+
+    ex:
+    ```
+    gpu_instance_configs = {
+      "T4" = {
+        instance = {
+          disk_type          = "pd-ssd"
+          gpu_driver_version = "LATEST"
+          accelerator_count  = 1
+          accelerator_type   = "nvidia-tesla-t4"
+          machine_type       = "n1-standard-16"
+        }
+        node_labels = {
+          "nvidia.com/gpu.product" = "nvidia-tesla-t4"
+        }
+      }
+    }
+    ```
   EOT
-  type        = list(string)
-  default     = ["T4"]
+  type = map(object({
+    instance = object({
+      disk_type          = string
+      gpu_driver_version = string
+      accelerator_count  = number
+      accelerator_type   = string
+      machine_type       = string
+    })
+    node_labels = map(string)
+  }))
+  default = {
+    "T4" = {
+      instance = {
+        disk_type          = "pd-ssd"
+        gpu_driver_version = "LATEST"
+        accelerator_count  = 1
+        accelerator_type   = "nvidia-tesla-t4"
+        machine_type       = "n1-standard-16"
+      }
+      node_labels = {
+        "nvidia.com/gpu.product" = "nvidia-tesla-t4"
+      }
+    }
+  }
 }
 
 
