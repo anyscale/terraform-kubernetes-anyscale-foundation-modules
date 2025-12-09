@@ -89,7 +89,7 @@ variable "node_group_gpu_types" {
 
 variable "node_group_disk_size" {
   description = <<-EOT
-    (Optional) The disk size of the EKS nodes.
+    (Optional) The disk size (GB) of the EKS nodes.
     Possible values: [500, 1000]
 
     ex:
