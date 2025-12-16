@@ -4,19 +4,19 @@
 # ------------------------------------------------------------------------------
 variable "cloud_provider" {
   description = <<-EOT
-    (Required) The cloud provider (aws or gcp)
+    (Required) The cloud provider (aws or azure or gcp)
 
     ex:
     ```
-    cloud_provider = "aws"
+    cloud_provider = "azure"
     ```
   EOT
   type        = string
   validation {
     condition = (
-      var.cloud_provider == "aws" || var.cloud_provider == "gcp"
+      var.cloud_provider == "aws" || var.cloud_provider == "azure" || var.cloud_provider == "gcp"
     )
-    error_message = "The cloud_provider only allows `aws` or `gcp`"
+    error_message = "The cloud_provider only allows `aws` or `azure` or `gcp`"
   }
 }
 
