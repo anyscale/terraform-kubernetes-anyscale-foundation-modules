@@ -45,3 +45,36 @@ variable "node_group_gpu_types" {
     error_message = "GPU type must be one of: T4, A10, A100, H100."
   }
 }
+
+variable "cors_rule" {
+  description = <<-EOT
+    (Optional)
+    Object containing a rule of Cross-Origin Resource Sharing.
+    The default allows GET, POST, PUT, HEAD, and DELETE
+    access for the purpose of viewing logs and other functionality
+    from within the Anyscale Web UI (*.anyscale.com).
+
+    ex:
+    ```
+    cors_rule = {
+      allowed_headers = ["*"]
+      allowed_methods = ["GET", "POST", "PUT", "HEAD", "DELETE"]
+      allowed_origins = ["https://*.anyscale.com"]
+      expose_headers  = ["Accept-Ranges", "Content-Range", "Content-Length"]
+    }
+    ```
+  EOT
+  type = object({
+    allowed_headers    = list(string)
+    allowed_methods    = list(string)
+    allowed_origins    = list(string)
+    expose_headers     = list(string)
+    max_age_in_seconds = optional(number, 0)
+  })
+  default = {
+    allowed_headers = ["*"]
+    allowed_methods = ["GET", "POST", "PUT", "HEAD", "DELETE"]
+    allowed_origins = ["https://*.anyscale.com"]
+    expose_headers  = ["Accept-Ranges", "Content-Range", "Content-Length"]
+  }
+}
