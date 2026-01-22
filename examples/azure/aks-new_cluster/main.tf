@@ -39,6 +39,16 @@ resource "azurerm_storage_account" "sa" {
   # still blocks "anonymous blob" catches
   allow_nested_items_to_be_public = false
   tags                            = var.tags
+
+  blob_properties {
+    cors_rule {
+      allowed_headers    = var.cors_rule.allowed_headers
+      allowed_methods    = var.cors_rule.allowed_methods
+      allowed_origins    = var.cors_rule.allowed_origins
+      exposed_headers    = var.cors_rule.expose_headers
+      max_age_in_seconds = var.cors_rule.max_age_in_seconds
+    }
+  }
 }
 
 # Storage bucket (similar to S3)
