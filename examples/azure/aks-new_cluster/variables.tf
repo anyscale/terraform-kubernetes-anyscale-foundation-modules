@@ -9,6 +9,11 @@ variable "azure_location" {
   default     = "West US"
 }
 
+variable "azure_tenant_id" {
+  description = "Azure tenant ID. Can be found by running `az account show --query tenantId -o tsv`."
+  type        = string
+}
+
 variable "tags" {
   description = "(Optional) Tags applied to all taggable resources."
   type        = map(string)
