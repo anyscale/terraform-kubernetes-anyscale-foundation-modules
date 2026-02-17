@@ -35,7 +35,7 @@ locals {
     "--provider azure",
     "--compute-stack k8s",
     "--azure-tenant-id ${var.azure_tenant_id}",
-    "--anyscale-operator-iam-identity ${azurerm_user_assigned_identity.anyscale_operator.principal_id}",
+    "--anyscale-operator-iam-identity ${azurerm_user_assigned_identity.anyscale_operator.client_id}",
     "--cloud-storage-bucket-name 'azure://${azurerm_storage_container.blob.name}'",
     "--cloud-storage-bucket-endpoint 'https://${azurerm_storage_account.sa.name}.blob.core.windows.net'",
   ])
