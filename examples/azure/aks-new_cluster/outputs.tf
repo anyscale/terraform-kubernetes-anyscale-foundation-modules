@@ -8,6 +8,16 @@ output "azure_storage_account_name" {
   description = "Name of the Azure Storage Account created for the cluster."
 }
 
+output "azure_storage_container_name" {
+  value       = var.enable_operator_infrastructure ? azurerm_storage_container.blob[0].name : null
+  description = "Name of the Azure Storage Container created for the cluster."
+}
+
+output "azure_nfs_storage_account_name" {
+  value       = var.enable_nfs ? azurerm_storage_account.nfs["enabled"].name : null
+  description = "Name of the Azure NFS Storage Account created for the cluster."
+}
+
 output "azure_aks_cluster_name" {
   value       = azurerm_kubernetes_cluster.aks.name
   description = "Name of the Azure AKS cluster created for the cluster."
