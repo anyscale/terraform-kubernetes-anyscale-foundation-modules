@@ -16,6 +16,11 @@ resource "azurerm_resource_group" "rg" {
 ############################################
 # storage (blob)
 ############################################
+moved {
+  from = azurerm_storage_account.sa
+  to   = azurerm_storage_account.sa[0]
+}
+
 resource "azurerm_storage_account" "sa" {
   count = var.enable_operator_infrastructure ? 1 : 0
 
@@ -54,6 +59,11 @@ resource "azurerm_storage_account" "sa" {
 }
 
 # Storage bucket (similar to S3)
+moved {
+  from = azurerm_storage_container.blob
+  to   = azurerm_storage_container.blob[0]
+}
+
 resource "azurerm_storage_container" "blob" {
   count = var.enable_operator_infrastructure ? 1 : 0
 

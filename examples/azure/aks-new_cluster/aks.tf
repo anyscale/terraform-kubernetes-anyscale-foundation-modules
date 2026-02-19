@@ -267,6 +267,11 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_spot" {
 ##############################################################################
 # MANAGED IDENTITY FOR ANYSCALE OPERATOR
 ###############################################################################
+moved {
+  from = azurerm_user_assigned_identity.anyscale_operator
+  to   = azurerm_user_assigned_identity.anyscale_operator[0]
+}
+
 resource "azurerm_user_assigned_identity" "anyscale_operator" {
   count               = var.enable_operator_infrastructure ? 1 : 0
   name                = "${var.aks_cluster_name}-anyscale-operator-mi"
@@ -277,6 +282,11 @@ resource "azurerm_user_assigned_identity" "anyscale_operator" {
 ###############################################################################
 # FEDERATED‑IDENTITY CREDENTIAL  (ServiceAccount --> User‑Assigned Identity)
 ###############################################################################
+moved {
+  from = azurerm_federated_identity_credential.anyscale_operator_fic
+  to   = azurerm_federated_identity_credential.anyscale_operator_fic[0]
+}
+
 resource "azurerm_federated_identity_credential" "anyscale_operator_fic" {
   count               = var.enable_operator_infrastructure ? 1 : 0
   name                = "anyscale-operator-fic"
@@ -291,6 +301,11 @@ resource "azurerm_federated_identity_credential" "anyscale_operator_fic" {
 ###############################################################################
 # ROLE ASSIGNMENTS (IDENTITY ←→ STORAGE ACCOUNT)
 ###############################################################################
+moved {
+  from = azurerm_role_assignment.anyscale_blob_contrib
+  to   = azurerm_role_assignment.anyscale_blob_contrib[0]
+}
+
 resource "azurerm_role_assignment" "anyscale_blob_contrib" {
   count                = var.enable_operator_infrastructure ? 1 : 0
   scope                = azurerm_storage_account.sa[0].id
