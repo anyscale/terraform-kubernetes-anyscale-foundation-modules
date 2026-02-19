@@ -79,15 +79,19 @@ variable "aks_cluster_dns_address" {
   default     = null
 }
 
-variable "enable_blob_storage" {
-  description = "(Optional) Enable blob storage account and container."
+variable "enable_blob_driver" {
+  description = "(Optional) Enable the Azure Blob CSI driver on the AKS cluster. Required for mounting blob storage from pods."
   type        = bool
   nullable    = false
   default     = false
 }
 
-variable "enable_operator_identity" {
-  description = "(Optional) Enable managed identity, federated identity credential, and role assignment for the Anyscale operator."
+variable "enable_operator_infrastructure" {
+  description = <<-EOT
+    (Optional) Enable blob storage, managed identity, federated identity credential,
+    role assignment, and output registration/helm commands for the Anyscale operator.
+    Set to false when using the Azure control plane, which provisions these via ARM templates.
+  EOT
   type        = bool
   nullable    = false
   default     = false

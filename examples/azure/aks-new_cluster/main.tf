@@ -17,7 +17,7 @@ resource "azurerm_resource_group" "rg" {
 # storage (blob)
 ############################################
 resource "azurerm_storage_account" "sa" {
-  count = var.enable_blob_storage ? 1 : 0
+  count = var.enable_operator_infrastructure ? 1 : 0
 
   #checkov:skip=CKV_AZURE_33: "Ensure Storage logging is enabled for Queue service for read, write and delete requests"
   #checkov:skip=CKV_AZURE_59: "Ensure that Storage accounts disallow public access"
@@ -55,7 +55,7 @@ resource "azurerm_storage_account" "sa" {
 
 # Storage bucket (similar to S3)
 resource "azurerm_storage_container" "blob" {
-  count = var.enable_blob_storage ? 1 : 0
+  count = var.enable_operator_infrastructure ? 1 : 0
 
   #checkov:skip=CKV2_AZURE_21: "Ensure Storage logging is enabled for Blob service for read requests"
 

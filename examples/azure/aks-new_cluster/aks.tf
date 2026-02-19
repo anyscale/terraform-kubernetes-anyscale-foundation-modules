@@ -4,7 +4,7 @@
 #trivy:ignore:avd-azu-0040
 #trivy:ignore:avd-azu-0041
 #trivy:ignore:avd-azu-0042
-resource " " "aks" {
+resource "azurerm_kubernetes_cluster" "aks" {
 
   #checkov:skip=CKV_AZURE_170: "Ensure that AKS use the Paid Sku for its SLA"
   #checkov:skip=CKV_AZURE_172: "Ensure autorotation of Secrets Store CSI Driver secrets for AKS clusters"
@@ -60,6 +60,10 @@ resource " " "aks" {
     network_policy = "azure"
     service_cidr   = var.aks_cluster_subnet_cidr
     dns_service_ip = coalesce(var.aks_cluster_dns_address, cidrhost(var.aks_cluster_subnet_cidr, 2))
+  }
+
+  storage_profile {
+    blob_driver_enabled = var.enable_blob_driver
   }
 
   lifecycle {
@@ -234,7 +238,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_spot" {
   # ── autoscaling (shared across all pools) ───────────────────────────────────
   auto_scaling_enabled = true
   min_count            = 0
-  max_count            = 20
+  max_count            = 10
 
   # ── labels & taints ────────────────────────────────────────────────────────
   node_labels = {
@@ -264,7 +268,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_spot" {
 # MANAGED IDENTITY FOR ANYSCALE OPERATOR
 ###############################################################################
 resource "azurerm_user_assigned_identity" "anyscale_operator" {
-  count               = var.enable_operator_identity ? 1 : 0
+  count               = var.enable_operator_infrastructure ? 1 : 0
   name                = "${var.aks_cluster_name}-anyscale-operator-mi"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
@@ -274,7 +278,7 @@ resource "azurerm_user_assigned_identity" "anyscale_operator" {
 # FEDERATED‑IDENTITY CREDENTIAL  (ServiceAccount --> User‑Assigned Identity)
 ###############################################################################
 resource "azurerm_federated_identity_credential" "anyscale_operator_fic" {
-  count               = var.enable_operator_identity ? 1 : 0
+  count               = var.enable_operator_infrastructure ? 1 : 0
   name                = "anyscale-operator-fic"
   resource_group_name = azurerm_resource_group.rg.name
 
@@ -288,7 +292,7 @@ resource "azurerm_federated_identity_credential" "anyscale_operator_fic" {
 # ROLE ASSIGNMENTS (IDENTITY ←→ STORAGE ACCOUNT)
 ###############################################################################
 resource "azurerm_role_assignment" "anyscale_blob_contrib" {
-  count                = (var.enable_blob_storage && var.enable_operator_identity) ? 1 : 0
+  count                = var.enable_operator_infrastructure ? 1 : 0
   scope                = azurerm_storage_account.sa[0].id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_user_assigned_identity.anyscale_operator[0].principal_id
