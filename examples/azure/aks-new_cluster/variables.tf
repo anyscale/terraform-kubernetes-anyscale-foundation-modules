@@ -94,7 +94,7 @@ variable "enable_operator_infrastructure" {
   EOT
   type        = bool
   nullable    = false
-  default     = false
+  default     = true
 }
 
 variable "storage_account_name" {
