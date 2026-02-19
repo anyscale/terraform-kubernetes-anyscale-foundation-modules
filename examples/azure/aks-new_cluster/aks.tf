@@ -4,7 +4,7 @@
 #trivy:ignore:avd-azu-0040
 #trivy:ignore:avd-azu-0041
 #trivy:ignore:avd-azu-0042
-resource "azurerm_kubernetes_cluster" "aks" {
+resource " " "aks" {
 
   #checkov:skip=CKV_AZURE_170: "Ensure that AKS use the Paid Sku for its SLA"
   #checkov:skip=CKV_AZURE_172: "Ensure autorotation of Secrets Store CSI Driver secrets for AKS clusters"
@@ -58,6 +58,12 @@ resource "azurerm_kubernetes_cluster" "aks" {
   network_profile {
     network_plugin = "azure"
     network_policy = "azure"
+    service_cidr   = var.aks_cluster_subnet_cidr
+    dns_service_ip = coalesce(var.aks_cluster_dns_address, cidrhost(var.aks_cluster_subnet_cidr, 2))
+  }
+
+  lifecycle {
+    ignore_changes = [default_node_pool[0].upgrade_settings]
   }
 
   tags = var.tags
@@ -86,6 +92,10 @@ resource "azurerm_kubernetes_cluster_node_pool" "ondemand_cpu" {
     "node.anyscale.com/capacity-type=ON_DEMAND:NoSchedule"
   ]
 
+  lifecycle {
+    ignore_changes = [upgrade_settings]
+  }
+
   tags = var.tags
 }
 
@@ -109,11 +119,16 @@ resource "azurerm_kubernetes_cluster_node_pool" "spot_cpu" {
   max_count            = 10
 
   node_taints = [
-    "node.anyscale.com/capacity-type=SPOT:NoSchedule"
+    "node.anyscale.com/capacity-type=SPOT:NoSchedule",
+    "kubernetes.azure.com/scalesetpriority=spot:NoSchedule",
   ]
 
   priority        = "Spot"
   eviction_policy = "Delete"
+
+  lifecycle {
+    ignore_changes = [upgrade_settings]
+  }
 
   tags = var.tags
 }
@@ -191,6 +206,10 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_ondemand" {
     "node.anyscale.com/accelerator-type=GPU:NoSchedule",
   ]
 
+  lifecycle {
+    ignore_changes = [upgrade_settings]
+  }
+
   tags = var.tags
 }
 
@@ -215,22 +234,28 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_spot" {
   # ── autoscaling (shared across all pools) ───────────────────────────────────
   auto_scaling_enabled = true
   min_count            = 0
-  max_count            = 10
+  max_count            = 20
 
   # ── labels & taints ────────────────────────────────────────────────────────
   node_labels = {
-    "nvidia.com/gpu.product" = each.value.product_name
-    "nvidia.com/gpu.count"   = each.value.gpu_count
+    "nvidia.com/gpu.product"                = each.value.product_name
+    "nvidia.com/gpu.count"                  = each.value.gpu_count
+    "kubernetes.azure.com/scalesetpriority" = "spot"
   }
 
   node_taints = [
     "node.anyscale.com/capacity-type=ON_DEMAND:NoSchedule",
     "nvidia.com/gpu=present:NoSchedule",
     "node.anyscale.com/accelerator-type=GPU:NoSchedule",
+    "kubernetes.azure.com/scalesetpriority=spot:NoSchedule",
   ]
 
   priority        = "Spot"
   eviction_policy = "Delete"
+
+  lifecycle {
+    ignore_changes = [upgrade_settings]
+  }
 
   tags = var.tags
 }
@@ -239,6 +264,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_spot" {
 # MANAGED IDENTITY FOR ANYSCALE OPERATOR
 ###############################################################################
 resource "azurerm_user_assigned_identity" "anyscale_operator" {
+  count               = var.enable_operator_identity ? 1 : 0
   name                = "${var.aks_cluster_name}-anyscale-operator-mi"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
@@ -248,11 +274,12 @@ resource "azurerm_user_assigned_identity" "anyscale_operator" {
 # FEDERATED‑IDENTITY CREDENTIAL  (ServiceAccount --> User‑Assigned Identity)
 ###############################################################################
 resource "azurerm_federated_identity_credential" "anyscale_operator_fic" {
+  count               = var.enable_operator_identity ? 1 : 0
   name                = "anyscale-operator-fic"
   resource_group_name = azurerm_resource_group.rg.name
 
-  parent_id = azurerm_user_assigned_identity.anyscale_operator.id # user assigned identity
-  issuer    = azurerm_kubernetes_cluster.aks.oidc_issuer_url      # OIDC issuer from AKS
+  parent_id = azurerm_user_assigned_identity.anyscale_operator[0].id # user assigned identity
+  issuer    = azurerm_kubernetes_cluster.aks.oidc_issuer_url          # OIDC issuer from AKS
   subject   = "system:serviceaccount:${var.anyscale_operator_namespace}:anyscale-operator"
   audience  = ["api://AzureADTokenExchange"] # fixed value for AAD tokens
 }
@@ -261,9 +288,10 @@ resource "azurerm_federated_identity_credential" "anyscale_operator_fic" {
 # ROLE ASSIGNMENTS (IDENTITY ←→ STORAGE ACCOUNT)
 ###############################################################################
 resource "azurerm_role_assignment" "anyscale_blob_contrib" {
-  scope                = azurerm_storage_account.sa.id
+  count                = (var.enable_blob_storage && var.enable_operator_identity) ? 1 : 0
+  scope                = azurerm_storage_account.sa[0].id
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.anyscale_operator.principal_id
+  principal_id         = azurerm_user_assigned_identity.anyscale_operator[0].principal_id
 }
 
 ###############################################################################

@@ -51,6 +51,79 @@ variable "node_group_gpu_types" {
   }
 }
 
+variable "vnet_cidr" {
+  description = "(Optional) CIDR block for the VNet."
+  type        = string
+  nullable    = false
+  default     = "10.42.0.0/16"
+}
+
+variable "nodes_subnet_cidr" {
+  description = "(Optional) CIDR block for the AKS nodes subnet."
+  type        = string
+  nullable    = false
+  default     = "10.42.1.0/24"
+}
+
+variable "aks_cluster_subnet_cidr" {
+  description = "(Optional) CIDR block for the AKS cluster service subnet. Cannot overlap with vnet_cidr or nodes_subnet_cidr."
+  type        = string
+  nullable    = false
+  default     = "10.0.0.0/16"
+}
+
+variable "aks_cluster_dns_address" {
+  description = "(Optional) DNS address for the AKS cluster. If not set, a default will be generated from aks_cluster_subnet_cidr."
+  type        = string
+  nullable    = true
+  default     = null
+}
+
+variable "enable_blob_storage" {
+  description = "(Optional) Enable blob storage account and container."
+  type        = bool
+  nullable    = false
+  default     = false
+}
+
+variable "enable_operator_identity" {
+  description = "(Optional) Enable managed identity, federated identity credential, and role assignment for the Anyscale operator."
+  type        = bool
+  nullable    = false
+  default     = false
+}
+
+variable "storage_account_name" {
+  description = "(Optional) Name of the Azure Storage account to create for cloud storage. May be needed if generated name is already taken."
+  type        = string
+  nullable    = true
+  default     = null
+
+  validation {
+    condition     = var.storage_account_name == null || can(regex("^[a-z0-9]{3,24}$", var.storage_account_name))
+    error_message = "Storage account name must be between 3 and 24 characters long and contain only lowercase letters and numbers."
+  }
+}
+
+variable "enable_nfs" {
+  description = "(Optional) Enable NFS storage account."
+  type        = bool
+  nullable    = false
+  default     = false
+}
+
+variable "storage_account_name_nfs" {
+  description = "(Optional) Name of the Azure NFS storage account to create. May be needed if generated name is already taken."
+  type        = string
+  nullable    = true
+  default     = null
+
+  validation {
+    condition     = var.storage_account_name_nfs == null || can(regex("^[a-z0-9]{3,24}$", var.storage_account_name_nfs))
+    error_message = "NFS storage account name must be between 3 and 24 characters long and contain only lowercase letters and numbers."
+  }
+}
+
 variable "cors_rule" {
   description = <<-EOT
     (Optional)
