@@ -59,11 +59,12 @@ output "anyscale_registration_command" {
 locals {
   helm_upgrade_command_parts = var.enable_operator_infrastructure ? [
     "helm upgrade anyscale-operator anyscale/anyscale-operator",
-    "--set-string anyscaleCliToken=<anyscale-cli-token>",
-    "--set-string cloudDeploymentId=<cloud-deployment-id>",
-    "--set-string cloudProvider=azure",
-    "--set-string operatorIamIdentity=${azurerm_user_assigned_identity.anyscale_operator[0].client_id}",
-    "--set-string workloadServiceAccountName=anyscale-operator",
+    "--set-string global.cloudDeploymentId=<cloud-deployment-id>",
+    "--set-string global.controlPlaneURL=https://console.azure.anyscale.com",
+    "--set-string global.cloudProvider=azure",
+    "--set-string global.auth.iamIdentity=${azurerm_user_assigned_identity.anyscale_operator[0].client_id}",
+    "--set-string global.auth.audience=api://086bc555-6989-4362-ba30-fded273e432b/.default",
+    "--set-string workloads.serviceAccount.name=anyscale-operator",
     "--namespace ${var.anyscale_operator_namespace}",
     "--create-namespace",
     "-i"
