@@ -251,7 +251,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_spot" {
   }
 
   node_taints = [
-    "node.anyscale.com/capacity-type=ON_DEMAND:NoSchedule",
+    "node.anyscale.com/capacity-type=SPOT:NoSchedule",
     "nvidia.com/gpu=present:NoSchedule",
     "node.anyscale.com/accelerator-type=GPU:NoSchedule",
     "kubernetes.azure.com/scalesetpriority=spot:NoSchedule",
