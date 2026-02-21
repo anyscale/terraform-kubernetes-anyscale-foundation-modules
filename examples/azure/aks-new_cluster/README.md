@@ -24,11 +24,12 @@ Steps for deploying Anyscale resources via Terraform:
 * Review variables.tf and (optionally) create a `terraform.tfvars` file to override any of the defaults.
 e.g. 
 ```sh
-aks_cluster_name = ""
+azure_tenant_id = "" # az account show --query tenantId -o tsv
 azure_subscription_id = ""
 azure_location = ""
-azure_tenant_id = ""
+aks_cluster_name = ""
 node_group_gpu_types = ["T4"]
+enable_nfs            = true
 ```
 
 * Apply the terraform
@@ -40,7 +41,7 @@ terraform apply
 ```
 
 If you are using a `tfvars` file, you will need to update the above commands accordingly.
-Note the output from Terraform which includes example cloud registration and helm commands you will use below.
+Note the output from Terraform which includes example cloud registration, helm commands and the command to get the AKS credentials you will use below.
 
 ### Install the Kubernetes Requirements
 
@@ -48,9 +49,10 @@ The Anyscale Operator requires the following components:
 * [Nginx Ingress Controller](https://kubernetes.github.io/ingress-nginx/deploy/) (other ingress controllers may be possible but are untested)
 * (Optional) [Nvidia device plugin](https://github.com/NVIDIA/k8s-device-plugin/tree/main?tab=readme-ov-file#deployment-via-helm) (required if utilizing GPU nodes)
 
-**Note:** Ensure that you are authenticated to the AKS cluster for the remaining steps:
+**Note:** Ensure that you are authenticated to the AKS cluster for the remaining steps. You can use the command from the Terraform output:
 
 ```shell
+# From terraform output: aks_get_credentials_command
 az aks get-credentials --resource-group <azure_resource_group_name> --name <aks_cluster_name> --overwrite-existing
 ```
 
@@ -220,6 +222,7 @@ No modules.
 
 | Name | Description |
 |------|-------------|
+| <a name="output_aks_get_credentials_command"></a> [aks\_get\_credentials\_command](#output\_aks\_get\_credentials\_command) | The command to get the AKS cluster credentials. |
 | <a name="output_anyscale_operator_client_id"></a> [anyscale\_operator\_client\_id](#output\_anyscale\_operator\_client\_id) | Client ID of the Azure User Assigned Identity created for the cluster. |
 | <a name="output_anyscale_operator_principal_id"></a> [anyscale\_operator\_principal\_id](#output\_anyscale\_operator\_principal\_id) | Principal ID of the Azure User Assigned Identity created for the cluster. |
 | <a name="output_anyscale_registration_command"></a> [anyscale\_registration\_command](#output\_anyscale\_registration\_command) | The Anyscale registration command. |

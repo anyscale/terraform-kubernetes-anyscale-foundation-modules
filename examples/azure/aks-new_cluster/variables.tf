@@ -120,7 +120,10 @@ variable "storage_account_name" {
 }
 
 variable "enable_nfs" {
-  description = "(Optional) Enable NFS storage account."
+  description = <<-EOT
+    (Optional) Enable provisioning of an Azure NFS (Network File System) storage account.
+    This NFS storage can be used for file-based persistent storage needs, mounting shared volumes to AKS nodes and pods.
+  EOT
   type        = bool
   nullable    = false
   default     = false

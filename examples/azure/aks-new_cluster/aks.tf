@@ -128,7 +128,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "spot_cpu" {
   ]
 
   node_labels = {
-    kubernetes.azure.com/scalesetpriority = "spot"
+    "kubernetes.azure.com/scalesetpriority" = "spot"
   }
   priority        = "Spot"
   eviction_policy = "Delete"
@@ -296,7 +296,7 @@ resource "azurerm_federated_identity_credential" "anyscale_operator_fic" {
   resource_group_name = azurerm_resource_group.rg.name
 
   parent_id = azurerm_user_assigned_identity.anyscale_operator[0].id # user assigned identity
-  issuer    = azurerm_kubernetes_cluster.aks.oidc_issuer_url          # OIDC issuer from AKS
+  issuer    = azurerm_kubernetes_cluster.aks.oidc_issuer_url         # OIDC issuer from AKS
   subject   = "system:serviceaccount:${var.anyscale_operator_namespace}:anyscale-operator"
   audience  = ["api://AzureADTokenExchange"] # fixed value for AAD tokens
 }
