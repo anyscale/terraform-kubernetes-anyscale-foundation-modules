@@ -78,7 +78,7 @@ resource "azurerm_storage_container" "blob" {
 # storage (nfs) - optional
 ############################################
 resource "azurerm_storage_account" "nfs" {
-  for_each = toset(var.enable_nfs ? ["enabled"] : [])
+  count = var.enable_nfs ? 1 : 0
 
   name                       = local.storage_account_name_nfs
   resource_group_name        = azurerm_resource_group.rg.name
