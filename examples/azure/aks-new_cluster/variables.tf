@@ -70,6 +70,16 @@ variable "aks_cluster_subnet_cidr" {
   type        = string
   nullable    = false
   default     = "10.0.0.0/16"
+
+  validation {
+    condition = !anytrue([
+      cidrcontains(var.vnet_cidr, cidrhost(var.aks_cluster_subnet_cidr, 0)),
+      cidrcontains(var.aks_cluster_subnet_cidr, cidrhost(var.vnet_cidr, 0)),
+      cidrcontains(var.nodes_subnet_cidr, cidrhost(var.aks_cluster_subnet_cidr, 0)),
+      cidrcontains(var.aks_cluster_subnet_cidr, cidrhost(var.nodes_subnet_cidr, 0)),
+    ])
+    error_message = "aks_cluster_subnet_cidr must not overlap with vnet_cidr or nodes_subnet_cidr."
+  }
 }
 
 variable "aks_cluster_dns_address" {
