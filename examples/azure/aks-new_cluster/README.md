@@ -118,14 +118,12 @@ helm upgrade nvdp nvdp/nvidia-device-plugin \
 
 Ensure that you are logged into Anyscale with valid CLI credentials. (`anyscale login`)
 
-You will need an Anyscale platform API Key for the helm chart installation. You can generate one from the [Anyscale Web UI](https://console.anyscale.com/api-keys).
-
-Using the output from the Terraform modules, register the Anyscale Cloud. It should look sonething like:
+Using the output from the Terraform modules, register the Anyscale Cloud. Choose a name for your cloud in Anyscale in `<anyscale_cloud_name`. It should look sonething like:
 
 ```shell
 anyscale cloud register \
   --name <anyscale_cloud_name> \
-  --region westus \
+  --region ... \
   --provider azure \
   --compute-stack k8s \
   --azure-tenant-id ... \
