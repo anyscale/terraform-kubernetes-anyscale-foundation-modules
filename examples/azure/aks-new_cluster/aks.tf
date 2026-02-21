@@ -127,6 +127,9 @@ resource "azurerm_kubernetes_cluster_node_pool" "spot_cpu" {
     "kubernetes.azure.com/scalesetpriority=spot:NoSchedule",
   ]
 
+  node_labels = {
+    kubernetes.azure.com/scalesetpriority = "spot"
+  }
   priority        = "Spot"
   eviction_policy = "Delete"
 
