@@ -14,7 +14,7 @@ output "azure_storage_container_name" {
 }
 
 output "azure_nfs_storage_account_name" {
-  value       = var.enable_nfs ? azurerm_storage_account.nfs["enabled"].name : null
+  value       = var.enable_nfs ? azurerm_storage_account.nfs[0].name : null
   description = "Name of the Azure NFS Storage Account created for the cluster."
 }
 

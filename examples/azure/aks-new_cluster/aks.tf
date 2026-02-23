@@ -127,6 +127,9 @@ resource "azurerm_kubernetes_cluster_node_pool" "spot_cpu" {
     "kubernetes.azure.com/scalesetpriority=spot:NoSchedule",
   ]
 
+  node_labels = {
+    "kubernetes.azure.com/scalesetpriority" = "spot"
+  }
   priority        = "Spot"
   eviction_policy = "Delete"
 
@@ -248,7 +251,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_spot" {
   }
 
   node_taints = [
-    "node.anyscale.com/capacity-type=ON_DEMAND:NoSchedule",
+    "node.anyscale.com/capacity-type=SPOT:NoSchedule",
     "nvidia.com/gpu=present:NoSchedule",
     "node.anyscale.com/accelerator-type=GPU:NoSchedule",
     "kubernetes.azure.com/scalesetpriority=spot:NoSchedule",
@@ -293,7 +296,7 @@ resource "azurerm_federated_identity_credential" "anyscale_operator_fic" {
   resource_group_name = azurerm_resource_group.rg.name
 
   parent_id = azurerm_user_assigned_identity.anyscale_operator[0].id # user assigned identity
-  issuer    = azurerm_kubernetes_cluster.aks.oidc_issuer_url          # OIDC issuer from AKS
+  issuer    = azurerm_kubernetes_cluster.aks.oidc_issuer_url         # OIDC issuer from AKS
   subject   = "system:serviceaccount:${var.anyscale_operator_namespace}:anyscale-operator"
   audience  = ["api://AzureADTokenExchange"] # fixed value for AAD tokens
 }

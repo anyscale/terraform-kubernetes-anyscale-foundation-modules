@@ -1,7 +1,9 @@
 locals {
-  storage_account_name_base = replace(var.aks_cluster_name, "-", "")
-  storage_account_name      = coalesce(var.storage_account_name, "${local.storage_account_name_base}sa")
-  storage_account_name_nfs  = coalesce(var.storage_account_name_nfs, "${local.storage_account_name_base}nfs")
+  storage_account_name_base     = replace(var.aks_cluster_name, "-", "")
+  storage_account_name_base_sa  = length(local.storage_account_name_base) > 22 ? substr(local.storage_account_name_base, 0, 22) : local.storage_account_name_base
+  storage_account_name_base_nfs = length(local.storage_account_name_base) > 21 ? substr(local.storage_account_name_base, 0, 21) : local.storage_account_name_base
+  storage_account_name          = coalesce(var.storage_account_name, "${local.storage_account_name_base_sa}sa")
+  storage_account_name_nfs      = coalesce(var.storage_account_name_nfs, "${local.storage_account_name_base_nfs}nfs")
 }
 
 ############################################
@@ -78,7 +80,7 @@ resource "azurerm_storage_container" "blob" {
 # storage (nfs) - optional
 ############################################
 resource "azurerm_storage_account" "nfs" {
-  for_each = toset(var.enable_nfs ? ["enabled"] : [])
+  count = var.enable_nfs ? 1 : 0
 
   name                       = local.storage_account_name_nfs
   resource_group_name        = azurerm_resource_group.rg.name
