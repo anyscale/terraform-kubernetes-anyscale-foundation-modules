@@ -36,7 +36,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
   #########################################################################
   default_node_pool {
     name            = "sys"
-    vm_size         = "Standard_D2s_v5"
+    vm_size         = var.system_vm_size
     vnet_subnet_id  = azurerm_subnet.nodes.id
     os_disk_size_gb = 64
     type            = "VirtualMachineScaleSets"
@@ -74,7 +74,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
 }
 
 ###############################################################################
-# CPU NODE POOL (Standard_D16s_v5) OnDemand
+# CPU NODE POOL – OnDemand
 ###############################################################################
 resource "azurerm_kubernetes_cluster_node_pool" "ondemand_cpu" {
 
@@ -84,7 +84,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "ondemand_cpu" {
   name                  = "cpu16"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
 
-  vm_size        = "Standard_D16s_v5"
+  vm_size        = var.cpu_vm_size
   mode           = "User"
   vnet_subnet_id = azurerm_subnet.nodes.id
 
@@ -104,7 +104,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "ondemand_cpu" {
 }
 
 ###############################################################################
-# CPU NODE POOL (Standard_D16s_v5) Spot
+# CPU NODE POOL – Spot
 ###############################################################################
 resource "azurerm_kubernetes_cluster_node_pool" "spot_cpu" {
 
@@ -114,7 +114,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "spot_cpu" {
   name                  = "cpu16spot"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
 
-  vm_size        = "Standard_D16s_v5"
+  vm_size        = var.cpu_vm_size
   mode           = "User"
   vnet_subnet_id = azurerm_subnet.nodes.id
 
@@ -140,43 +140,8 @@ resource "azurerm_kubernetes_cluster_node_pool" "spot_cpu" {
   tags = var.tags
 }
 
-locals {
-  gpu_pool_configs = {
-    T4 = {
-      name         = "gput4"
-      vm_size      = "Standard_NC16as_T4_v3"
-      product_name = "NVIDIA-T4"
-      gpu_count    = "1"
-    }
-    A10 = {
-      name         = "gpua10"
-      vm_size      = "Standard_NV36ads_A10_v5"
-      product_name = "NVIDIA-A10"
-      gpu_count    = "1"
-    }
-    A100 = {
-      name         = "gpua100"
-      vm_size      = "Standard_NC24ads_A100_v4"
-      product_name = "NVIDIA-A100"
-      gpu_count    = "1"
-    }
-    H100 = {
-      name         = "h100x8"
-      vm_size      = "Standard_ND96isr_H100_v5"
-      product_name = "NVIDIA-H100"
-      gpu_count    = "8"
-    }
-  }
-
-  # keep only the types the caller asked for
-  selected_gpu_pools = {
-    for k, v in local.gpu_pool_configs :
-    k => v if contains(var.node_group_gpu_types, k)
-  }
-}
-
 ###############################################################################
-# GPU Node POOL (Standard_NC16as_T4_v3) OnDemand
+# GPU NODE POOLS – OnDemand
 ###############################################################################
 
 #trivy:ignore:avd-azu-0168
@@ -185,7 +150,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_ondemand" {
   #checkov:skip=CKV_AZURE_168
   #checkov:skip=CKV_AZURE_227
 
-  for_each = local.selected_gpu_pools
+  for_each = var.gpu_pool_configs
 
   name                  = each.value.name
   kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
@@ -221,7 +186,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_ondemand" {
 }
 
 ###############################################################################
-# GPU Node POOL (Standard_NC16as_T4_v3) Spot
+# GPU NODE POOLS – Spot
 ###############################################################################
 #trivy:ignore:avd-azu-0168
 #trivy:ignore:avd-azu-0227
@@ -229,7 +194,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_spot" {
   #checkov:skip=CKV_AZURE_168
   #checkov:skip=CKV_AZURE_227
 
-  for_each = local.selected_gpu_pools
+  for_each = var.gpu_pool_configs
 
   name                  = "${each.value.name}spot"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id

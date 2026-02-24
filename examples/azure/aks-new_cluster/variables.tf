@@ -35,22 +35,6 @@ variable "anyscale_operator_namespace" {
   default     = "anyscale-operator"
 }
 
-variable "node_group_gpu_types" {
-  description = <<-EOT
-    (Optional) The GPU types of the AKS nodes.
-    Possible values: ["T4", "A10", "A100", "H100"]
-  EOT
-  type        = list(string)
-  default     = ["T4", "A100"]
-
-  validation {
-    condition = alltrue(
-      [for g in var.node_group_gpu_types : contains(["T4", "A10", "A100", "H100"], g)]
-    )
-    error_message = "GPU type must be one of: T4, A10, A100, H100."
-  }
-}
-
 variable "vnet_cidr" {
   description = "(Optional) CIDR block for the VNet."
   type        = string
@@ -128,6 +112,58 @@ variable "storage_account_name_nfs" {
   validation {
     condition     = var.storage_account_name_nfs == null || can(regex("^[a-z0-9]{3,24}$", var.storage_account_name_nfs))
     error_message = "NFS storage account name must be between 3 and 24 characters long and contain only lowercase letters and numbers."
+  }
+}
+
+variable "system_vm_size" {
+  description = "VM size for the default system node pool."
+  type        = string
+  default     = "Standard_D2s_v5"
+}
+
+variable "cpu_vm_size" {
+  description = "VM size for the CPU node pools (on-demand and spot)."
+  type        = string
+  default     = "Standard_D16s_v5"
+}
+
+variable "gpu_pool_configs" {
+  description = <<-EOT
+    (Optional) Full configuration for GPU node pools. Each key is a GPU type label
+    used for selection via `node_group_gpu_types`. Override any field to customize
+    pool names, VM sizes, GPU labels, or GPU counts.
+  EOT
+  type = map(object({
+    name         = string
+    vm_size      = string
+    product_name = string
+    gpu_count    = string
+  }))
+  default = {
+    T4 = {
+      name         = "gput4"
+      vm_size      = "Standard_NC16as_T4_v3"
+      product_name = "NVIDIA-T4"
+      gpu_count    = "1"
+    }
+    A10 = {
+      name         = "gpua10"
+      vm_size      = "Standard_NV36ads_A10_v5"
+      product_name = "NVIDIA-A10"
+      gpu_count    = "1"
+    }
+    A100 = {
+      name         = "gpua100"
+      vm_size      = "Standard_NC24ads_A100_v4"
+      product_name = "NVIDIA-A100"
+      gpu_count    = "1"
+    }
+    H100 = {
+      name         = "h100x8"
+      vm_size      = "Standard_ND96isr_H100_v5"
+      product_name = "NVIDIA-H100"
+      gpu_count    = "8"
+    }
   }
 }
 

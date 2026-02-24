@@ -55,7 +55,6 @@ output "anyscale_registration_command" {
   description = "The Anyscale registration command."
   value       = length(local.registration_command_parts) > 0 ? join(" \\\n\t", local.registration_command_parts) : null
 }
-
 locals {
   helm_upgrade_command_parts = var.enable_operator_infrastructure ? [
     "helm upgrade anyscale-operator anyscale/anyscale-operator",
