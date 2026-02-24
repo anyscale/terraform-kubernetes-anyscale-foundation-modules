@@ -291,7 +291,7 @@ resource "azurerm_role_assignment" "anyscale_blob_contrib" {
 #   name: anyscale-operator
 #   namespace: anyscale-system
 #   annotations:
-#     azure.workload.identity/client-id: "${azurerm_user_assigned_identity.anyscale_operator.client_id}"
+#     azure.workload.identity/client-id: "${azurerm_user_assigned_identity.anyscale_operator[0].client_id}"
 #
 # ================================
 # apiVersion: v1
