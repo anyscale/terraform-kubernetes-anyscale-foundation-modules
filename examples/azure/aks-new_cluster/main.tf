@@ -1,6 +1,9 @@
 locals {
-  vnet_cidr         = "10.42.0.0/16"
-  nodes_subnet_cidr = "10.42.1.0/24"
+  storage_account_name_base     = replace(var.aks_cluster_name, "-", "")
+  storage_account_name_base_sa  = length(local.storage_account_name_base) > 22 ? substr(local.storage_account_name_base, 0, 22) : local.storage_account_name_base
+  storage_account_name_base_nfs = length(local.storage_account_name_base) > 21 ? substr(local.storage_account_name_base, 0, 21) : local.storage_account_name_base
+  storage_account_name          = coalesce(var.storage_account_name, "${local.storage_account_name_base_sa}sa")
+  storage_account_name_nfs      = coalesce(var.storage_account_name_nfs, "${local.storage_account_name_base_nfs}nfs")
 }
 
 ############################################
@@ -15,7 +18,13 @@ resource "azurerm_resource_group" "rg" {
 ############################################
 # storage (blob)
 ############################################
+moved {
+  from = azurerm_storage_account.sa
+  to   = azurerm_storage_account.sa[0]
+}
+
 resource "azurerm_storage_account" "sa" {
+  count = var.enable_operator_infrastructure ? 1 : 0
 
   #checkov:skip=CKV_AZURE_33: "Ensure Storage logging is enabled for Queue service for read, write and delete requests"
   #checkov:skip=CKV_AZURE_59: "Ensure that Storage accounts disallow public access"
@@ -30,7 +39,7 @@ resource "azurerm_storage_account" "sa" {
   #checkov:skip=CKV2_AZURE_21: "Ensure Storage logging is enabled for Blob service for read requests"
   #checkov:skip=CKV2_AZURE_31: "Ensure VNET subnet is configured with a Network Security Group (NSG)"
 
-  name                     = replace("${var.aks_cluster_name}sa", "-", "") # demo-aks --> demoakssa
+  name                     = local.storage_account_name
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = azurerm_resource_group.rg.location
   account_tier             = "Standard"
@@ -52,13 +61,44 @@ resource "azurerm_storage_account" "sa" {
 }
 
 # Storage bucket (similar to S3)
+moved {
+  from = azurerm_storage_container.blob
+  to   = azurerm_storage_container.blob[0]
+}
+
 resource "azurerm_storage_container" "blob" {
+  count = var.enable_operator_infrastructure ? 1 : 0
 
   #checkov:skip=CKV2_AZURE_21: "Ensure Storage logging is enabled for Blob service for read requests"
 
   name                  = "${var.aks_cluster_name}-blob"
-  storage_account_id    = azurerm_storage_account.sa.id
+  storage_account_id    = azurerm_storage_account.sa[0].id
   container_access_type = "private" # blobs are private but reachable via the public endpoint
+}
+
+############################################
+# storage (nfs) - optional
+############################################
+resource "azurerm_storage_account" "nfs" {
+  count = var.enable_nfs ? 1 : 0
+
+  name                       = local.storage_account_name_nfs
+  resource_group_name        = azurerm_resource_group.rg.name
+  location                   = azurerm_resource_group.rg.location
+  account_kind               = "FileStorage"
+  account_tier               = "Premium"
+  account_replication_type   = "ZRS"
+  https_traffic_only_enabled = false
+
+  allow_nested_items_to_be_public = false
+
+  network_rules {
+    default_action             = "Deny"
+    virtual_network_subnet_ids = [azurerm_subnet.nodes.id]
+    bypass                     = ["AzureServices"]
+  }
+
+  tags = var.tags
 }
 
 ############################################
@@ -68,7 +108,7 @@ resource "azurerm_virtual_network" "vnet" {
   name                = "${var.aks_cluster_name}-vnet"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  address_space       = [local.vnet_cidr]
+  address_space       = [var.vnet_cidr]
   tags                = var.tags
 }
 
@@ -80,5 +120,6 @@ resource "azurerm_subnet" "nodes" {
   name                 = "aks-nodes"
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
-  address_prefixes     = [local.nodes_subnet_cidr]
+  address_prefixes     = [var.nodes_subnet_cidr]
+  service_endpoints    = ["Microsoft.Storage"]
 }
