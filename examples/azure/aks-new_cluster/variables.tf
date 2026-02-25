@@ -146,24 +146,25 @@ variable "gpu_pool_configs" {
       product_name = "NVIDIA-T4"
       gpu_count    = "1"
     }
-    A10 = {
-      name         = "gpua10"
-      vm_size      = "Standard_NV36ads_A10_v5"
-      product_name = "NVIDIA-A10"
-      gpu_count    = "1"
-    }
     A100 = {
       name         = "gpua100"
       vm_size      = "Standard_NC24ads_A100_v4"
       product_name = "NVIDIA-A100"
       gpu_count    = "1"
     }
-    H100 = {
-      name         = "h100x8"
-      vm_size      = "Standard_ND96isr_H100_v5"
-      product_name = "NVIDIA-H100"
-      gpu_count    = "8"
-    }
+    # Example of adding new GPU pools:
+    # A10 = {
+    #   name         = "gpua10"
+    #   vm_size      = "Standard_NV36ads_A10_v5"
+    #   product_name = "NVIDIA-A10"
+    #   gpu_count    = "1"
+    # }
+    # H100 = {
+    #   name         = "h100x8"
+    #   vm_size      = "Standard_ND96isr_H100_v5"
+    #   product_name = "NVIDIA-H100"
+    #   gpu_count    = "8"
+    # }
   }
 }
 
