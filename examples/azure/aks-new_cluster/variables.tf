@@ -129,9 +129,9 @@ variable "cpu_vm_size" {
 
 variable "gpu_pool_configs" {
   description = <<-EOT
-    (Optional) Full configuration for GPU node pools. Each key is a GPU type label
-    used for selection via `node_group_gpu_types`. Override any field to customize
-    pool names, VM sizes, GPU labels, or GPU counts.
+    (Optional) Full configuration for GPU node pools. The map key is a logical label
+    (e.g. "T4", "A100"). The `name` field is used as the AKS node pool name and must
+    be lowercase alphanumeric, max 8 chars (spot pools append "spot").
   EOT
   type = map(object({
     name         = string
@@ -165,6 +165,20 @@ variable "gpu_pool_configs" {
     #   product_name = "NVIDIA-H100"
     #   gpu_count    = "8"
     # }
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gpu_pool_configs : can(regex("^[a-z0-9]{1,8}$", v.name))
+    ])
+    error_message = "gpu_pool_configs name must be lowercase alphanumeric, max 8 characters (spot pools append 'spot' for a 12-char AKS limit)."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.gpu_pool_configs : can(regex("^[1-9][0-9]*$", v.gpu_count))
+    ])
+    error_message = "gpu_pool_configs gpu_count must be a positive integer string (e.g. \"1\", \"8\")."
   }
 }
 
