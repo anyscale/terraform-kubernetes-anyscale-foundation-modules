@@ -21,8 +21,14 @@ The examples folder has a couple common use cases that have been tested. These i
 * Anyscale - AWS & EKS
   * [eks-public](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/aws/eks-public) - Build everything - use a common name for all resources, public networking
   * [eks-private](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/aws/eks-private) - Build everything - use a common name for all resources, private networking
+  * [eks-existing](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/aws/eks-existing) - Use an existing EKS cluster
 * Anyscale - GCP & GKE
   * [gke-existing_cluster](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/gcp/gke-existing_cluster) - Use an existing GKE cluster, build additional resources such as object storage, service accounts, filestore.
+  * [gke-new_cluster](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/gcp/gke-new_cluster) - Build a new GKE cluster with all resources
+* Anyscale - Azure & AKS
+  * [aks-new_cluster](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/azure/aks-new_cluster) - Build a new AKS cluster with all resources
+* Anyscale - Nebius & MK8s
+  * [mk8s-hybrid-autoscaler](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/nebius/mk8s-hybrid-autoscaler) - Hybrid architecture with autoscaling workload nodes
 
 Additional examples can be requested via an [issues] ticket.
 
