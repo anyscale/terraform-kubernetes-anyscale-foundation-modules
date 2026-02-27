@@ -132,6 +132,11 @@ anyscale cloud register \
   --cloud-storage-bucket-endpoint 'https://....blob.core.windows.net'
 ```
 
+3. Add new cluster to existing Anyscale cloud
+```shell
+anyscale cloud resource create --cloud <name> -f sample-cloud_resource.yaml
+```
+
 ### Install the Anyscale Operator
 
 Update helm repo cache:
