@@ -1,0 +1,58 @@
+output "azure_resource_group_name" {
+  value       = data.azurerm_resource_group.existing.name
+  description = "Name of the Azure Resource Group used for the cluster."
+}
+
+output "azure_storage_account_name" {
+  value       = azurerm_storage_account.sa.name
+  description = "Name of the Azure Storage Account created for Anyscale."
+}
+
+output "azure_aks_cluster_name" {
+  value       = data.azurerm_kubernetes_cluster.existing.name
+  description = "Name of the existing Azure AKS cluster."
+}
+
+output "anyscale_operator_client_id" {
+  value       = azurerm_user_assigned_identity.anyscale_operator.client_id
+  description = "Client ID of the Azure User Assigned Identity created for Anyscale."
+}
+
+output "anyscale_operator_principal_id" {
+  value       = azurerm_user_assigned_identity.anyscale_operator.principal_id
+  description = "Principal ID of the Azure User Assigned Identity created for Anyscale."
+}
+
+locals {
+  registration_command_parts = compact([
+    "anyscale cloud register",
+    "--name <anyscale_cloud_name>",
+    "--region ${data.azurerm_resource_group.existing.location}",
+    "--provider azure",
+    "--compute-stack k8s",
+    "--cloud-storage-bucket-name 'azure://${azurerm_storage_container.blob.name}'",
+    "--cloud-storage-bucket-endpoint 'https://${azurerm_storage_account.sa.name}.blob.core.windows.net'",
+  ])
+
+  helm_upgrade_command_parts = compact([
+    "helm upgrade anyscale-operator anyscale/anyscale-operator",
+    "--set-string global.cloudDeploymentId=<cloud-deployment-id>",
+    "--set-string global.azure.region=${data.azurerm_resource_group.existing.location}",
+    "--set-string global.cloudProvider=azure",
+    "--set-string global.auth.iamIdentity=${azurerm_user_assigned_identity.anyscale_operator.client_id}",
+    "--set-string workloads.serviceAccount.name=anyscale-operator",
+    "--namespace ${var.anyscale_operator_namespace}",
+    "--create-namespace",
+    "-i"
+  ])
+}
+
+output "anyscale_registration_command" {
+  description = "The Anyscale registration command."
+  value       = join(" \\\n\t", local.registration_command_parts)
+}
+
+output "helm_upgrade_command" {
+  description = "The helm upgrade command."
+  value       = join(" \\\n\t", local.helm_upgrade_command_parts)
+}

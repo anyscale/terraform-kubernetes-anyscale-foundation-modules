@@ -1,0 +1,16 @@
+# ---------------------------------------------------------------------------------------------------------------------
+# Terraform variables for Anyscale K8s - Existing AKS Cluster example
+# ---------------------------------------------------------------------------------------------------------------------
+# Copy this file to terraform.tfvars and fill in your values.
+#
+# Azure authentication: set these environment variables (not in tfvars) for the Azure provider:
+#   ARM_SUBSCRIPTION_ID, ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_TENANT_ID
+# ---------------------------------------------------------------------------------------------------------------------
+
+azure_subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# Existing Resource Group where your AKS cluster is deployed
+existing_resource_group_name = "my-aks-resource-group"
+
+# Existing AKS cluster name (must have OIDC issuer and workload identity enabled)
+existing_aks_cluster_name = "my-aks-cluster"
