@@ -9,6 +9,17 @@ requirements.
 
 ## Getting Started
 
+### Claude Code Guided Deployment
+
+If you have [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed, you can use the built-in skill to get interactive, step-by-step deployment guidance:
+
+```shell
+claude
+# Then type: /deploy-azure-aks
+```
+
+This will walk you through the full deployment process, check your prerequisites, and help you configure variables. You can also jump to a specific step (e.g., `/deploy-azure-aks nginx` or `/deploy-azure-aks register`).
+
 ### Prerequisites
 
 * [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/)

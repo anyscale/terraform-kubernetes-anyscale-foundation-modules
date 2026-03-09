@@ -15,6 +15,17 @@ requirements.
 
 ## Getting Started
 
+### Claude Code Guided Deployment
+
+If you have [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed, you can use the built-in skill to get interactive, step-by-step deployment guidance:
+
+```shell
+claude
+# Then type: /deploy-gcp-gke
+```
+
+This will walk you through the full deployment process, check your prerequisites, and help you configure variables. You can also jump to a specific step (e.g., `/deploy-gcp-gke nginx` or `/deploy-gcp-gke register`).
+
 ### Prerequisites
 
 * [Google Cloud Project](https://cloud.google.com/resource-manager/docs/creating-managing-projects)
