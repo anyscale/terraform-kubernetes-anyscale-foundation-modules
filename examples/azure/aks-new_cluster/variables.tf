@@ -214,3 +214,10 @@ variable "cors_rule" {
     expose_headers  = ["Accept-Ranges", "Content-Range", "Content-Length"]
   }
 }
+
+variable "storage_use_azuread" {
+  description = "(Optional) Determines whether the provider uses AzureAD or the SharedKey from the Storage Account to connect to the Storage Blob & Queue APIs"
+  type        = bool
+  nullable    = false
+  default     = false
+}

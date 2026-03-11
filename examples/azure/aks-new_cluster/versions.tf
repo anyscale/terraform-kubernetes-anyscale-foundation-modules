@@ -12,4 +12,5 @@ provider "azurerm" {
   features {}
   subscription_id                 = var.azure_subscription_id
   resource_provider_registrations = "none"
+  storage_use_azuread = var.storage_use_azuread
 }
