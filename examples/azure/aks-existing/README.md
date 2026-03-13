@@ -19,20 +19,6 @@ requirements.
 * Existing [Azure Resource Group](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/manage-resource-groups-portal)
 * Existing [Azure AKS Cluster](https://learn.microsoft.com/en-us/azure/aks/learn/quick-kubernetes-deploy-portal) running in the existing Resource Group
 
-Ensure your AKS cluster has the following configurations:
-
-* **OIDC issuer enabled** (`oidc_issuer_enabled = true`) - Required for workload identity federation
-* **Workload identity enabled** (`workload_identity_enabled = true`) - Required for Azure AD token support
-* **Node pools configured** with appropriate taints and labels for Anyscale workloads:
-  * CPU OnDemand pools with taint: `node.anyscale.com/capacity-type=ON_DEMAND:NoSchedule`
-  * CPU Spot pools with taint: `node.anyscale.com/capacity-type=SPOT:NoSchedule`
-  * GPU pools with taints:
-    * `node.anyscale.com/capacity-type=ON_DEMAND:NoSchedule` or `SPOT`
-    * `nvidia.com/gpu=present:NoSchedule`
-    * `node.anyscale.com/accelerator-type=GPU:NoSchedule`
-  * GPU pools with labels:
-    * `nvidia.com/gpu.product=<GPU_TYPE>` (e.g., NVIDIA-T4, NVIDIA-A100)
-    * `nvidia.com/gpu.count=<GPU_COUNT>`
 
 ### Creating Anyscale Resources
 
@@ -44,7 +30,7 @@ Steps for deploying Anyscale resources via Terraform:
 azure_subscription_id         = "<your-subscription-id>"
 existing_resource_group_name = "<your-resource-group-name>"
 existing_aks_cluster_name    = "<your-aks-cluster-name>"
-anyscale_cloud_name          = "anyscale-prod"  # must yield a globally unique storage account name (3-24 chars)
+storage_account_name          = "anyscalesaexisting"  # must yield a globally unique storage account name (3-24 chars)
 ```
 
 * Apply the terraform
