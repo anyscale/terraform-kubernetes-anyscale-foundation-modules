@@ -107,25 +107,3 @@ resource "azurerm_role_assignment" "anyscale_blob_contrib" {
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_user_assigned_identity.anyscale_operator.principal_id
 }
-
-###############################################################################
-# HOW TO BIND KUBERNETES SERVICE ACCOUNT
-###############################################################################
-#
-# apiVersion: v1
-# kind: ServiceAccount
-# metadata:
-#   name: anyscale-operator
-#   namespace: anyscale-operator   # must match anyscale_operator_namespace
-#   annotations:
-#     azure.workload.identity/client-id: "${azurerm_user_assigned_identity.anyscale_operator.client_id}"
-#
-# ================================
-# apiVersion: v1
-# kind: Pod
-# metadata:
-#   name: sample-pod
-#   labels:
-#     azure.workload.identity/use: "true"
-# spec:
-#   serviceAccountName: anyscale-operator
