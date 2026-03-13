@@ -1,6 +1,21 @@
+output "azure_subscription_id" {
+  value       = var.azure_subscription_id
+  description = "Azure subscription ID."
+}
+
 output "azure_resource_group_name" {
   value       = azurerm_resource_group.rg.name
   description = "Name of the Azure Resource Group created for the cluster."
+}
+
+output "cloud_storage_bucket_endpoint" {
+  value       = "https://${azurerm_storage_account.sa.name}.blob.core.windows.net"
+  description = "Cloud storage bucket endpoint for creating Anyscale Cloud in Azure Portal."
+}
+
+output "cloud_storage_bucket_name" {
+  value       = "abfss://${azurerm_storage_container.blob.name}@${azurerm_storage_account.sa.name}.dfs.core.windows.net"
+  description = "Cloud storage bucket name for creating Anyscale Cloud in Azure Portal."
 }
 
 output "azure_storage_account_name" {
