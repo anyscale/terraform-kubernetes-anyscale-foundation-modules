@@ -15,5 +15,5 @@ existing_resource_group_name = "my-aks-resource-group"
 # Existing AKS cluster name (must have OIDC issuer and workload identity enabled)
 existing_aks_cluster_name = "my-aks-cluster"
 
-# Name prefix for Anyscale resources (storage account name = this value without hyphens + "sa")
-anyscale_cloud_name = "anyscale"
+# Storage account name must be globally unique across Azure (3-24 chars, lowercase alphanumeric).
+storage_account_name = "anyscalesaexisting"
