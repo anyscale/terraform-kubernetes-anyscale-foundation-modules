@@ -132,44 +132,39 @@ helm upgrade nvdp nvdp/nvidia-device-plugin \
 
 Ensure that you are logged into Anyscale with valid CLI credentials. (`anyscale login`)
 
-You will need an Anyscale platform API Key for the helm chart installation. You can generate one from the [Anyscale Web UI](https://console.anyscale.com/api-keys).
-
-1. Using the output from the Terraform modules, register the Anyscale Cloud. It should look something like:
+Using the output from the Terraform modules, register the Anyscale Cloud. It should look something like:
 
 ```shell
 anyscale cloud register \
-  --name <name> \
-  --region <region> \
+  --name <anyscale_cloud_name> \
+  --region ... \
   --provider azure \
   --compute-stack k8s \
-  --cloud-storage-bucket-name 'azure://<blob-storage-name>' \
-  --cloud-storage-bucket-endpoint 'https://<storage-account>.blob.core.windows.net'
-```
-
-2. Note the Cloud Deployment ID which will be used in the next step. The Anyscale CLI will return it as one of the outputs. Example:
-```shell
-Output
-(anyscale +22.5s) For registering this cloud's Kubernetes Manager, use cloud deployment ID 'cldrsrc_12345abcdefgh67890ijklmnop'.
+  --cloud-storage-bucket-name 'azure://...' \
+  --cloud-storage-bucket-endpoint 'https://....blob.core.windows.net'
 ```
 
 ### Install the Anyscale Operator
 
-Using the output from the Terraform modules, install the Anyscale Operator on the AKS Cluster. It should look something like:
+Update helm repo cache:
 
-```shell
-
+```
 helm repo add anyscale https://anyscale.github.io/helm-charts
 helm repo update
+```
 
+Using the output from the `cloud register`, install the Anyscale Operator on the AKS Cluster. It should look something like:
+
+```shell
 helm upgrade anyscale-operator anyscale/anyscale-operator \
---set-string global.cloudDeploymentId=<cloud-deployment-id> \
---set-string global.cloudProvider=azure \
---set-string global.azure.region=<region> \
---set-string global.auth.iamIdentity=<anyscale_operator_client_id> \
---set-string workloads.serviceAccount.name=anyscale-operator \
---namespace anyscale-operator \
---create-namespace \
--i
+  --set-string global.cloudDeploymentId=cldrsrc_... \
+  --set-string global.cloudProvider=azure \
+  --set-string global.auth.iamIdentity=... \
+  --set-string workloads.serviceAccount.name=anyscale-operator \
+  --namespace anyscale-operator \
+  --create-namespace \
+  --wait \
+  -i
 ```
 
 [optional] If you are using GPU types other than T4 follow these steps:
@@ -177,15 +172,10 @@ A sample file, `sample-custom_values.yaml` has been provided in this repo. Make 
 
 ```shell
 helm upgrade anyscale-operator anyscale/anyscale-operator \
---set-string global.auth.anyscaleCliToken=<anyscale-cli-token> \
---set-string global.cloudDeploymentId=<cloud-deployment-id> \
---set-string global.cloudProvider=azure \
---set-string global.auth.iamIdentity=<anyscale_operator_client_id> \
---set-string workloads.serviceAccount.name=anyscale-operator \
---namespace anyscale-operator \
--f custom_values.yaml \
---create-namespace \
--i
+  ...
+  -f custom_values.yaml \
+  --create-namespace \
+  -i
 ```
 
 <!-- BEGIN_TF_DOCS -->
