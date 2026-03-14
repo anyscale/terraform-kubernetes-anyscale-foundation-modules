@@ -26,6 +26,17 @@ locals {
     } : {}
   )
 
+  node_group_block_device_mappings = {
+    xvda = {
+      device_name = "/dev/xvda"
+      ebs = {
+        delete_on_termination = true
+        volume_size           = var.node_group_disk_size
+        volume_type           = "gp3"
+      }
+    }
+  }
+
   # Base configuration for GPU node groups
   gpu_node_group_base = {
     ami_type                     = "AL2023_x86_64_NVIDIA"
@@ -131,11 +142,19 @@ module "eks" {
 
   node_security_group_additional_rules = {
     anyscale_ingress_nodes = {
-      description = "Node to node ingress - Anyscale ports"
-      protocol    = "tcp"
-      from_port   = 80
-      to_port     = 65535
+      description = "Node to node ingress - all traffic"
+      protocol    = "-1"
+      from_port   = 0
+      to_port     = 0
       type        = "ingress"
+      self        = true
+    }
+    anyscale_egress_nodes = {
+      description = "Node to node egress - all traffic"
+      protocol    = "-1"
+      from_port   = 0
+      to_port     = 0
+      type        = "egress"
       self        = true
     }
   }
@@ -165,13 +184,7 @@ module "eks" {
       ondemand_cpu = {
         ami_type = "AL2023_x86_64_STANDARD"
         instance_types = [
-          "m7i.8xlarge",
-          "m7a.8xlarge",
-          "m7i.4xlarge",
-          "m7a.4xlarge",
-          "m6a.4xlarge",
-          "m5a.4xlarge",
-          "m6i.4xlarge",
+          "m5.8xlarge",
           "m5.4xlarge",
         ]
 
@@ -179,8 +192,8 @@ module "eks" {
         min_size                   = 0
         max_size                   = 10
         desired_size               = 0
-        disk_size                  = var.node_group_disk_size
-        use_custom_launch_template = false
+        block_device_mappings      = local.node_group_block_device_mappings
+        use_custom_launch_template = true
 
         taints = [
           {
@@ -196,11 +209,7 @@ module "eks" {
       spot_cpu = {
         ami_type = "AL2023_x86_64_STANDARD"
         instance_types = [
-          "m7i.8xlarge",
-          "m7a.8xlarge",
-          "m6a.4xlarge",
-          "m5a.4xlarge",
-          "m6i.4xlarge",
+          "m5.8xlarge",
           "m5.4xlarge",
         ]
 
@@ -208,8 +217,8 @@ module "eks" {
         min_size                   = 0
         max_size                   = 10
         desired_size               = 0
-        disk_size                  = var.node_group_disk_size
-        use_custom_launch_template = false
+        block_device_mappings      = local.node_group_block_device_mappings
+        use_custom_launch_template = true
 
         taints = [
           {
