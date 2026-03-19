@@ -36,11 +36,11 @@ module "anyscale_vpc" {
 module "anyscale_s3" {
   #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
   #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
-  source = "github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-s3"
+  source = "/Users/hongchao.deng/code/anyscale/tfaws/modules/aws-anyscale-s3"
 
   module_enabled = true
 
-  anyscale_bucket_name = "${var.eks_cluster_name}-${var.aws_region}"
+  anyscale_bucket_prefix = "${var.eks_cluster_name}-"
 
   tags = var.tags
 }

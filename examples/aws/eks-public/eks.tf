@@ -46,36 +46,39 @@ locals {
     disk_size                    = var.node_group_disk_size
     use_custom_launch_template   = false
     iam_role_additional_policies = local.anyscale_iam
+    metadata_options = {
+      http_put_response_hop_limit = 2
+    }
   }
 
-  gpu_node_taints_base = [
-    {
-      key    = "nvidia.com/gpu",
-      value  = "present",
-      effect = "NO_SCHEDULE",
-    },
-    {
-      key    = "node.anyscale.com/accelerator-type",
-      value  = "GPU",
-      effect = "NO_SCHEDULE",
+  gpu_node_taints_base = {
+    gpu = {
+      key    = "nvidia.com/gpu"
+      value  = "present"
+      effect = "NO_SCHEDULE"
     }
-  ]
+    accelerator_type = {
+      key    = "node.anyscale.com/accelerator-type"
+      value  = "GPU"
+      effect = "NO_SCHEDULE"
+    }
+  }
 
-  gpu_node_taints_ondemand = concat(local.gpu_node_taints_base, [
-    {
-      key    = "node.anyscale.com/capacity-type",
-      value  = "ON_DEMAND",
-      effect = "NO_SCHEDULE",
+  gpu_node_taints_ondemand = merge(local.gpu_node_taints_base, {
+    capacity_type = {
+      key    = "node.anyscale.com/capacity-type"
+      value  = "ON_DEMAND"
+      effect = "NO_SCHEDULE"
     }
-  ])
+  })
 
-  gpu_node_taints_spot = concat(local.gpu_node_taints_base, [
-    {
-      key    = "node.anyscale.com/capacity-type",
-      value  = "SPOT",
-      effect = "NO_SCHEDULE",
+  gpu_node_taints_spot = merge(local.gpu_node_taints_base, {
+    capacity_type = {
+      key    = "node.anyscale.com/capacity-type"
+      value  = "SPOT"
+      effect = "NO_SCHEDULE"
     }
-  ])
+  })
 
   # Create a map of GPU node groups based on gpu_instance_types
   gpu_node_groups = {
@@ -115,20 +118,20 @@ locals {
 module "eks" {
   #checkov:skip=CKV_TF_1: Use the given version of the module
   source  = "terraform-aws-modules/eks/aws"
-  version = "20.33.1"
+  version = "21.15.1"
 
   # Cluster basic configuration
-  cluster_name    = var.eks_cluster_name
-  cluster_version = var.eks_cluster_version
+  name                 = var.eks_cluster_name
+  kubernetes_version   = var.eks_cluster_version
 
-  cluster_addons = {
+  addons = {
     coredns                = {}
     eks-pod-identity-agent = {}
     kube-proxy             = {}
   }
 
   # API endpoint access configuration
-  cluster_endpoint_public_access = true
+  endpoint_public_access = true
 
   # The authentication mode for the cluster. Valid values are `CONFIG_MAP`, `API` or `API_AND_CONFIG_MAP`
   authentication_mode = "API_AND_CONFIG_MAP"
@@ -175,6 +178,10 @@ module "eks" {
         max_size     = 10
         desired_size = 2
 
+        metadata_options = {
+          http_put_response_hop_limit = 2
+        }
+
         iam_role_additional_policies = merge(local.anyscale_iam, {
           cluster_autoscaler_policy = aws_iam_policy.autoscaler_policy.arn
           elb_policy                = aws_iam_policy.elb_policy.arn
@@ -194,15 +201,17 @@ module "eks" {
         desired_size               = 0
         block_device_mappings      = local.node_group_block_device_mappings
         use_custom_launch_template = true
+        metadata_options = {
+          http_put_response_hop_limit = 2
+        }
 
-        taints = [
-          {
-            key    = "node.anyscale.com/capacity-type",
-            value  = "ON_DEMAND",
-            effect = "NO_SCHEDULE",
+        taints = {
+          capacity_type = {
+            key    = "node.anyscale.com/capacity-type"
+            value  = "ON_DEMAND"
+            effect = "NO_SCHEDULE"
           }
-        ]
-
+        }
         iam_role_additional_policies = local.anyscale_iam
       }
 
@@ -219,14 +228,17 @@ module "eks" {
         desired_size               = 0
         block_device_mappings      = local.node_group_block_device_mappings
         use_custom_launch_template = true
+        metadata_options = {
+          http_put_response_hop_limit = 2
+        }
 
-        taints = [
-          {
-            key    = "node.anyscale.com/capacity-type",
-            value  = "SPOT",
-            effect = "NO_SCHEDULE",
+        taints = {
+          capacity_type = {
+            key    = "node.anyscale.com/capacity-type"
+            value  = "SPOT"
+            effect = "NO_SCHEDULE"
           }
-        ]
+        }
 
         iam_role_additional_policies = local.anyscale_iam
       }
