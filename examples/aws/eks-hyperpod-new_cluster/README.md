@@ -246,11 +246,36 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
 ```shell
 helm list -n anyscale-operator
 ```
+
+4. **Enable `hostNetwork` on the operator Deployment (required on some HyperPod clusters).**
+
+   On SageMaker HyperPod EKS, the operator can fail to register with the Anyscale control plane because it cannot obtain AWS credentials: the operator signs its identity using instance credentials from IMDS (`169.254.169.254`), and on HyperPod the pod network cannot reach IMDS. The operator then CrashLoopBackOffs with an error like:
+
+   ```
+   register to Anyscale control plane: get identity from cloud provider:
+   sign aws identity payload: getting credentials: failed to refresh cached
+   credentials, no EC2 IMDS role found, operation error ec2imds: GetMetadata,
+   request canceled, context deadline exceeded
+   ```
+
+   Running the Deployment with `hostNetwork: true` puts the operator in the node's network namespace, where IMDS is reachable via the node's primary ENI. The `anyscale/anyscale-operator` Helm chart does not expose `hostNetwork` as a value today, so apply it as a post-install patch:
+
+   ```shell
+   kubectl patch deployment anyscale-operator \
+     -n anyscale-operator \
+     --patch '{"spec":{"template":{"spec":{"hostNetwork":true}}}}'
+
+   kubectl rollout status deployment/anyscale-operator \
+     -n anyscale-operator --timeout=300s
+   ```
+
+   This triggers a second rolling update of the operator pod after the initial Helm-driven rollout. This patch is only needed on HyperPod clusters that hit the IMDS error above; if your operator pod already reaches `Running` and connects, it is not required (for example, clusters whose pod subnets route to IMDS/the internet). It is not needed on standard EKS clusters.
+
 ### Add label to HyperPod node group(s)
 ```shell
 kubectl label nodes --all eks.amazonaws.com/capacityType=ON_DEMAND
 ```
-You need to wait until the HyperPod node group is available in your EKS cluster. And re-run this if you add new instance groups in the HyperPod cluster. You can check if the HyperPod node group is available by re-running this command: 
+You need to wait until the HyperPod node group is available in your EKS cluster. And re-run this if you add new instance groups in the HyperPod cluster. You can check if the HyperPod node group is available by re-running this command:
 ```shell
 kubectl get nodes -L node.kubernetes.io/instance-type -L sagemaker.amazonaws.com/node-health-status -L sagemaker.amazonaws.com/deep-health-check-status $@
 ```
