@@ -165,7 +165,7 @@ module "eks" {
 
   eks_managed_node_groups = merge(
     {
-      # This node group is for management components such as CoreDNS, Cluster Autoscaler, AWS-LB controller, ingress-nginx, Anyscale Operator, etc.
+      # This node group is for management components such as CoreDNS, Cluster Autoscaler, AWS-LB controller, Traefik, Anyscale Operator, etc.
       # Note that small instance types of Anyscale workloads can still be scheduled onto this node group.
       default = {
         ami_type       = "AL2023_x86_64_STANDARD"

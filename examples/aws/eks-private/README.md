@@ -39,7 +39,7 @@ Note the output from Terraform which includes an example cloud registration comm
 The Anyscale Operator requires the following components:
 * [Cluster autoscaler](https://github.com/kubernetes/autoscaler/tree/master/charts/cluster-autoscaler)
 * [AWS LBC (Load Balancer controller)](https://github.com/kubernetes-sigs/aws-load-balancer-controller/tree/main/helm/aws-load-balancer-controller)
-* [Nginx Ingress Controller](https://kubernetes.github.io/ingress-nginx/deploy/) (other ingress controllers may be possible but are untested)
+* [Traefik Ingress Controller](https://doc.traefik.io/traefik/getting-started/install-traefik/) (other ingress controllers may be possible but are untested)
 * (Optional) [Nvidia device plugin](https://github.com/NVIDIA/k8s-device-plugin/tree/main?tab=readme-ov-file#deployment-via-helm) (required if utilizing GPU nodes)
 
 **Note:** Ensure that you are [authenticated to the EKS cluster](https://docs.aws.amazon.com/eks/latest/userguide/create-kubeconfig.html) for the remaining steps.
@@ -70,18 +70,18 @@ helm upgrade aws-load-balancer-controller eks/aws-load-balancer-controller \
   --install
 ```
 
-#### Install the Nginx ingress controller
+#### Install the Traefik ingress controller
 
-A sample file, `sample-values_nginx.yaml` has been provided in this repo. Please review for your requirements before using.
+A sample file, `sample-values_traefik.yaml` has been provided in this repo. Please review for your requirements before using.
 
 Run:
 
 ```shell
-helm repo add nginx https://kubernetes.github.io/ingress-nginx
-helm upgrade ingress-nginx nginx/ingress-nginx \
-  --version 4.12.1 \
-  --namespace ingress-nginx \
-  --values sample-values_nginx.yaml \
+helm repo add traefik https://traefik.github.io/charts
+helm upgrade traefik traefik/traefik \
+  --version 33.0.0 \
+  --namespace traefik \
+  --values sample-values_traefik.yaml \
   --create-namespace \
   --install
 ```
@@ -152,8 +152,16 @@ Output
 
 ### Install the Anyscale Operator
 
-1. Using the below example, replace `<aws_region>` with the AWS region where EKS is running, and replace `<cloud-deployment-id>` with the appropriate value from the `anyscale cloud register` output. Please note that you can also change the namespace to one that you wish to associate with Anyscale pods.
-2. Using your updated helm upgrade command, install the Anyscale Operator.
+1. Fetch the Traefik LoadBalancer address (the operator needs this to populate Ingress hosts):
+
+```shell
+TRAEFIK_LB=$(kubectl get svc -n traefik traefik \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{.status.loadBalancer.ingress[0].ip}')
+echo "Traefik LB: $TRAEFIK_LB"
+```
+
+2. Using the below example, replace `<aws_region>` with the AWS region where EKS is running, and replace `<cloud-deployment-id>` with the appropriate value from the `anyscale cloud register` output. Please note that you can also change the namespace to one that you wish to associate with Anyscale pods.
+3. Using your updated helm upgrade command, install the Anyscale Operator.
 
 ```shell
 helm repo add anyscale https://anyscale.github.io/helm-charts
@@ -162,10 +170,14 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
   --set-string global.cloudProvider=aws \
   --set-string global.aws.region=<aws_region> \
   --set-string workloads.serviceAccount.name=anyscale-operator \
+  --set-string networking.ingress.classNameOverride=traefik \
+  --set-string networking.ingress.address=$TRAEFIK_LB \
   --namespace anyscale-operator \
   --create-namespace \
   --install
 ```
+
+> **Note:** The operator defaults to `ingressClassName: nginx`. Since this guide uses Traefik, `networking.ingress.classNameOverride=traefik` is required — otherwise Ingress creation will be rejected by the AWS LBC admission webhook with `IngressClass "nginx" not found`.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
