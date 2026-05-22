@@ -56,48 +56,24 @@ Note the output from Terraform which includes an example cloud registration comm
 
 The Anyscale Operator requires the following components:
 * [Cluster autoscaler](https://cloud.google.com/kubernetes-engine/docs/concepts/cluster-autoscaler) (enabled by default in GKE)
-* [Nginx Ingress Controller](https://kubernetes.github.io/ingress-nginx/deploy/) (other ingress controllers may be possible but are untested)
+* [Traefik Ingress Controller](https://doc.traefik.io/traefik/getting-started/install-traefik/) (other ingress controllers may be possible but are untested)
 * (Optional) [Nvidia device plugin](https://github.com/NVIDIA/k8s-device-plugin) (enabled by default in GKE if utilizing GPU nodes)
 
 **Note:** Ensure that you are [authenticated to the GKE cluster](https://cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl) for the remaining steps.
 
-#### Install the Nginx ingress controller
+#### Install the Traefik ingress controller
 
-Sample files, `sample-values_nginx_gke_private.yaml` and `sample-values_nginx_gke_public.yaml` have been provided in this repo. Please review for your requirements before using.
+Sample files, `sample-values_traefik_gke_private.yaml` and `sample-values_traefik_gke_public.yaml` have been provided in this repo. Please review for your requirements before using.
 
 1. Choose if the cluster should be public or private facing.
-2. If public, create a YAML values file named `values_nginx_gke_public.yaml`
-    * Add the following:
-    ```yaml
-    controller:
-      service:
-        type: LoadBalancer
-        annotations:
-          cloud.google.com/load-balancer-type: "External"
-      allowSnippetAnnotations: true
-      autoscaling:
-        enabled: true
-    ```
-3. If private, create a YAML values file named `values_nginx_gke_private.yaml`
-    * Add the following:
-    ```yaml
-    controller:
-      service:
-        type: LoadBalancer
-        annotations:
-          cloud.google.com/load-balancer-type: "Internal"
-      allowSnippetAnnotations: true
-      autoscaling:
-        enabled: true
-    ```
-4. Run the following, replacing with the appropriate values file:
+2. Run the following, replacing `<private|public>` with the appropriate values file name:
 
     ```shell
-    helm repo add nginx https://kubernetes.github.io/ingress-nginx
-    helm upgrade ingress-nginx nginx/ingress-nginx \
-      --version 4.12.1 \
-      --namespace ingress-nginx \
-      --values values_nginx_gke_<private|public>.yaml \
+    helm repo add traefik https://traefik.github.io/charts
+    helm upgrade traefik traefik/traefik \
+      --version 33.0.0 \
+      --namespace traefik \
+      --values sample-values_traefik_gke_<private|public>.yaml \
       --create-namespace \
       --install
     ```
@@ -129,6 +105,14 @@ anyscale cloud register \
 
 ### Install the Anyscale Operator
 
+1. Fetch the Traefik LoadBalancer address (the operator needs this to populate Ingress hosts):
+
+    ```shell
+    TRAEFIK_LB=$(kubectl get svc -n traefik traefik \
+      -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}')
+    echo "Traefik LB: $TRAEFIK_LB"
+    ```
+
 1. Using the below example, replace `<gke_region>` with the GCP region where GKE is running, replace `<service_account_email>` with the Google Cloud service account email, and replace `<cloud_deployment_id>` with the appropriate value from the `anyscale cloud register` output. Please note that you can also change the namespace to one that you wish to associate with Anyscale pods.
 1. Using your updated helm upgrade command, install the Anyscale Operator.
 1. Install the Anyscale Operator using the cloud deployment ID from the previous step:
@@ -141,10 +125,14 @@ anyscale cloud register \
       --set-string global.gcp.region=<gke_region> \
       --set-string global.auth.iamIdentity=<service_account_email> \
       --set-string workloads.serviceAccount.name=anyscale-operator \
+      --set-string networking.ingress.classNameOverride=traefik \
+      --set-string networking.ingress.address=$TRAEFIK_LB \
       --namespace anyscale-operator \
       --create-namespace \
       --install
     ```
+
+> **Note:** The operator defaults to `ingressClassName: nginx`. Since this guide uses Traefik, `networking.ingress.classNameOverride=traefik` is required — otherwise Ingress creation will be rejected when no `nginx` IngressClass exists in the cluster.
 
 1. (Optional) For the L4 GPU instances (`g2-standard-16`) to work, modify the Anyscale Operator `instance-types` ConfigMap:
     ```

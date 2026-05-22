@@ -1,0 +1,26 @@
+service:
+  type: LoadBalancer
+  annotations:
+    cloud.google.com/load-balancer-type: "Internal"
+    networking.gke.io/internal-load-balancer-allow-global-access: "true"
+providers:
+  kubernetesIngress:
+    enabled: true
+    publishedService:
+      enabled: true
+  kubernetesGateway:
+    enabled: false
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+ports:
+  web:
+    redirectTo:
+      port: websecure
+  websecure:
+    tls:
+      enabled: true
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
