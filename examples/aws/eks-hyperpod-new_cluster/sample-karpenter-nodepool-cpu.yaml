@@ -1,0 +1,54 @@
+# Karpenter NodePool for CPU instance groups on SageMaker HyperPod.
+#
+# Mirrors sample-karpenter-nodepool-gpu.yaml minus the GPU taint/limit. See
+# that file's header for the full rationale (HyperpodNodeClass requirement,
+# why `karpenter.sh/capacity-type` is omitted, etc.).
+#
+# Prerequisite: a HyperpodNodeClass referenced here must already exist
+# (see sample-hyperpod-nodeclass.yaml).
+#
+# `node.anyscale.com/capacity-type=ON_DEMAND:NoSchedule` is the
+# HyperPod-allowed alternative to the Anyscale operator default
+# `eks.amazonaws.com/capacityType` selector (rejected by HyperPod API +
+# Karpenter — see workloads.marketType.enableDefaults: false in
+# sample-values_anyscale-operator.yaml). The Anyscale operator already
+# tolerates this taint on every Ray pod it creates.
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: cpu
+spec:
+  template:
+    metadata:
+      labels:
+        anyscale.com/node-pool-type: cpu
+    spec:
+      nodeClassRef:
+        group: karpenter.sagemaker.amazonaws.com
+        kind: HyperpodNodeClass
+        name: hyperpod-default
+      taints:
+        - key: node.anyscale.com/capacity-type
+          value: ON_DEMAND
+          effect: NoSchedule
+      requirements:
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - ml.m5.2xlarge
+            - ml.m5.4xlarge
+            - ml.m5.8xlarge
+            - ml.m5.12xlarge
+            - ml.m5.16xlarge
+            - ml.m5.24xlarge
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["us-west-2a", "us-west-2b"]
+      expireAfter: 720h
+  limits:
+    cpu: "1000"
+    memory: 4000Gi
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 5m

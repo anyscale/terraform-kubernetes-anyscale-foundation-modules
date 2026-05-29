@@ -26,6 +26,7 @@ module "vpc" {
   vpc_cidr             = var.vpc_cidr
   public_subnet_1_cidr = var.public_subnet_1_cidr
   public_subnet_2_cidr = var.public_subnet_2_cidr
+  eks_cluster_name     = var.eks_cluster_name
 }
 
 module "private_subnet" {
@@ -37,6 +38,7 @@ module "private_subnet" {
   availability_zone_id = var.availability_zone_id
   private_subnet_cidr  = var.private_subnet_cidr
   nat_gateway_id       = var.create_vpc_module ? module.vpc[0].nat_gateway_1_id : var.existing_nat_gateway_id
+  eks_cluster_name     = var.eks_cluster_name
 }
 
 module "security_group" {
@@ -95,6 +97,31 @@ module "sagemaker_iam_role" {
   s3_bucket_name       = local.s3_bucket_name
 }
 
+module "aws_lbc_iam_role" {
+  count  = var.create_aws_lbc_iam_role_module ? 1 : 0
+  source = "./modules/aws_lbc_iam_role"
+
+  resource_name_prefix = var.resource_name_prefix
+}
+
+# MemoryDB Redis cluster backing Anyscale head node fault tolerance.
+# Off by default because it incurs ongoing cost in your account even when idle.
+# Set create_memorydb_module = true for production clouds (Anyscale recommends
+# head node fault tolerance for all production services). Requires the EKS module
+# (its multi-AZ private subnets host the subnet group) + the shared security group.
+module "memorydb" {
+  count  = var.create_memorydb_module ? 1 : 0
+  source = "./modules/memorydb"
+
+  resource_name_prefix     = var.resource_name_prefix
+  vpc_id                   = local.vpc_id
+  subnet_ids               = module.eks_cluster[0].private_subnet_ids
+  source_security_group_id = local.security_group_id
+  node_type                = var.memorydb_node_type
+
+  depends_on = [module.eks_cluster]
+}
+
 module "helm_chart" {
   count  = var.create_helm_chart_module ? 1 : 0
   source = "./modules/helm_chart"
@@ -140,12 +167,29 @@ module "hyperpod_cluster" {
 resource "aws_eks_pod_identity_association" "anyscale_operator" {
   count           = var.create_eks_module && var.create_sagemaker_iam_role_module ? 1 : 0
   cluster_name    = local.eks_cluster_name
-  namespace       = "anyscale-operator"
+  namespace       = var.anyscale_operator_namespace
   service_account = "anyscale-operator"
   role_arn        = module.sagemaker_iam_role[0].sagemaker_iam_role_arn
 
   depends_on = [
     module.eks_cluster,
     module.sagemaker_iam_role
+  ]
+}
+
+# EKS Pod Identity Association for the AWS Load Balancer Controller (LBC).
+# The LBC must be installed on HyperPod with IP target mode (instance target mode
+# does not work because HyperPod nodes lack standard EC2 metadata + DescribeInstances
+# visibility in the customer account). Pod Identity avoids needing an OIDC provider.
+resource "aws_eks_pod_identity_association" "aws_lbc" {
+  count           = var.create_eks_module && var.create_aws_lbc_iam_role_module ? 1 : 0
+  cluster_name    = local.eks_cluster_name
+  namespace       = "kube-system"
+  service_account = "aws-load-balancer-controller"
+  role_arn        = module.aws_lbc_iam_role[0].aws_lbc_iam_role_arn
+
+  depends_on = [
+    module.eks_cluster,
+    module.aws_lbc_iam_role
   ]
 }

@@ -1,0 +1,15 @@
+# GatewayClass `eg` is the controller the Anyscale operator targets when
+# `networking.gateway.enabled: true` is set in the operator's Helm values.
+# It binds Envoy Gateway's controller to the EnvoyProxy parameters defined
+# in sample-envoyproxy.yaml.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: envoy-proxy
+    namespace: envoy-gateway-system

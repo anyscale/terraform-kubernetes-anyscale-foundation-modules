@@ -30,6 +30,12 @@ variable "nat_gateway_id" {
   type        = string
 }
 
+variable "eks_cluster_name" {
+  description = "Name of the EKS cluster (used for kubernetes.io/cluster/<name>=shared and kubernetes.io/role/internal-elb=1 subnet tags required by the AWS Load Balancer Controller)."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Additional tags for all resources"
   type        = map(string)

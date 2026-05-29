@@ -1,6 +1,7 @@
-anyscale_new_cloud_name = "my-new-cloud"
-resource_name_prefix = "my_prefix"
-aws_region           = "us-west-2"
+anyscale_new_cloud_name     = "my-new-cloud"
+anyscale_operator_namespace = "anyscale-operator"
+resource_name_prefix        = "my_prefix"
+aws_region                  = "us-west-2"
 
 # VPC Module Variables
 create_vpc_module    = true
@@ -43,6 +44,17 @@ create_lifecycle_script_module = true
 # SageMaker IAM Role Module Variables
 create_sagemaker_iam_role_module = true
 existing_sagemaker_iam_role_name = ""
+
+# AWS Load Balancer Controller IAM Role Module
+# REQUIRED for HyperPod. The LBC runs in IP target mode (instance target mode
+# is not compatible with HyperPod-managed instance groups).
+create_aws_lbc_iam_role_module = true
+
+# MemoryDB Module (Anyscale head node fault tolerance)
+# Set to true for PRODUCTION clouds — Anyscale recommends head node fault
+# tolerance for all production services. Incurs ongoing MemoryDB cost.
+create_memorydb_module = false
+memorydb_node_type     = "db.t4g.small"
 
 # Helm Chart Module Variables
 create_helm_chart_module = true

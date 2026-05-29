@@ -1,0 +1,53 @@
+# Anyscale workspace / service traffic Gateway.
+#
+# Render the placeholder before applying:
+#   <cloud-resource-id> — from `anyscale cloud register` output
+#                         (e.g. cldrsrc_abcdef1234567890)
+#
+# The TLS Secrets `anyscale-<cloud-resource-id>-certificate` and
+# `anyscale-svc-<cloud-resource-id>-certificate` are provisioned by the
+# Anyscale operator once it observes this Gateway.
+#
+# NOTE: `metadata.namespace` below is hardcoded to `anyscale-operator`. If you
+# changed the `anyscale_operator_namespace` Terraform variable from its default,
+# update this namespace (and `networking.gateway.namespace` in
+# sample-values_anyscale-operator.yaml) to match — these YAMLs cannot
+# interpolate Terraform variables.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway
+  namespace: anyscale-operator
+spec:
+  gatewayClassName: eg
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: '*.i.anyscaleuserdata.com'
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: anyscale-<cloud-resource-id>-certificate
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-session
+      port: 443
+      protocol: HTTPS
+      hostname: '*.s.anyscaleuserdata.com'
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: anyscale-svc-<cloud-resource-id>-certificate
+      allowedRoutes:
+        namespaces:
+          from: All

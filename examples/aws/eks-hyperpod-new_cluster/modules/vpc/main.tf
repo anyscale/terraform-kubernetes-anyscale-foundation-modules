@@ -32,9 +32,14 @@ resource "aws_subnet" "public_1" {
   availability_zone       = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = true
 
+  # Subnet tags required for AWS Load Balancer Controller auto-discovery.
+  # `kubernetes.io/role/elb=1` is REQUIRED for internet-facing NLB/ALB target group placement
+  # on HyperPod clusters where nodes do not expose standard EC2 instance metadata.
   tags = merge(
     {
-      Name = "${var.resource_name_prefix}-SMHP-Public1"
+      Name                                            = "${var.resource_name_prefix}-SMHP-Public1"
+      "kubernetes.io/role/elb"                        = "1"
+      "kubernetes.io/cluster/${var.eks_cluster_name}" = "shared"
     },
     var.tags
   )
@@ -48,7 +53,9 @@ resource "aws_subnet" "public_2" {
 
   tags = merge(
     {
-      Name = "${var.resource_name_prefix}-SMHP-Public2"
+      Name                                            = "${var.resource_name_prefix}-SMHP-Public2"
+      "kubernetes.io/role/elb"                        = "1"
+      "kubernetes.io/cluster/${var.eks_cluster_name}" = "shared"
     },
     var.tags
   )

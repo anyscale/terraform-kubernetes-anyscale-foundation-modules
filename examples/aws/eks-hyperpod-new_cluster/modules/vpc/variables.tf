@@ -21,6 +21,11 @@ variable "public_subnet_2_cidr" {
   default     = "10.192.11.0/24"
 }
 
+variable "eks_cluster_name" {
+  description = "Name of the EKS cluster (used for kubernetes.io/cluster/<name>=shared subnet tag required by AWS Load Balancer Controller subnet auto-discovery)."
+  type        = string
+}
+
 variable "tags" {
   description = "Additional tags for all resources"
   type        = map(string)

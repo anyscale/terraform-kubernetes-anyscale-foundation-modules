@@ -45,4 +45,61 @@ The sequence of events in this architecture is as follows:
 
 This flow shows distribution and execution of user-submitted jobs across the available computing resources, while maintaining monitoring and data accessibility throughout the process.
 
-See [here](README.md) for instructions on setting this up.
+## What this Terraform module provisions
+
+In support of the flow above, this Terraform stack creates and wires up the
+following resources end-to-end so that the only post-`terraform apply` work is
+a handful of `helm`/`kubectl` commands (all rendered for you in the
+`z_next_steps` output):
+
+### AWS infrastructure
+
+- **VPC** (`modules/vpc`) with two public subnets, two NAT Gateways, and the
+  subnet tags required by the AWS Load Balancer Controller's auto-discovery:
+  `kubernetes.io/role/elb=1` on public subnets,
+  `kubernetes.io/cluster/<eks_cluster_name>=shared` on every subnet.
+- **HyperPod private subnet** (`modules/private_subnet`) — a dedicated subnet
+  in a specific AZ for HyperPod cross-account ENIs, tagged
+  `kubernetes.io/role/internal-elb=1`.
+- **Security group** (`modules/security_group`) — single SG shared between EKS
+  nodes and HyperPod instance groups, with intra-SG + Lustre + egress rules.
+- **S3 bucket** (`modules/s3_bucket`) + **S3 Gateway endpoint**
+  (`modules/s3_endpoint`) for lifecycle scripts and Anyscale workload data.
+- **EKS cluster** (`modules/eks_cluster`) — control plane plus a small managed
+  node group sized for system pods (CoreDNS, AWS LBC, Envoy Gateway, Anyscale
+  operator). Cluster log types enabled: api, audit, authenticator,
+  controllerManager, scheduler.
+- **EKS add-ons** — `vpc-cni`, `kube-proxy`, `coredns`,
+  `eks-pod-identity-agent` (used by the LBC and the Anyscale operator).
+- **SageMaker IAM role** (`modules/sagemaker_iam_role`) — execution role for
+  the HyperPod cluster *and* the role assumed by the
+  `anyscale-operator/anyscale-operator` service account via Pod Identity.
+- **AWS LBC IAM role** (`modules/aws_lbc_iam_role`) — dedicated role assumed
+  by the `kube-system/aws-load-balancer-controller` SA via Pod Identity, with
+  the upstream LBC v2.11.0 IAM policy.
+- **HyperPod cluster** (`modules/hyperpod_cluster`) — created with
+  `awscc_sagemaker_cluster`, wired to the EKS cluster as the orchestrator,
+  using the dedicated private subnet + shared security group.
+- **Lifecycle script** (`modules/lifecycle_script`) — `on_create.sh` uploaded
+  to the S3 bucket.
+- **HyperPod dependencies Helm release** (`modules/helm_chart`) — installs
+  the HyperPod health-monitoring agent, training operator, and (on
+  inference-enabled clusters) the AWS LBC CRDs into `kube-system`. The
+  Karpenter control plane itself is **managed by SageMaker HyperPod**
+  whenever `NodeProvisioningMode=Continuous` (set here) — you do not install
+  Karpenter via Helm. You DO still need to install the
+  `HyperpodNodeClass` + `NodePool` custom resources after the apply.
+
+### Kubernetes layer (installed via `helm`/`kubectl` after `terraform apply`)
+
+| Component | Why | Sample file |
+|-----------|-----|-------------|
+| AWS Load Balancer Controller (≥ v2.11) | Provides NLB/ALB for the Envoy Gateway. Must run in **IP target mode** on HyperPod. v2.11 is the first release with the dedicated `sagemaker-hyperpod` pod-compute-type code path ([PR #3886](https://github.com/kubernetes-sigs/aws-load-balancer-controller/pull/3886)). | `sample-values_aws-lbc.yaml` |
+| Envoy Gateway v1.7.0 | Recommended Anyscale ingress (replaces ingress-nginx). | `sample-envoyproxy.yaml`, `sample-gatewayclass.yaml`, `sample-gateway.yaml` |
+| NVIDIA device plugin (optional) | Surfaces `nvidia.com/gpu` extended resource. GPU Feature Discovery is **not** bundled on HyperPod, so accelerator-type scheduling is unavailable — use generic `GPU: <n>` requests instead. | `sample-values_nvdp.yaml` |
+| Anyscale Operator | Bridges the Anyscale control plane to the cluster. Must run with `workloads.marketType.enableDefaults: false` on HyperPod. | `sample-values_anyscale-operator.yaml` |
+| `HyperpodNodeClass` + Karpenter NodePools (CPU + GPU) | Map Karpenter capacity requests to HyperPod InstanceGroups. GPU NodePool uses `nvidia.com/gpu=present:NoSchedule`, not the Anyscale accelerator-type taint. Spot-on-demand fallback is configured at the `HyperpodNodeClass` level (mixed InstanceGroups), not via Karpenter's `capacity-type` requirement. | `sample-hyperpod-nodeclass.yaml`, `sample-karpenter-nodepool-cpu.yaml`, `sample-karpenter-nodepool-gpu.yaml` |
+
+See [README.md](README.md) for the step-by-step install commands and
+[README.md#hyperpod-specific-gotchas-this-module-fixes](README.md) for the rationale behind each
+divergence from the stock [Anyscale on EKS docs](https://docs.anyscale.com/clouds/aws/create-eks).

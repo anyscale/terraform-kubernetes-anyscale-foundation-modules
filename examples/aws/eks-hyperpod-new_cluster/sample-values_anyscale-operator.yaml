@@ -1,0 +1,61 @@
+# Anyscale Operator Helm values for SageMaker HyperPod on EKS.
+#
+# Render the placeholders before applying:
+#   <cloud-resource-id>  — from `anyscale cloud register` output (cldrsrc_*)
+#   <aws_region>         — from terraform output `aws_region`
+#   <gateway-address>    — from `kubectl get gateway gateway -n anyscale-operator \
+#                              -o jsonpath='{.status.addresses[0].value}'`
+#                          For an NLB, this is typically a hostname; use the `ip`
+#                          field below instead if you provisioned a static IP.
+#
+# NOTE: `networking.gateway.namespace` below is hardcoded to `anyscale-operator`.
+# If you changed the `anyscale_operator_namespace` Terraform variable from its
+# default, update it here (and `metadata.namespace` in sample-gateway.yaml) to
+# match — these YAMLs cannot interpolate Terraform variables.
+#
+# Why this file diverges from the public Anyscale on EKS docs
+# (https://docs.anyscale.com/clouds/aws/create-eks):
+#
+# 1. workloads.marketType.enableDefaults: false  [HYPERPOD-CRITICAL]
+#    Anyscale's default operator patch hardcodes
+#      nodeSelector: eks.amazonaws.com/capacityType=ON_DEMAND
+#    on every Ray pod. HyperPod rejects this in three places:
+#      (a) The HyperPod API rejects the `eks.amazonaws.com/` label prefix on
+#          CreateCluster and UpdateCluster (the prefix is reserved).
+#      (b) Karpenter NodePools cannot use `eks.amazonaws.com` in `requirements`
+#          (restricted domain).
+#      (c) Karpenter scheduling refuses to provision nodes for pods that request
+#          unknown labels, so the pod sits Pending forever.
+#    Disabling the defaults removes the bogus nodeSelector while keeping the
+#    `node.anyscale.com/capacity-type` toleration and `cluster-autoscaler.kubernetes.io/safe-to-evict`
+#    annotation that the operator still injects.
+#
+# 2. networking.gateway.enabled: true
+#    Replaces the legacy ingress-nginx wiring with the Envoy Gateway flow.
+
+global:
+  cloudDeploymentId: <cloud-resource-id>
+  cloudProvider: aws
+  aws:
+    region: <aws_region>
+
+workloads:
+  serviceAccount:
+    name: anyscale-operator
+  marketType:
+    # CRITICAL on HyperPod. Do NOT remove. See header comment for the full
+    # explanation. If/when HyperPod adds a `karpenter.sh/capacity-type` taint on
+    # its NodePools that matches the Anyscale operator default, this flag can be
+    # re-enabled.
+    enableDefaults: false
+
+networking:
+  gateway:
+    enabled: true
+    name: gateway
+    namespace: anyscale-operator
+    apiVersion: gateway.networking.k8s.io/v1
+    # Use `hostname` if the LB provides a DNS name (the typical NLB case).
+    # Use `ip` instead if you provisioned a static IP for the LB.
+    hostname: <gateway-address>
+    # ip: <gateway-ip>

@@ -2,7 +2,7 @@ data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
 resource "aws_s3_bucket" "bucket" {
-  bucket = "${replace(var.resource_name_prefix, "_", "-")}-bucket-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.id}"
+  bucket = "${replace(var.resource_name_prefix, "_", "-")}-bucket-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.region}"
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "bucket_encryption" {

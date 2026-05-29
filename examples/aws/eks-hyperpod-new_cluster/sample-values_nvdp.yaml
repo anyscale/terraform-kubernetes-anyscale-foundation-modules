@@ -1,0 +1,66 @@
+# NVIDIA Device Plugin Helm values for SageMaker HyperPod on EKS.
+#
+# HyperPod does NOT deploy GPU Feature Discovery (GFD) by default, which means
+# `nvidia.com/gpu.product` is never set on nodes. As a result the Anyscale
+# accelerator-type scheduling path (e.g. requesting a specific GPU like A10G)
+# cannot work — the resulting nodeSelector has no node to match.
+#
+# Implications:
+#   • Do not request `accelerator_type=*` in Anyscale `compute_template` /
+#     `required_resources` on HyperPod. Use a generic `GPU: <count>` request
+#     instead. Karpenter then matches the request to the GPU NodePool via the
+#     `nvidia.com/gpu` resource.
+#   • The taint applied by HyperPod GPU NodePools must be
+#     `nvidia.com/gpu=present:NoSchedule`. The NVIDIA device plugin already
+#     tolerates this taint (see `tolerations` below), as does the Anyscale
+#     operator when it injects the standard GPU pod toleration.
+#   • If you want accelerator-type scheduling back, install
+#     gpu-feature-discovery (https://github.com/NVIDIA/gpu-feature-discovery)
+#     as a prereq AFTER deploying the device plugin. Verify
+#     `nvidia.com/gpu.product` lands on nodes before re-enabling accelerator
+#     types in Anyscale.
+#
+# nodeAffinity ensures the device plugin runs only on GPU nodes (those that
+# already report `nvidia.com/gpu.product`). On HyperPod-only clusters without
+# GFD, switch this to a label that HyperPod injects on GPU instance groups
+# (for example, `node.kubernetes.io/instance-type` with a GPU instance family)
+# or set `nodeSelector: {}` to deploy unconditionally.
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: "nvidia.com/gpu.product"
+              operator: Exists
+        - matchExpressions:
+            - key: "node.kubernetes.io/instance-type"
+              operator: In
+              values:
+                # Add the GPU instance types your HyperPod instance groups use.
+                - "ml.g5.xlarge"
+                - "ml.g5.2xlarge"
+                - "ml.g5.4xlarge"
+                - "ml.g5.8xlarge"
+                - "ml.g5.12xlarge"
+                - "ml.g5.16xlarge"
+                - "ml.g5.24xlarge"
+                - "ml.g5.48xlarge"
+                - "ml.p4d.24xlarge"
+                - "ml.p4de.24xlarge"
+                - "ml.p5.48xlarge"
+                - "ml.p5e.48xlarge"
+
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  - key: node.anyscale.com/capacity-type
+    operator: Exists
+    effect: NoSchedule
+  - key: node.anyscale.com/accelerator-type
+    operator: Exists
+    effect: NoSchedule
+  # SageMaker HyperPod system taints
+  - key: sagemaker.amazonaws.com/node-health-status
+    operator: Exists
+    effect: NoSchedule

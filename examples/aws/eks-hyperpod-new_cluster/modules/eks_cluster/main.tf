@@ -15,6 +15,9 @@ resource "aws_subnet" "private" {
   cidr_block        = var.private_subnet_cidrs[count.index]
   availability_zone = data.aws_availability_zones.available.names[count.index]
 
+  # internal-elb tag enables AWS Load Balancer Controller to discover this subnet for
+  # internal NLBs/ALBs; required since HyperPod nodes lack standard EC2 instance metadata
+  # and the LBC cannot fall back to instance-based discovery.
   tags = {
     Name                                            = "${var.resource_name_prefix}-private-subnet-${count.index + 1}"
     "kubernetes.io/role/internal-elb"               = "1"
@@ -111,7 +114,9 @@ resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
   role       = aws_iam_role.eks_node_role.name
 }
 
-# New subnet for node groups
+# Private subnet that hosts the EKS-managed node group used by Anyscale system pods
+# (CoreDNS, AWS LBC, Envoy Gateway, Anyscale operator). HyperPod-managed instance groups
+# run in the separate private_subnet module (cross-account ENIs).
 resource "aws_subnet" "private_node" {
   vpc_id = data.aws_vpc.selected.id
   # Use a larger CIDR block, e.g., /24
@@ -155,17 +160,20 @@ resource "aws_eks_node_group" "node_group" {
   node_group_name = "${var.resource_name_prefix}-private-node-group"
   node_role_arn   = aws_iam_role.eks_node_role.arn
   subnet_ids      = [aws_subnet.private_node.id]
-  instance_types  = ["t3.small"]
+  instance_types  = var.system_node_instance_types
 
   launch_template {
     id      = aws_launch_template.eks_node.id
     version = aws_launch_template.eks_node.latest_version
   }
 
+  # Sized for HA by default (>= 2 nodes). The node group runs in a single
+  # private_node subnet (one AZ); for AZ-failure resilience, add a second
+  # private_node subnet in another AZ and include it in subnet_ids above.
   scaling_config {
-    desired_size = 1
-    max_size     = 1
-    min_size     = 1
+    desired_size = var.system_node_desired_size
+    max_size     = var.system_node_max_size
+    min_size     = var.system_node_min_size
   }
 
   update_config {

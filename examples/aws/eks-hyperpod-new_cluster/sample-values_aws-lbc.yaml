@@ -1,0 +1,57 @@
+# AWS Load Balancer Controller (LBC) Helm values for SageMaker HyperPod on EKS.
+#
+# Use LBC v2.11.0+ (Helm chart v1.10.0+). v2.11 is the first release that ships
+# the dedicated `sagemaker-hyperpod` pod-compute-type code path
+# (kubernetes-sigs/aws-load-balancer-controller PR #3886), which resolves pod
+# ENIs in the customer VPC instead of incorrectly assuming nodes live there.
+# The Helm chart version 1.13.2 referenced in the README pulls LBC v2.11.x.
+#
+# HyperPod-specific requirements (vs. a stock EKS cluster):
+#   1. clusterName, region, and vpcId MUST be set explicitly. The LBC's
+#      auto-discovery paths read EC2 instance metadata + DescribeInstances
+#      which do not work on HyperPod nodes (non-standard providerID; ENIs are
+#      in the SageMaker service account, not the customer account).
+#   2. defaultTargetType: ip — instance target type does NOT work on HyperPod
+#      for the same reason. Setting this default protects from accidental
+#      misconfiguration on a per-Service basis.
+#
+# KNOWN OPEN ISSUE (not solved by this file):
+#   If VPC CNI prefix delegation is enabled on the cluster (HyperPod enables
+#   it by default for higher max-pods-per-node), the LBC's IP target resolution
+#   still fails because pod IPs are allocated from /28 ENI prefixes, not from
+#   secondary private IPs. The `addresses.private-ip-address` EC2 filter the
+#   LBC uses returns no matches and you'll see logs like
+#       "cannot resolve pod ENI for pods: [...]"
+#   in the controller. Tracked upstream:
+#       https://github.com/kubernetes-sigs/aws-load-balancer-controller/issues/4666
+#   Workaround until a fix ships: set ENABLE_PREFIX_DELEGATION=false on the
+#   VPC CNI add-on if your HyperPod configuration permits it
+#       kubectl set env daemonset aws-node -n kube-system ENABLE_PREFIX_DELEGATION=false
+#   Validate first — disabling prefix delegation reduces max pods per node.
+#
+# Render the placeholders before applying:
+#   <eks_cluster_name>   — from terraform output `eks_cluster_name`
+#   <aws_region>         — from terraform output `aws_region`
+#   <vpc_id>             — from terraform output `vpc_id`
+
+clusterName: <eks_cluster_name>
+region: <aws_region>
+vpcId: <vpc_id>
+
+# Use the IAM role attached via EKS Pod Identity. Terraform creates the role and
+# the PodIdentityAssociation for the `kube-system/aws-load-balancer-controller` SA.
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+
+# IP is the only target type that works with HyperPod-managed instance groups.
+defaultTargetType: ip
+
+# Run the controller as a redundant deployment so a single node loss does not
+# stall NLB/target group reconciliation.
+replicaCount: 2
+
+# Tolerate scheduling onto Anyscale-tainted system nodes (default EKS node group).
+tolerations:
+  - key: CriticalAddonsOnly
+    operator: Exists

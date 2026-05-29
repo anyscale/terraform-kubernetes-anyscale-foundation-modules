@@ -2,7 +2,7 @@ data "aws_region" "current" {}
 
 # IAM Role
 resource "aws_iam_role" "sagemaker_execution_role" {
-  name = "${var.resource_name_prefix}-SMHP-Exec-Role-${data.aws_region.current.id}"
+  name = "${var.resource_name_prefix}-SMHP-Exec-Role-${data.aws_region.current.region}"
   path = "/"
 
   assume_role_policy = jsonencode({
@@ -45,7 +45,7 @@ resource "aws_iam_role_policy_attachment" "eks_cni_policy_attachment" {
 
 # Custom IAM Policy
 resource "aws_iam_policy" "sagemaker_execution_policy" {
-  name = "${var.resource_name_prefix}-ExecutionRolePolicy-${data.aws_region.current.id}"
+  name = "${var.resource_name_prefix}-ExecutionRolePolicy-${data.aws_region.current.region}"
   path = "/"
 
   policy = jsonencode({

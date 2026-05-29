@@ -1,0 +1,42 @@
+# HyperpodNodeClass — REQUIRED before any Karpenter NodePool can provision capacity
+# on SageMaker HyperPod.
+#
+# Reference: https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-spot.html
+#            https://aws.amazon.com/blogs/machine-learning/introducing-auto-scaling-on-amazon-sagemaker-hyperpod/
+#
+# Why this file exists:
+#   The Karpenter control plane on HyperPod is managed by SageMaker itself when
+#   `NodeProvisioningMode=Continuous` (set by the hyperpod_cluster module in
+#   this stack). The HyperpodNodeClass custom resource (apiVersion
+#   `karpenter.sagemaker.amazonaws.com/v1`, kind `HyperpodNodeClass`) is the
+#   HyperPod equivalent of EC2NodeClass — it tells Karpenter which pre-created
+#   HyperPod InstanceGroups to draw capacity from.
+#
+# Why the InstanceGroups list matters (spot fallback on HyperPod):
+#   HyperPod does NOT implement upstream Karpenter's EC2-Fleet-style spot →
+#   on-demand fallback. The `karpenter.sh/capacity-type` requirement on a
+#   NodePool has no effect (this is the bug called out in our Anyscale
+#   integration findings). The HyperPod-native way to get spot-with-fallback is
+#   to list BOTH spot and on-demand InstanceGroups in the SAME HyperpodNodeClass:
+#   Karpenter then prefers spot and falls back to on-demand based on EC2 Spot
+#   Placement Scores in each subnet's AZ.
+#
+# To start spot-disabled (recommended until you've validated the fallback works
+# in your account), include only on-demand InstanceGroup names below.
+#
+# Render before applying:
+#   <on_demand_instance_group_*> — names from `aws sagemaker describe-cluster
+#                                   --cluster-name <hyperpod_cluster_name>`
+#                                   (look for InstanceGroupName fields).
+apiVersion: karpenter.sagemaker.amazonaws.com/v1
+kind: HyperpodNodeClass
+metadata:
+  name: hyperpod-default
+spec:
+  # List of HyperPod InstanceGroup names this NodeClass can draw capacity from.
+  # MaxItems: 10.
+  instanceGroups:
+    - <on_demand_instance_group_1>
+    - <on_demand_instance_group_2>
+    # Uncomment when you want Karpenter to prefer spot with on-demand fallback:
+    # - <spot_instance_group_1>

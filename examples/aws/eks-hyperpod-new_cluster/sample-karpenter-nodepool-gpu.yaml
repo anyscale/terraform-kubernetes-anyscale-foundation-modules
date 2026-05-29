@@ -1,0 +1,83 @@
+# Karpenter NodePool for GPU instance groups on SageMaker HyperPod.
+#
+# References:
+#   https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-scaling-eks.html
+#   https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-spot.html
+#
+# Prerequisite: a HyperpodNodeClass must already exist in the cluster
+#   (see sample-hyperpod-nodeclass.yaml). The Karpenter control plane is
+#   managed by SageMaker HyperPod itself when NodeProvisioningMode=Continuous,
+#   so you don't install Karpenter — but you do install both this NodePool and
+#   the HyperpodNodeClass it references.
+#
+# Key differences from a stock EKS Karpenter NodePool (and why):
+#
+# 1. nodeClassRef must point to a HyperpodNodeClass
+#    (apiVersion karpenter.sagemaker.amazonaws.com/v1, kind HyperpodNodeClass),
+#    NOT the upstream karpenter.k8s.aws/v1 EC2NodeClass. This is the HyperPod
+#    Karpenter provider's only supported NodeClass.
+#
+# 2. taints uses `nvidia.com/gpu=present:NoSchedule` for GPU isolation. The
+#    NVIDIA device plugin and the Anyscale operator both tolerate this taint
+#    natively, AND it works without GPU Feature Discovery (which HyperPod
+#    does not deploy). The Anyscale-default taint
+#    `node.anyscale.com/accelerator-type=GPU:NoSchedule` is NOT used here
+#    because the operator only injects the matching toleration when an
+#    explicit `accelerator_type` is requested — and accelerator-type scheduling
+#    requires `nvidia.com/gpu.product` labels that aren't present on HyperPod.
+#
+# 3. requirements MUST NOT use the `eks.amazonaws.com/*` prefix (rejected by
+#    Karpenter on HyperPod as a restricted domain), and MUST NOT rely on
+#    `karpenter.sh/capacity-type` for spot↔on-demand fallback (HyperPod's
+#    Karpenter provider does not honor it for fallback). Spot vs on-demand
+#    selection is controlled by which InstanceGroups you list in the
+#    referenced HyperpodNodeClass — see sample-hyperpod-nodeclass.yaml.
+#
+# 4. Spot is intentionally NOT split out into a separate "spot" NodePool here.
+#    The HyperPod-native spot strategy is to add spot InstanceGroup names to
+#    the HyperpodNodeClass. Until you've validated fallback behaviour in your
+#    AWS account, start with on-demand-only InstanceGroups (see header note in
+#    sample-hyperpod-nodeclass.yaml).
+#
+# 5. expireAfter is intentionally finite so HyperPod can rotate nodes through
+#    deep health checks; consolidationPolicy: WhenEmpty avoids interrupting
+#    Ray jobs whose pods Anyscale marks as not safe-to-evict.
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: gpu
+spec:
+  template:
+    metadata:
+      labels:
+        anyscale.com/node-pool-type: gpu
+    spec:
+      nodeClassRef:
+        group: karpenter.sagemaker.amazonaws.com
+        kind: HyperpodNodeClass
+        name: hyperpod-default
+      taints:
+        - key: nvidia.com/gpu
+          value: present
+          effect: NoSchedule
+      requirements:
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - ml.g5.4xlarge
+            - ml.g5.8xlarge
+            - ml.g5.12xlarge
+            - ml.g5.24xlarge
+            - ml.g5.48xlarge
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["us-west-2a", "us-west-2b"]
+      expireAfter: 720h
+  limits:
+    nvidia.com/gpu: 32
+    cpu: "1000"
+    memory: 4000Gi
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 5m

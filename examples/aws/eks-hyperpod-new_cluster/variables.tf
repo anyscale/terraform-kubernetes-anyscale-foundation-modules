@@ -174,6 +174,43 @@ variable "existing_sagemaker_iam_role_name" {
   default     = ""
 }
 
+# AWS Load Balancer Controller IAM Role Module Variables
+variable "create_aws_lbc_iam_role_module" {
+  description = <<-EOT
+    (Optional) Whether to create the IAM role consumed by the AWS Load Balancer Controller
+    via EKS Pod Identity.
+
+    Required for HyperPod because the LBC must run in IP target mode (instance target mode
+    is incompatible with HyperPod's non-standard providerID + cross-account ENIs).
+    EOT
+  type        = bool
+  default     = true
+}
+
+# MemoryDB Module Variables (Anyscale head node fault tolerance)
+variable "create_memorydb_module" {
+  description = <<-EOT
+    (Optional) Whether to create an Amazon MemoryDB cluster as the Redis-compatible
+    external storage backend for Anyscale head node fault tolerance.
+
+    Anyscale recommends head node fault tolerance for ALL production services.
+    Defaults to false because MemoryDB incurs ongoing cost in your account even
+    when idle — set this to true for production clouds. Requires create_eks_module
+    (the EKS module's multi-AZ private subnets host the MemoryDB subnet group).
+
+    After apply, set the `redis_endpoint` output on the Anyscale cloud resource
+    (see the z_next_steps output).
+    EOT
+  type        = bool
+  default     = false
+}
+
+variable "memorydb_node_type" {
+  description = "MemoryDB node type for the head node fault tolerance cluster."
+  type        = string
+  default     = "db.t4g.small"
+}
+
 # Helm Chart Module Variables
 variable "create_helm_chart_module" {
   description = "Whether to create Helm chart module"
@@ -265,6 +302,19 @@ variable "restricted_instance_groups" {
 }
 
 variable "anyscale_new_cloud_name" {
-  type = string
-  description = "Name of the new Anyscale cloud"
+  type        = string
+  description = "Name of the new Anyscale cloud (used in the rendered `anyscale cloud register` command output)."
 }
+
+variable "anyscale_operator_namespace" {
+  description = <<-EOT
+    (Optional) Kubernetes namespace where the Anyscale Operator runs.
+
+    Used for both the EKS Pod Identity association (which maps the
+    `anyscale-operator` service account in this namespace to the SageMaker
+    execution IAM role) and the rendered Helm install commands.
+    EOT
+  type        = string
+  default     = "anyscale-operator"
+}
+

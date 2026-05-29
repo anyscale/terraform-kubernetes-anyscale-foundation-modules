@@ -2,7 +2,7 @@ data "aws_region" "current" {}
 
 resource "aws_vpc_endpoint" "s3" {
   vpc_id       = var.vpc_id
-  service_name = "com.amazonaws.${data.aws_region.current.id}.s3"
+  service_name = "com.amazonaws.${data.aws_region.current.region}.s3"
 
   policy = jsonencode({
     Version = "2012-10-17"

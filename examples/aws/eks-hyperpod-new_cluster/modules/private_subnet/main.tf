@@ -11,10 +11,16 @@ resource "aws_subnet" "private" {
   # Ensure the subnet is created after the CIDR block is associated
   depends_on = [aws_vpc_ipv4_cidr_block_association.additional_cidr]
 
+  # Tag with internal-elb=1 so the AWS Load Balancer Controller will consider this subnet
+  # for internal load balancers (e.g., Anyscale operator gateway in private mode).
   tags = merge(
     {
-      Name = "${var.resource_name_prefix}-SMHP-Private1"
+      Name                              = "${var.resource_name_prefix}-SMHP-Private1"
+      "kubernetes.io/role/internal-elb" = "1"
     },
+    var.eks_cluster_name != "" ? {
+      "kubernetes.io/cluster/${var.eks_cluster_name}" = "shared"
+    } : {},
     var.tags
   )
 }

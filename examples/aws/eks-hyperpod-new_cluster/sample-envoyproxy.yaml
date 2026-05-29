@@ -1,0 +1,29 @@
+# EnvoyProxy parameters consumed by the Envoy Gateway control plane for every
+# Gateway that references the `eg` GatewayClass.
+#
+# HyperPod-specific overrides vs. the public Anyscale docs
+# (https://docs.anyscale.com/clouds/aws/create-eks):
+#   - aws-load-balancer-nlb-target-type MUST be `ip`, not `instance`. The default
+#     `instance` target type leaves the NLB with zero registered targets on
+#     HyperPod because the LBC cannot resolve EC2 instances behind HyperPod's
+#     non-standard providerID format. Using `ip` registers pod IPs directly via
+#     the VPC CNI and bypasses EC2 entirely.
+#
+# Switch `aws-load-balancer-scheme` to `internal` if you front Anyscale workspaces
+# via VPN/PrivateLink instead of the public internet.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: envoy-proxy
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        type: LoadBalancer
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: external
+          service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+          service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+          service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
