@@ -1,0 +1,23 @@
+controller:
+  service:
+    type: LoadBalancer
+    annotations:
+      cloud.google.com/load-balancer-type: "External"
+  ingressClassResource:
+    enabled: true
+    name: haproxy
+    default: true
+  config:
+    # Raise the body size limit from the 1m default.
+    proxy-body-size: "64m"
+    # Accept headers with underscores and other non-standard cases —
+    # equivalent to nginx-ingress' `underscores_in_headers on`.
+    config-frontend: |
+      option accept-invalid-http-request
+  replicaCount: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+defaultBackend:
+  enabled: true

@@ -102,6 +102,26 @@ Sample files, `sample-values_nginx_gke_private.yaml` and `sample-values_nginx_gk
       --install
     ```
 
+#### (Alternative) Install the HAProxy ingress controller
+
+`ingress-nginx` is deprecated upstream; `haproxy-ingress` is a drop-in alternative. Use this section *instead of* the Nginx section above — install only one ingress controller.
+
+Sample files, `sample-values_haproxy_gke_private.yaml` and `sample-values_haproxy_gke_public.yaml`, are provided. Each sample sets two HAProxy ConfigMap keys: `proxy-body-size: 64m` (raises the body size limit from the 1m default) and `option accept-invalid-http-request` via `config-frontend` (accepts headers with underscores — equivalent to nginx-ingress' `underscores_in_headers on`).
+
+Run the following, replacing `<private|public>` with the appropriate values file name:
+
+```shell
+helm repo add haproxy-ingress https://haproxy-ingress.github.io/charts
+helm upgrade haproxy-ingress haproxy-ingress/haproxy-ingress \
+  --version 0.14.7 \
+  --namespace haproxy-ingress \
+  --values sample-values_haproxy_gke_<private|public>.yaml \
+  --create-namespace \
+  --install
+```
+
+> If you chose HAProxy, you'll need two extra `--set-string` flags on the Anyscale Operator helm install below — see the note at the end of the [Install the Anyscale Operator](#install-the-anyscale-operator) section.
+
 ### Register the Anyscale Cloud
 
 Ensure that you are logged into Anyscale with valid CLI credentials. (`anyscale login`)
@@ -145,6 +165,18 @@ anyscale cloud register \
       --create-namespace \
       --install
     ```
+
+> **Using HAProxy instead of Nginx?** Add these flags to the helm command above:
+>
+> ```shell
+> HAPROXY_LB=$(kubectl get svc -n haproxy-ingress haproxy-ingress \
+>   -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}')
+>
+>   --set-string networking.ingress.classNameOverride=haproxy \
+>   --set-string networking.ingress.address=$HAPROXY_LB
+> ```
+>
+> Without these, the operator defaults to `ingressClassName: nginx` and Ingress creation will fail when no `nginx` IngressClass exists in the cluster.
 
 1. (Optional) For the L4 GPU instances (`g2-standard-16`) to work, modify the Anyscale Operator `instance-types` ConfigMap:
     ```

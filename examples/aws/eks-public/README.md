@@ -96,6 +96,24 @@ helm upgrade ingress-nginx nginx/ingress-nginx \
   --install
 ```
 
+#### (Alternative) Install the HAProxy ingress controller
+
+`ingress-nginx` is deprecated upstream; `haproxy-ingress` is a drop-in alternative. Use this section *instead of* the Nginx section above — install only one ingress controller.
+
+A sample file, `sample-values_haproxy.yaml` is provided. The sample sets two HAProxy ConfigMap keys: `proxy-body-size: 64m` (raises the body size limit from the 1m default) and `option accept-invalid-http-request` via `config-frontend` (accepts headers with underscores — equivalent to nginx-ingress' `underscores_in_headers on`).
+
+```shell
+helm repo add haproxy-ingress https://haproxy-ingress.github.io/charts
+helm upgrade haproxy-ingress haproxy-ingress/haproxy-ingress \
+  --version 0.14.7 \
+  --namespace haproxy-ingress \
+  --values sample-values_haproxy.yaml \
+  --create-namespace \
+  --install
+```
+
+> If you chose HAProxy, you'll need two extra `--set-string` flags on the Anyscale Operator helm install below — see the note at the end of the [Install the Anyscale Operator](#install-the-anyscale-operator) section.
+
 #### (Optional) Install the Nvidia device plugin
 
 A sample file, `sample-values_nvdp.yaml` has been provided in this repo. Please review for your requirements before using.
@@ -176,6 +194,18 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
   --create-namespace \
   --install
 ```
+
+> **Using HAProxy instead of Nginx?** Add these flags to the helm command above:
+>
+> ```shell
+> HAPROXY_LB=$(kubectl get svc -n haproxy-ingress haproxy-ingress \
+>   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{.status.loadBalancer.ingress[0].ip}')
+>
+>   --set-string networking.ingress.classNameOverride=haproxy \
+>   --set-string networking.ingress.address=$HAPROXY_LB
+> ```
+>
+> Without these, the operator defaults to `ingressClassName: nginx` and the AWS Load Balancer Controller's admission webhook rejects the Ingress with `IngressClass "nginx" not found`.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
