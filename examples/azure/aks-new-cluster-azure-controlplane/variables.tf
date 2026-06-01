@@ -4,9 +4,34 @@ variable "azure_subscription_id" {
 }
 
 variable "azure_location" {
-  description = "(Optional) Azure region for all resources."
+  description = <<-EOT
+    (Optional) Azure region for all resources. Must be one of the regions where
+    `Anyscale.Platform/clouds` is supported: westcentralus, eastus, eastus2,
+    westus2, westus3, southcentralus, westeurope, swedencentral, uksouth,
+    australiaeast, southeastasia, northeurope. Older regions like `westus` are
+    NOT supported by the Anyscale resource provider.
+
+    Tip: run `./select-region.sh` to print the supported regions, scan your
+    subscription's CPU/GPU quota in each, and pick a deployable region.
+  EOT
   type        = string
-  default     = "West US"
+  default     = "westus2"
+
+  # Single source of truth for Anyscale-supported regions. Keep in sync with
+  # the list in select-region.sh, the README, and terraform.tfvars.example.
+  validation {
+    condition = contains([
+      "westcentralus", "eastus", "eastus2", "westus2", "westus3",
+      "southcentralus", "westeurope", "swedencentral", "uksouth",
+      "australiaeast", "southeastasia", "northeurope",
+    ], var.azure_location)
+    error_message = <<-EOT
+      azure_location must be a region where Anyscale.Platform/clouds is supported:
+      westcentralus, eastus, eastus2, westus2, westus3, southcentralus,
+      westeurope, swedencentral, uksouth, australiaeast, southeastasia,
+      northeurope. Run ./select-region.sh to scan quota and pick one.
+    EOT
+  }
 }
 
 variable "azure_tenant_id" {
@@ -151,9 +176,24 @@ variable "cpu_vm_size" {
 
 variable "gpu_pool_configs" {
   description = <<-EOT
-    (Optional) Full configuration for GPU node pools. The map key is a logical label
-    (e.g. "T4", "A100"). The `name` field is used as the AKS node pool name and must
-    be lowercase alphanumeric, max 8 chars (spot pools append "spot").
+    (Optional) Configuration for GPU node pools. Empty by default — GPU pools are
+    OPT-IN so a plain `terraform apply` never tries to create a GPU SKU (e.g. A100)
+    that has no quota or capacity in your region. The CPU/system pools always deploy.
+
+    The map key is a logical label (e.g. "T4", "A100"). The `name` field is used as
+    the AKS node pool name and must be lowercase alphanumeric, max 8 chars (spot pools
+    append "spot" for a 12-char AKS limit).
+
+    Tip: run `./select-gpu.sh` to pick a GPU type from the Anyscale-supported catalog
+    — or scan your chosen region for GPU SKUs that are both available AND have quota —
+    and have it write this block into terraform.tfvars for you.
+
+    Example (one on-demand + spot pool per entry):
+      gpu_pool_configs = {
+        T4   = { name = "gput4",   vm_size = "Standard_NC16as_T4_v3",     product_name = "NVIDIA-T4",   gpu_count = "1" }
+        A100 = { name = "gpua100", vm_size = "Standard_NC24ads_A100_v4",  product_name = "NVIDIA-A100", gpu_count = "1" }
+        H100 = { name = "h100x8",  vm_size = "Standard_ND96isr_H100_v5",  product_name = "NVIDIA-H100", gpu_count = "8" }
+      }
   EOT
   type = map(object({
     name         = string
@@ -161,33 +201,7 @@ variable "gpu_pool_configs" {
     product_name = string
     gpu_count    = string
   }))
-  default = {
-    T4 = {
-      name         = "gput4"
-      vm_size      = "Standard_NC16as_T4_v3"
-      product_name = "NVIDIA-T4"
-      gpu_count    = "1"
-    }
-    A100 = {
-      name         = "gpua100"
-      vm_size      = "Standard_NC24ads_A100_v4"
-      product_name = "NVIDIA-A100"
-      gpu_count    = "1"
-    }
-    # Example of adding new GPU pools:
-    # A10 = {
-    #   name         = "gpua10"
-    #   vm_size      = "Standard_NV36ads_A10_v5"
-    #   product_name = "NVIDIA-A10"
-    #   gpu_count    = "1"
-    # }
-    # H100 = {
-    #   name         = "h100x8"
-    #   vm_size      = "Standard_ND96isr_H100_v5"
-    #   product_name = "NVIDIA-H100"
-    #   gpu_count    = "8"
-    # }
-  }
+  default = {}
 
   validation {
     condition = alltrue([
@@ -342,6 +356,24 @@ variable "anyscale_platform_contributors" {
     condition     = alltrue([for c in var.anyscale_platform_contributors : contains(["User", "Group", "ServicePrincipal"], c.principal_type)])
     error_message = "principal_type must be one of: User, Group, ServicePrincipal."
   }
+}
+
+variable "assign_current_user_platform_roles" {
+  description = <<-EOT
+    (Optional) When true (default), Terraform runs `az role assignment create`
+    during apply to grant the signed-in `az` user both the
+    "Anyscale Platform Contributor Role" and "Anyscale Platform Reader Role"
+    on the Anyscale cloud resource.
+
+    This lets whoever runs the deploy open the cloud in the Anyscale console and
+    create workspaces/jobs/services without first looking up their own object
+    ID. Set to false to skip (e.g. in CI where the service principal already has
+    access, or when you assign roles exclusively via
+    var.anyscale_platform_contributors). Requires the Azure CLI to be installed
+    and logged in (the same `az login` the rest of the deploy relies on).
+  EOT
+  type        = bool
+  default     = true
 }
 
 ###############################################################################

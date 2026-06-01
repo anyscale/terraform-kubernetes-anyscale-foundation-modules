@@ -81,8 +81,9 @@ resource "azurerm_kubernetes_cluster_node_pool" "ondemand_cpu" {
   #checkov:skip=CKV_AZURE_168: "Ensure Azure Kubernetes Cluster (AKS) nodes should use a minimum number of 50 pods"
   #checkov:skip=CKV_AZURE_227: "Ensure that the AKS cluster encrypt temp disks, caches, and data flows between Compute and Storage resources"
 
-  name                  = "cpu16"
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
+  name                        = "cpu16"
+  kubernetes_cluster_id       = azurerm_kubernetes_cluster.aks.id
+  temporary_name_for_rotation = "cpu16tmp"
 
   vm_size        = var.cpu_vm_size
   mode           = "User"
@@ -111,8 +112,9 @@ resource "azurerm_kubernetes_cluster_node_pool" "spot_cpu" {
   #checkov:skip=CKV_AZURE_168: "Ensure Azure Kubernetes Cluster (AKS) nodes should use a minimum number of 50 pods"
   #checkov:skip=CKV_AZURE_227: "Ensure that the AKS cluster encrypt temp disks, caches, and data flows between Compute and Storage resources"
 
-  name                  = "cpu16spot"
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
+  name                        = "cpu16spot"
+  kubernetes_cluster_id       = azurerm_kubernetes_cluster.aks.id
+  temporary_name_for_rotation = "cpu16sptmp"
 
   vm_size        = var.cpu_vm_size
   mode           = "User"

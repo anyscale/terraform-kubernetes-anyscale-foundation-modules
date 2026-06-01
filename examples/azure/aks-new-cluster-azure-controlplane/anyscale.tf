@@ -149,6 +149,66 @@ resource "azurerm_role_assignment" "anyscale_platform_contributor" {
 }
 
 ###############################################################################
+# Self-grant: give the principal running Terraform (the signed-in `az` user)
+# both the Contributor and Reader platform roles on the cloud resource.
+#
+# Subscription Owner/Contributor does NOT carry over to the Anyscale RP, so the
+# operator running the deploy still can't open the cloud in the console or
+# create workspaces/jobs/services until these are assigned. The native
+# azurerm_role_assignment above covers explicitly-listed principals; this hook
+# covers "whoever is running the apply" without them having to look up their own
+# object ID first.
+#
+# Implemented as a local-exec (rather than azurerm_role_assignment) at the
+# user's request — it runs the exact `az role assignment create` calls during
+# apply. Trade-off: not tracked in state and not removed on destroy (the
+# assignments disappear with the cloud resource anyway). Authentication reuses
+# the same `az login` Terraform already depends on.
+#
+# `az role assignment create` is idempotent (re-running returns the existing
+# assignment), and we retry briefly to ride out Entra principal-replication lag.
+###############################################################################
+resource "terraform_data" "anyscale_platform_self_grant" {
+  count = var.assign_current_user_platform_roles ? 1 : 0
+
+  triggers_replace = {
+    cloud_arm_id = local.anyscale_cloud_arm_id
+    subscription = var.azure_subscription_id
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      az account set --subscription "${var.azure_subscription_id}"
+      ASSIGNEE="$(az ad signed-in-user show --query id -o tsv)"
+      SCOPE="${local.anyscale_cloud_arm_id}"
+      for ROLE in "Anyscale Platform Contributor Role" "Anyscale Platform Reader Role"; do
+        echo "[anyscale] Granting '$ROLE' to $ASSIGNEE on $SCOPE"
+        for attempt in 1 2 3 4 5; do
+          if az role assignment create \
+              --assignee "$ASSIGNEE" \
+              --role "$ROLE" \
+              --scope "$SCOPE" \
+              --only-show-errors >/dev/null; then
+            break
+          fi
+          if [ "$attempt" -eq 5 ]; then
+            echo "[anyscale] ERROR: failed to assign '$ROLE' after $attempt attempts" >&2
+            exit 1
+          fi
+          echo "[anyscale] assign '$ROLE' attempt $attempt failed (principal replication?); retrying in 15s..."
+          sleep 15
+        done
+      done
+      echo "[anyscale] Platform role grants complete."
+    EOT
+  }
+
+  depends_on = [azapi_resource.anyscale_platform]
+}
+
+###############################################################################
 # Step 2: install the Anyscale.AKS.Operator marketplace extension.
 #
 # The extension is installed AFTER the Envoy Gateway has an LB address

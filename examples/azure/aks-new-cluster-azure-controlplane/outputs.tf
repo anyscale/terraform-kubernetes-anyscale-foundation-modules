@@ -114,3 +114,48 @@ output "anyscale_console_url" {
   value       = var.anyscale_platform.control_plane_url
   description = "URL of the Anyscale console where the registered cloud is visible."
 }
+
+###############################################################################
+# Deployment summary file
+#
+# Writes a YAML summary of the deployment to anyscale-aks-cloud.yaml when the
+# apply completes. Because the content references the cloud, operator-extension
+# and gateway resources, Terraform schedules this write after they exist — so
+# the file reflects the finished deployment. The file embeds ARM resource IDs
+# (which include the subscription ID), so it is gitignored.
+###############################################################################
+resource "local_file" "cloud_summary" {
+  filename        = "${path.module}/anyscale-aks-cloud.yaml"
+  file_permission = "0600"
+
+  content = yamlencode({
+    anyscale_cloud = {
+      name               = local.anyscale_cloud_name
+      resource_id        = local.anyscale_cloud_resource_id
+      arm_id             = "${azurerm_resource_group.rg.id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
+      console_url        = var.anyscale_platform.control_plane_url
+      operator_namespace = var.anyscale_operator_namespace
+      extension_id       = azurerm_kubernetes_cluster_extension.anyscale_operator.id
+    }
+    azure = {
+      resource_group    = azurerm_resource_group.rg.name
+      aks_cluster       = azurerm_kubernetes_cluster.aks.name
+      oidc_issuer_url   = azurerm_kubernetes_cluster.aks.oidc_issuer_url
+      storage_account   = var.enable_operator_infrastructure ? azurerm_storage_account.sa[0].name : null
+      storage_container = var.enable_operator_infrastructure ? azurerm_storage_container.blob[0].name : null
+      acr_login_server  = var.enable_acr ? azurerm_container_registry.acr[0].login_server : null
+    }
+    operator_identity = {
+      client_id    = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].client_id : null
+      principal_id = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].principal_id : null
+    }
+    gateway = {
+      lb_hostname                = data.external.gateway_lb.result.address
+      certificate_secret         = local.anyscale_gateway_certificate_secret_name
+      service_certificate_secret = local.anyscale_gateway_service_certificate_secret_name
+    }
+    commands = {
+      get_credentials = "az aks get-credentials --resource-group ${azurerm_resource_group.rg.name} --name ${azurerm_kubernetes_cluster.aks.name} --overwrite-existing"
+    }
+  })
+}

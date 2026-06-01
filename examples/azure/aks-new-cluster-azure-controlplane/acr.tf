@@ -11,7 +11,9 @@
 
 locals {
   acr_name_base = replace(var.aks_cluster_name, "-", "")
-  acr_name      = coalesce(var.acr_name, "${substr(local.acr_name_base, 0, 47)}acr")
+  # ACR names are also globally unique. Reserve 3 chars for "acr" + 5 for the
+  # shared random suffix = 42 chars max for the base (well inside the 50 limit).
+  acr_name = coalesce(var.acr_name, "${substr(local.acr_name_base, 0, 42)}acr${local.name_suffix}")
 }
 
 resource "azurerm_container_registry" "acr" {

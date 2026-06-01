@@ -33,6 +33,18 @@ terraform {
       source  = "hashicorp/external"
       version = "~> 2.3"
     }
+    # random generates a small suffix appended to globally-unique resource
+    # names (storage account, ACR) so the default `aks_cluster_name` does
+    # not collide with another tenant's deployment.
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
+    # local writes the post-apply deployment summary (anyscale-aks-cloud.yaml).
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
   }
 }
 

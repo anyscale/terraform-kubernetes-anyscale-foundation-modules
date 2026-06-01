@@ -1,9 +1,32 @@
+###############################################################################
+# Global-uniqueness suffix
+#
+# Storage accounts and container registries share a *global* DNS namespace
+# across all of Azure, so a generic name like `anyscaledemosa` derived from the
+# default `aks_cluster_name` is almost guaranteed to collide with another
+# tenant's deployment. Append a short random suffix when the user has not
+# supplied an explicit override.
+###############################################################################
+resource "random_string" "name_suffix" {
+  length  = 5
+  upper   = false
+  special = false
+  numeric = true
+
+  keepers = {
+    aks_cluster_name = var.aks_cluster_name
+  }
+}
+
 locals {
-  storage_account_name_base     = replace(var.aks_cluster_name, "-", "")
-  storage_account_name_base_sa  = length(local.storage_account_name_base) > 22 ? substr(local.storage_account_name_base, 0, 22) : local.storage_account_name_base
-  storage_account_name_base_nfs = length(local.storage_account_name_base) > 21 ? substr(local.storage_account_name_base, 0, 21) : local.storage_account_name_base
-  storage_account_name          = coalesce(var.storage_account_name, "${local.storage_account_name_base_sa}sa")
-  storage_account_name_nfs      = coalesce(var.storage_account_name_nfs, "${local.storage_account_name_base_nfs}nfs")
+  name_suffix               = random_string.name_suffix.result
+  storage_account_name_base = replace(var.aks_cluster_name, "-", "")
+  # 24-char limit on storage account names. Reserve 2 for "sa" + 5 for suffix = 17 chars for the base.
+  storage_account_name_base_sa = length(local.storage_account_name_base) > 17 ? substr(local.storage_account_name_base, 0, 17) : local.storage_account_name_base
+  # Reserve 3 for "nfs" + 5 for suffix = 16 chars for the base.
+  storage_account_name_base_nfs = length(local.storage_account_name_base) > 16 ? substr(local.storage_account_name_base, 0, 16) : local.storage_account_name_base
+  storage_account_name          = coalesce(var.storage_account_name, "${local.storage_account_name_base_sa}sa${local.name_suffix}")
+  storage_account_name_nfs      = coalesce(var.storage_account_name_nfs, "${local.storage_account_name_base_nfs}nfs${local.name_suffix}")
 }
 
 ############################################
