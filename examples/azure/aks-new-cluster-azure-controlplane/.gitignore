@@ -1,0 +1,15 @@
+agents_artifacts/
+
+# Generated Terraform plan/apply artifacts (contain live subscription/resource IDs)
+tf.out
+tfplan*
+*.tfplan
+
+# diagnose-head-pod.sh output (cluster-specific logs)
+diagnostics/
+
+# Post-apply deployment summary (embeds ARM IDs / subscription ID)
+anyscale-aks-cloud.yaml
+
+# Local PR write-up (not part of the example)
+PR_DESCRIPTION.md

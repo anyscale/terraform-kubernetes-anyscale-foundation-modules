@@ -9,6 +9,14 @@ terraform.tfvars
 *.tfstate
 *.tfstate.*
 
+# Local kubeconfig written by examples (may contain cluster admin credentials)
+.kubeconfig
+*.kubeconfig
+
+# Saved terraform plan files
+*.tfplan
+tf.plan
+
 # Crash log files
 crash.log
 crash.*.log
