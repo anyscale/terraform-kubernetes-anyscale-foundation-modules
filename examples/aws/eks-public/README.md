@@ -40,9 +40,8 @@ terraform plan
 terraform apply
 ```
 
-`terraform apply` writes three files into `./generated/` for use in later steps:
+`terraform apply` writes two files into `./generated/` for use in later steps:
 
-* `generated/cloud-resource.yaml` — a complete Anyscale CloudResource definition you can pass to `anyscale cloud register -f` to register the cloud in one shot (see the [Register the Anyscale Cloud](#register-the-anyscale-cloud) section below).
 * `generated/pv-pvc.yaml` — applied via `kubectl` when `enable_s3_pvc = true` (the default).
 * `generated/deploy.sh` — an executable shell script that runs every post-terraform step in order (cloud register → kubectl/helm installs → verify). Use it to drive the full flow end-to-end, or copy-paste sections of it.
 
@@ -54,19 +53,13 @@ Note the Terraform outputs, which include the cloud registration and helm upgrad
 
 Ensure that you are logged into Anyscale with valid CLI credentials (`anyscale login`). Registration runs against the Anyscale control plane only — no cluster connectivity required — and returns a `cldrsrc_…` cloud deployment id that the next steps use.
 
-Pick whichever method fits your workflow:
-
-**Option A — single YAML file (recommended).** The `generated/cloud-resource.yaml` rendered by Terraform contains the full CloudResource definition (region, S3 bucket, PVC name, MemoryDB endpoint, zones, operator IAM identity):
-
-```shell
-anyscale cloud register --name <my_kubernetes_cloud> -f ./generated/cloud-resource.yaml
-```
-
-**Option B — pre-rendered CLI flags.** The `anyscale_registration_command` Terraform output expands the same information into a flag-based invocation:
+The `anyscale_registration_command` Terraform output expands the cloud-resource details (region, S3 bucket, PVC name, MemoryDB endpoint, zones, operator IAM identity) into a flag-based `anyscale cloud register` invocation:
 
 ```shell
 terraform output -raw anyscale_registration_command | sh
 ```
+
+> The `anyscale cloud register -f <file>` (YAML) path is not currently usable for K8s compute stacks — CLI 0.26.100 rejects the K8s CloudResource on a missing `aws_config` block whose schema isn't documented. Use the CLI-flags command above.
 
 Capture the cloud deployment id from the CLI output and export it — later steps reference it:
 
@@ -127,15 +120,24 @@ The provided `sample-values_gateway.yaml` contains three documents that set up t
 * A `GatewayClass` named `eg` that adds `parametersRef → EnvoyProxy` to the helm chart's default class.
 * A `Gateway` in `anyscale-operator` with three listeners: an `http:80` bootstrap listener (no app traffic; needed so Envoy Gateway will program the Gateway before the Operator creates the TLS Secrets below), `https:443` for `*.i.anyscaleuserdata.com` (head-node) → secret `anyscale-<cldrsrc-id>-certificate`, and `https-session:443` for `*.s.anyscaleuserdata.com` (services) → secret `anyscale-svc-<cldrsrc-id>-certificate`.
 
-Before applying, substitute the `<cloud-deployment-id>` placeholder in the gateway YAML with the cldrsrc slug (the cloud deployment id with `_` replaced by `-`) so the TLS listeners reference the real Secret names from the start. The Operator (installed below) will create those Secrets once it's running, and the listeners flip to `ResolvedRefs: True` automatically — no second `kubectl apply` needed.
+Before applying, substitute the `<cldrsrc-with-dashes>` placeholder in the gateway YAML with the cldrsrc slug (the cloud deployment id with `_` replaced by `-`) so the TLS listeners reference the real Secret names from the start. The Operator (installed below) will create those Secrets once it's running, and the listeners flip to `ResolvedRefs: True` automatically — no second `kubectl apply` needed.
 
-1. Install Envoy Gateway:
+> Pasting the underscored `cldrsrc_xxx` form looks valid but is wrong — the operator's TLS Secret name uses dashes, so the listener silently stays at `ResolvedRefs: False`. The placeholder is named to spell that out.
+
+1. Install Envoy Gateway. Apply CRDs separately so reruns with a newer chart version pick up new Gateway API / Envoy Gateway CRD fields — `helm upgrade --install` only installs `chart/crds/` on first install by design:
 
    ```shell
-   helm install eg oci://docker.io/envoyproxy/gateway-helm \
+   EG_CRD_DIR=$(mktemp -d)
+   trap 'rm -rf "$EG_CRD_DIR"' EXIT
+   helm pull oci://docker.io/envoyproxy/gateway-helm --version v1.7.0 \
+     --untar --untardir "$EG_CRD_DIR"
+   kubectl apply --server-side --force-conflicts -f "$EG_CRD_DIR/gateway-helm/crds/"
+   helm upgrade eg oci://docker.io/envoyproxy/gateway-helm \
      --version v1.7.0 \
      --namespace envoy-gateway-system \
-     --create-namespace
+     --create-namespace \
+     --skip-crds \
+     --install
    kubectl wait --for=condition=available deployment/envoy-gateway \
      -n envoy-gateway-system --timeout=120s
    ```
@@ -144,7 +146,7 @@ Before applying, substitute the `<cloud-deployment-id>` placeholder in the gatew
 
    ```shell
    SECRET_SLUG=${CLOUD_DEPLOYMENT_ID//_/-}    # cldrsrc_xxx → cldrsrc-xxx
-   sed "s/<cloud-deployment-id>/${SECRET_SLUG}/g" sample-values_gateway.yaml | kubectl apply -f -
+   sed "s/<cldrsrc-with-dashes>/${SECRET_SLUG}/g" sample-values_gateway.yaml | kubectl apply -f -
    ```
 
 3. Wait for the Gateway to be programmed and capture the NLB hostname:
@@ -263,7 +265,6 @@ Set `enable_memorydb = false` in your tfvars to skip this and avoid the ongoing 
 | [aws_iam_role_policy.s3_csi_driver](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_security_group.allow_all_vpc](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group) | resource |
 | [aws_security_group.memorydb](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group) | resource |
-| [local_file.cloud_resource_yaml](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
 | [local_file.deploy_script](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
 | [local_file.pv_pvc_yaml](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
 | [aws_iam_role.default_nodegroup](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_role) | data source |
@@ -272,7 +273,7 @@ Set `enable_memorydb = false` in your tfvars to skip this and avoid the ongoing 
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_anyscale_cloud_name"></a> [anyscale\_cloud\_name](#input\_anyscale\_cloud\_name) | (Optional) Anyscale cloud name embedded in the rendered `generated/cloud-resource.yaml` and shown in the `anyscale cloud register` command output.<br/><br/>Pick a name that is unique within your Anyscale organization.<br/><br/>ex:<pre>anyscale_cloud_name = "my-eks-public-cloud"</pre> | `string` | `"anyscale-eks-public"` | no |
+| <a name="input_anyscale_cloud_name"></a> [anyscale\_cloud\_name](#input\_anyscale\_cloud\_name) | (Optional) Anyscale cloud name passed to `anyscale cloud register --name`.<br/><br/>Pick a name that is unique within your Anyscale organization.<br/><br/>ex:<pre>anyscale_cloud_name = "my-eks-public-cloud"</pre> | `string` | `"anyscale-eks-public"` | no |
 | <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | (Optional) The AWS region in which all resources will be created.<br/><br/>ex:<pre>aws_region = "us-east-2"</pre> | `string` | `"us-east-2"` | no |
 | <a name="input_bucket_force_destroy"></a> [bucket\_force\_destroy](#input\_bucket\_force\_destroy) | (Optional) When true, `terraform destroy` will delete the Anyscale S3 bucket<br/>even if it still contains objects (operator logs, cluster metadata, mounted<br/>PVC data, etc.). Default is `false` so accidental destroys do not wipe data.<br/><br/>Set to `true` for ephemeral dev / e2e test deployments where you want<br/>teardown to be one command. See `dev-overrides.tfvars.example` for a ready-made<br/>override file.<br/><br/>ex:<pre>bucket_force_destroy = true</pre> | `bool` | `false` | no |
 | <a name="input_eks_cluster_name"></a> [eks\_cluster\_name](#input\_eks\_cluster\_name) | (Optional) The name of the EKS cluster.<br/><br/>This will be used for naming resources created by this module including the EKS cluster and the S3 bucket.<br/><br/>ex:<pre>eks_cluster_name = "anyscale-eks-public"</pre> | `string` | `"anyscale-eks-public"` | no |
@@ -292,7 +293,7 @@ Set `enable_memorydb = false` in your tfvars to skip this and avoid the ongoing 
 
 | Name | Description |
 | ---- | ----------- |
-| <a name="output_anyscale_registration_command"></a> [anyscale\_registration\_command](#output\_anyscale\_registration\_command) | The `anyscale cloud register` command with all required flags pre-populated. (The rendered `generated/cloud-resource.yaml` is also available as a reference but is not currently consumable by `anyscale cloud register -f` for K8S compute stacks.) |
+| <a name="output_anyscale_registration_command"></a> [anyscale\_registration\_command](#output\_anyscale\_registration\_command) | The `anyscale cloud register` command with all required flags pre-populated. |
 | <a name="output_aws_region"></a> [aws\_region](#output\_aws\_region) | The AWS region. This is used for Helm chart values. |
 | <a name="output_deploy_script_path"></a> [deploy\_script\_path](#output\_deploy\_script\_path) | Path to a rendered shell script containing every post-terraform step in order (autoscaler, AWS LBC, Envoy Gateway + manifests, PVC, Anyscale Operator, verify). Open it to copy-paste steps, or run end-to-end after exporting CLOUD\_DEPLOYMENT\_ID. |
 | <a name="output_eks_cluster_name"></a> [eks\_cluster\_name](#output\_eks\_cluster\_name) | The name of the EKS cluster. This is used for Helm chart values. |

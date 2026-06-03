@@ -40,33 +40,26 @@ terraform plan
 terraform apply
 ```
 
-`terraform apply` writes three files into `./generated/` for use in later steps:
+`terraform apply` writes two files into `./generated/` for use in later steps:
 
-* `generated/cloud-resource.yaml` — passed to `anyscale cloud register -f …` below.
 * `generated/pv-pvc.yaml` — applied via `kubectl` when `enable_s3_pvc = true` (the default).
 * `generated/deploy.sh` — an executable shell script that runs every post-terraform step in order (cloud register → kubectl/helm installs → verify). Use it to drive the full flow end-to-end, or copy-paste sections of it.
 
 Note the Terraform output, which includes the cloud registration and helm upgrade commands used below.
 
-> **Tip — drive the post-terraform steps from `generated/deploy.sh`.** The script wraps every step in this README (Register → Authenticate → Install autoscaler/LBC/Envoy Gateway → Apply PVC → Install Operator → Verify) in order. Either run it end-to-end (`./generated/deploy.sh`) or open it side-by-side with this README and copy-paste step by step. The rest of this README documents what that script is doing so you can adapt or run pieces of it manually. (Note: because this example is private-by-default, you must run the script from inside the VPC — via VPN/bastion — unless `validation_test_mode = true` is set.)
+> **Tip — drive the post-terraform steps from `generated/deploy.sh`.** The script wraps every step in this README (Register → Authenticate → Install autoscaler/LBC/Envoy Gateway → Apply PVC → Install Operator → Verify) in order. Either run it end-to-end (`./generated/deploy.sh`) or open it side-by-side with this README and copy-paste step by step. The rest of this README documents what that script is doing so you can adapt or run pieces of it manually. Because the EKS API endpoint is private-only by default, the script must be run from inside the VPC (VPN or bastion).
 
 ### Register the Anyscale Cloud
 
 Ensure that you are logged into Anyscale with valid CLI credentials (`anyscale login`). Registration runs against the Anyscale control plane only — no cluster connectivity required — and returns a `cldrsrc_…` cloud deployment id that the next steps use.
 
-Pick whichever method fits your workflow:
-
-**Option A — single YAML file (recommended).** The `generated/cloud-resource.yaml` rendered by Terraform contains the full CloudResource definition (region, S3 bucket, PVC name, MemoryDB endpoint if enabled, zones, operator IAM identity):
-
-```shell
-anyscale cloud register --name <my_kubernetes_cloud> -f ./generated/cloud-resource.yaml
-```
-
-**Option B — pre-rendered CLI flags.** The `anyscale_registration_command` Terraform output expands the same information into a flag-based invocation:
+The `anyscale_registration_command` Terraform output expands the cloud-resource details (region, S3 bucket, PVC name, MemoryDB endpoint if enabled, zones, operator IAM identity) into a flag-based `anyscale cloud register` invocation:
 
 ```shell
 terraform output -raw anyscale_registration_command | sh
 ```
+
+> The `anyscale cloud register -f <file>` (YAML) path is not currently usable for K8s compute stacks — CLI 0.26.100 rejects the K8s CloudResource on a missing `aws_config` block whose schema isn't documented. Use the CLI-flags command above.
 
 Capture the cloud deployment id from the CLI output and export it — later steps reference it:
 
@@ -127,15 +120,24 @@ The provided `sample-values_gateway.yaml` contains three documents that set up t
 * A `GatewayClass` named `eg` that adds `parametersRef → EnvoyProxy` to the helm chart's default class.
 * A `Gateway` in `anyscale-operator` with three listeners: an `http:80` bootstrap listener (no app traffic; needed so Envoy Gateway will program the Gateway before the Operator creates the TLS Secrets below), `https:443` for `*.i.anyscaleuserdata.com` (head-node) → secret `anyscale-<cldrsrc-id>-certificate`, and `https-session:443` for `*.s.anyscaleuserdata.com` (services) → secret `anyscale-svc-<cldrsrc-id>-certificate`.
 
-Before applying, substitute the `<cloud-deployment-id>` placeholder in the gateway YAML with the cldrsrc slug (the cloud deployment id with `_` replaced by `-`) so the TLS listeners reference the real Secret names from the start. The Operator (installed below) will create those Secrets once it's running, and the listeners flip to `ResolvedRefs: True` automatically — no second `kubectl apply` needed.
+Before applying, substitute the `<cldrsrc-with-dashes>` placeholder in the gateway YAML with the cldrsrc slug (the cloud deployment id with `_` replaced by `-`) so the TLS listeners reference the real Secret names from the start. The Operator (installed below) will create those Secrets once it's running, and the listeners flip to `ResolvedRefs: True` automatically — no second `kubectl apply` needed.
 
-1. Install Envoy Gateway:
+> Pasting the underscored `cldrsrc_xxx` form looks valid but is wrong — the operator's TLS Secret name uses dashes, so the listener silently stays at `ResolvedRefs: False`. The placeholder is named to spell that out.
+
+1. Install Envoy Gateway. Apply CRDs separately so reruns with a newer chart version pick up new Gateway API / Envoy Gateway CRD fields — `helm upgrade --install` only installs `chart/crds/` on first install by design:
 
    ```shell
-   helm install eg oci://docker.io/envoyproxy/gateway-helm \
+   EG_CRD_DIR=$(mktemp -d)
+   trap 'rm -rf "$EG_CRD_DIR"' EXIT
+   helm pull oci://docker.io/envoyproxy/gateway-helm --version v1.7.0 \
+     --untar --untardir "$EG_CRD_DIR"
+   kubectl apply --server-side --force-conflicts -f "$EG_CRD_DIR/gateway-helm/crds/"
+   helm upgrade eg oci://docker.io/envoyproxy/gateway-helm \
      --version v1.7.0 \
      --namespace envoy-gateway-system \
-     --create-namespace
+     --create-namespace \
+     --skip-crds \
+     --install
    kubectl wait --for=condition=available deployment/envoy-gateway \
      -n envoy-gateway-system --timeout=120s
    ```
@@ -144,7 +146,7 @@ Before applying, substitute the `<cloud-deployment-id>` placeholder in the gatew
 
    ```shell
    SECRET_SLUG=${CLOUD_DEPLOYMENT_ID//_/-}    # cldrsrc_xxx → cldrsrc-xxx
-   sed "s/<cloud-deployment-id>/${SECRET_SLUG}/g" sample-values_gateway.yaml | kubectl apply -f -
+   sed "s/<cldrsrc-with-dashes>/${SECRET_SLUG}/g" sample-values_gateway.yaml | kubectl apply -f -
    ```
 
 3. Wait for the Gateway to be programmed and capture the internal NLB hostname:
@@ -221,15 +223,9 @@ The `https-session` listener for `*.s.anyscaleuserdata.com` will remain `Resolve
 
 ### (Optional) MemoryDB
 
-When `enable_memorydb = true`, Terraform provisions an AWS MemoryDB cluster in the private subnets via the `aws-anyscale-memorydb` submodule. The cluster endpoint is already embedded in `generated/cloud-resource.yaml` as `kubernetes_config.redis_endpoint`, so no additional step is required — Anyscale Services head-node fault tolerance is enabled at registration time.
+When `enable_memorydb = true`, Terraform provisions an AWS MemoryDB cluster in the private subnets via the `aws-anyscale-memorydb` submodule. The cluster endpoint is already wired into the rendered registration command's `--memorydb-cluster-id` flag, so no additional step is required — Anyscale Services head-node fault tolerance is enabled at registration time.
 
 The MemoryDB security group permits Redis ingress (port 6379 by default) only from the EKS managed node security group.
-
-### Note: `validation_test_mode` is for e2e testing only
-
-This example ships with two variables, `validation_test_mode` and `validation_test_allowed_cidrs`, that exist only to support end-to-end tests run from outside the VPC (where kubectl/helm normally can't reach the private API endpoint). When `validation_test_mode = true`, `endpoint_public_access` is flipped to `true` and restricted to the supplied CIDR allowlist.
-
-**Do not enable this in a real deployment.** Leave both variables at their defaults; the cluster will keep its private API endpoint and only be reachable via VPN/bastion.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
@@ -269,7 +265,6 @@ This example ships with two variables, `validation_test_mode` and `validation_te
 | [aws_iam_role_policy.s3_csi_driver](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_security_group.allow_all_vpc](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group) | resource |
 | [aws_security_group.memorydb](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group) | resource |
-| [local_file.cloud_resource_yaml](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
 | [local_file.deploy_script](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
 | [local_file.pv_pvc_yaml](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
 | [aws_iam_role.default_nodegroup](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_role) | data source |
@@ -278,7 +273,7 @@ This example ships with two variables, `validation_test_mode` and `validation_te
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_anyscale_cloud_name"></a> [anyscale\_cloud\_name](#input\_anyscale\_cloud\_name) | (Optional) Anyscale cloud name embedded in the rendered `generated/cloud-resource.yaml` and shown in the `anyscale cloud register` command output.<br/><br/>Pick a name that is unique within your Anyscale organization.<br/><br/>ex:<pre>anyscale_cloud_name = "my-eks-private-cloud"</pre> | `string` | `"anyscale-eks-private"` | no |
+| <a name="input_anyscale_cloud_name"></a> [anyscale\_cloud\_name](#input\_anyscale\_cloud\_name) | (Optional) Anyscale cloud name passed to `anyscale cloud register --name`.<br/><br/>Pick a name that is unique within your Anyscale organization.<br/><br/>ex:<pre>anyscale_cloud_name = "my-eks-private-cloud"</pre> | `string` | `"anyscale-eks-private"` | no |
 | <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | (Optional) The AWS region in which all resources will be created.<br/><br/>ex:<pre>aws_region = "us-east-2"</pre> | `string` | `"us-east-2"` | no |
 | <a name="input_bucket_force_destroy"></a> [bucket\_force\_destroy](#input\_bucket\_force\_destroy) | (Optional) When true, `terraform destroy` will delete the Anyscale S3 bucket<br/>even if it still contains objects (operator logs, cluster metadata, mounted<br/>PVC data, etc.). Default is `false` so accidental destroys do not wipe data.<br/><br/>Set to `true` for ephemeral dev / e2e test deployments where you want<br/>teardown to be one command. See `dev-overrides.tfvars.example` for a ready-made<br/>override file.<br/><br/>ex:<pre>bucket_force_destroy = true</pre> | `bool` | `false` | no |
 | <a name="input_eks_cluster_name"></a> [eks\_cluster\_name](#input\_eks\_cluster\_name) | (Optional) The name of the EKS cluster.<br/><br/>This will be used for naming resources created by this module including the EKS cluster and the S3 bucket.<br/><br/>ex:<pre>eks_cluster_name = "anyscale-eks-private"</pre> | `string` | `"anyscale-eks-private"` | no |
@@ -293,19 +288,17 @@ This example ships with two variables, `validation_test_mode` and `validation_te
 | <a name="input_memorydb_port"></a> [memorydb\_port](#input\_memorydb\_port) | (Optional) Port on which the MemoryDB cluster listens. Only used when `enable_memorydb = true`. | `number` | `6379` | no |
 | <a name="input_node_group_disk_size"></a> [node\_group\_disk\_size](#input\_node\_group\_disk\_size) | (Optional) The disk size (GB) of the EKS nodes.<br/>Possible values: [500, 1000]<br/><br/>ex:<pre>node_group_disk_size = 1000</pre> | `number` | `500` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | (Optional) A map of tags to all resources that accept tags.<br/><br/>ex:<pre>tags = {<br/>  Environment = "dev"<br/>  Repo        = "terraform-kubernetes-anyscale-foundation-modules",<br/>}</pre> | `map(string)` | <pre>{<br/>  "Environment": "dev",<br/>  "Example": "aws/eks-private",<br/>  "Repo": "terraform-kubernetes-anyscale-foundation-modules",<br/>  "Test": "true"<br/>}</pre> | no |
-| <a name="input_validation_test_allowed_cidrs"></a> [validation\_test\_allowed\_cidrs](#input\_validation\_test\_allowed\_cidrs) | (Optional, **e2e testing only**) CIDR allowlist for `endpoint_public_access`<br/>when `validation_test_mode = true`. Set to the runner's public IP /32 before<br/>applying. Ignored when `validation_test_mode = false`.<br/><br/>ex:<pre>validation_test_allowed_cidrs = ["203.0.113.42/32"]</pre> | `list(string)` | `[]` | no |
-| <a name="input_validation_test_mode"></a> [validation\_test\_mode](#input\_validation\_test\_mode) | (Optional, **e2e testing only**) When true, flips `endpoint_public_access` on<br/>the EKS cluster to `true` so the validation runner can reach the API server<br/>over the internet. Public access is restricted to `validation_test_allowed_cidrs`.<br/><br/>!!! WARNING — DO NOT enable this in a production deployment. The example is<br/>intended to run with a private API endpoint accessed only via VPN or a<br/>bastion. This toggle exists only to support `terraform-kubernetes-anyscale-foundation-modules`<br/>e2e tests where the validation harness lives outside the VPC.<br/><br/>ex:<pre>validation_test_mode = true</pre> | `bool` | `false` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| <a name="output_anyscale_registration_command"></a> [anyscale\_registration\_command](#output\_anyscale\_registration\_command) | The `anyscale cloud register` command with all required flags pre-populated. (The rendered `generated/cloud-resource.yaml` is also available as a reference but is not currently consumable by `anyscale cloud register -f` for K8S compute stacks.) |
+| <a name="output_anyscale_registration_command"></a> [anyscale\_registration\_command](#output\_anyscale\_registration\_command) | The `anyscale cloud register` command with all required flags pre-populated. |
 | <a name="output_aws_region"></a> [aws\_region](#output\_aws\_region) | The AWS region. This is used for Helm chart values. |
 | <a name="output_deploy_script_path"></a> [deploy\_script\_path](#output\_deploy\_script\_path) | Path to a rendered shell script containing every post-terraform step in order (autoscaler, AWS LBC, Envoy Gateway + manifests, PVC, Anyscale Operator, verify). Open it to copy-paste steps, or run end-to-end after exporting CLOUD\_DEPLOYMENT\_ID. |
 | <a name="output_eks_cluster_name"></a> [eks\_cluster\_name](#output\_eks\_cluster\_name) | The name of the EKS cluster. This is used for Helm chart values. |
 | <a name="output_helm_upgrade_command"></a> [helm\_upgrade\_command](#output\_helm\_upgrade\_command) | The Anyscale Operator helm upgrade command, with gateway settings populated for the Anyscale Envoy Gateway setup. |
-| <a name="output_memorydb_endpoint"></a> [memorydb\_endpoint](#output\_memorydb\_endpoint) | MemoryDB cluster configuration endpoint as host:port — what the rendered cloud-resource.yaml uses for `kubernetes_config.redis_endpoint`. Only set when `enable_memorydb = true`. |
+| <a name="output_memorydb_endpoint"></a> [memorydb\_endpoint](#output\_memorydb\_endpoint) | MemoryDB cluster configuration endpoint as host:port. Wired into the rendered registration command's `--memorydb-cluster-id` flag. Only set when `enable_memorydb = true`. |
 | <a name="output_s3_pvc_bucket_name"></a> [s3\_pvc\_bucket\_name](#output\_s3\_pvc\_bucket\_name) | Name of the S3 bucket exposed as a PVC via the Mountpoint-for-S3 CSI driver. Only set when `enable_s3_pvc = true`. |
 | <a name="output_s3_pvc_csi_driver_role_arn"></a> [s3\_pvc\_csi\_driver\_role\_arn](#output\_s3\_pvc\_csi\_driver\_role\_arn) | IAM role ARN assumed by the Mountpoint-for-S3 CSI driver pods via EKS Pod Identity. The pod identity association itself is managed by the `aws-mountpoint-s3-csi-driver` EKS managed addon. Only set when `enable_s3_pvc = true`. |
 | <a name="output_vpc_id"></a> [vpc\_id](#output\_vpc\_id) | VPC id. Pass to `helm upgrade aws-load-balancer-controller --set vpcId=<this>` so the controller does not need IMDS access to introspect it. |

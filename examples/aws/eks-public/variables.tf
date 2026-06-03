@@ -162,7 +162,7 @@ variable "bucket_force_destroy" {
 
 variable "anyscale_cloud_name" {
   description = <<-EOT
-    (Optional) Anyscale cloud name embedded in the rendered `generated/cloud-resource.yaml` and shown in the `anyscale cloud register` command output.
+    (Optional) Anyscale cloud name passed to `anyscale cloud register --name`.
 
     Pick a name that is unique within your Anyscale organization.
 

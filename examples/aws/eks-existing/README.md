@@ -109,15 +109,24 @@ The provided `sample-values_gateway.yaml` contains three documents that set up t
 * A `GatewayClass` named `eg` that adds `parametersRef → EnvoyProxy` to the helm chart's default class.
 * A `Gateway` in `anyscale-operator` with three listeners: an `http:80` bootstrap listener (no app traffic; needed so Envoy Gateway will program the Gateway before the Operator creates the TLS Secrets below), `https:443` for `*.i.anyscaleuserdata.com` (head-node) → secret `anyscale-<cldrsrc-id>-certificate`, and `https-session:443` for `*.s.anyscaleuserdata.com` (services) → secret `anyscale-svc-<cldrsrc-id>-certificate`.
 
-Before applying, substitute the `<cloud-deployment-id>` placeholder in the gateway YAML with the cldrsrc slug (the cloud deployment id with `_` replaced by `-`) so the TLS listeners reference the real Secret names from the start. The Operator (installed below) will create those Secrets once it's running, and the listeners flip to `ResolvedRefs: True` automatically — no second `kubectl apply` needed.
+Before applying, substitute the `<cldrsrc-with-dashes>` placeholder in the gateway YAML with the cldrsrc slug (the cloud deployment id with `_` replaced by `-`) so the TLS listeners reference the real Secret names from the start. The Operator (installed below) will create those Secrets once it's running, and the listeners flip to `ResolvedRefs: True` automatically — no second `kubectl apply` needed.
 
-1. Install Envoy Gateway (Kubernetes 1.30+ required by v1.7.0):
+> Pasting the underscored `cldrsrc_xxx` form looks valid but is wrong — the operator's TLS Secret name uses dashes, so the listener silently stays at `ResolvedRefs: False`. The placeholder is named to spell that out.
+
+1. Install Envoy Gateway (Kubernetes 1.30+ required by v1.7.0). Apply CRDs separately so reruns with a newer chart version pick up new Gateway API / Envoy Gateway CRD fields — `helm upgrade --install` only installs `chart/crds/` on first install by design:
 
    ```shell
-   helm install eg oci://docker.io/envoyproxy/gateway-helm \
+   EG_CRD_DIR=$(mktemp -d)
+   trap 'rm -rf "$EG_CRD_DIR"' EXIT
+   helm pull oci://docker.io/envoyproxy/gateway-helm --version v1.7.0 \
+     --untar --untardir "$EG_CRD_DIR"
+   kubectl apply --server-side --force-conflicts -f "$EG_CRD_DIR/gateway-helm/crds/"
+   helm upgrade eg oci://docker.io/envoyproxy/gateway-helm \
      --version v1.7.0 \
      --namespace envoy-gateway-system \
-     --create-namespace
+     --create-namespace \
+     --skip-crds \
+     --install
    kubectl wait --for=condition=available deployment/envoy-gateway \
      -n envoy-gateway-system --timeout=120s
    ```
@@ -126,7 +135,7 @@ Before applying, substitute the `<cloud-deployment-id>` placeholder in the gatew
 
    ```shell
    SECRET_SLUG=${CLOUD_DEPLOYMENT_ID//_/-}    # cldrsrc_xxx → cldrsrc-xxx
-   sed "s/<cloud-deployment-id>/${SECRET_SLUG}/g" sample-values_gateway.yaml | kubectl apply -f -
+   sed "s/<cldrsrc-with-dashes>/${SECRET_SLUG}/g" sample-values_gateway.yaml | kubectl apply -f -
    ```
 
 3. Wait for the Gateway to be programmed and capture the NLB hostname:

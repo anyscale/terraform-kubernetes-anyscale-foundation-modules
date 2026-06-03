@@ -25,11 +25,13 @@
 # ResolvedRefs=True automatically. The http listener itself never carries
 # user traffic — Anyscale workspace URLs are all HTTPS.
 #
-# Before applying, substitute the `<cloud-deployment-id>` placeholders with the
-# full cloud deployment id returned by `anyscale cloud register` (`cldrsrc_xxx`),
-# with the underscore replaced by a dash — e.g. `cldrsrc_tbtjs3jrtvbrw5uvsuwcikp43c`
+# Before applying, substitute the `<cldrsrc-with-dashes>` placeholders with the
+# cloud deployment id returned by `anyscale cloud register` (`cldrsrc_xxx`),
+# **with the underscore(s) replaced by dashes** — e.g. `cldrsrc_tbtjs3jrtvbrw5uvsuwcikp43c`
 # becomes `cldrsrc-tbtjs3jrtvbrw5uvsuwcikp43c`. The operator names the TLS Secret
-# it creates as `anyscale-<that slug>-certificate`. See the README's `sed` step.
+# it creates as `anyscale-<that slug>-certificate`, so pasting the underscored
+# id verbatim looks valid but leaves the listener stuck at `ResolvedRefs: False`.
+# See the README's `sed` step.
 ---
 apiVersion: v1
 kind: Namespace
@@ -88,7 +90,7 @@ spec:
         mode: Terminate
         certificateRefs:
           - kind: Secret
-            name: anyscale-<cloud-deployment-id>-certificate
+            name: anyscale-<cldrsrc-with-dashes>-certificate
       allowedRoutes:
         namespaces:
           from: All
@@ -100,7 +102,7 @@ spec:
         mode: Terminate
         certificateRefs:
           - kind: Secret
-            name: anyscale-svc-<cloud-deployment-id>-certificate
+            name: anyscale-svc-<cldrsrc-with-dashes>-certificate
       allowedRoutes:
         namespaces:
           from: All

@@ -162,7 +162,7 @@ variable "bucket_force_destroy" {
 
 variable "anyscale_cloud_name" {
   description = <<-EOT
-    (Optional) Anyscale cloud name embedded in the rendered `generated/cloud-resource.yaml` and shown in the `anyscale cloud register` command output.
+    (Optional) Anyscale cloud name passed to `anyscale cloud register --name`.
 
     Pick a name that is unique within your Anyscale organization.
 
@@ -245,45 +245,4 @@ variable "memorydb_port" {
   EOT
   type        = number
   default     = 6379
-}
-
-# ---------------------------------------------------------------------------------------------------------------------
-# E2E TEST AFFORDANCE
-# These variables are only used for end-to-end validation runs of this example.
-# Do not set them in a production deployment.
-# ---------------------------------------------------------------------------------------------------------------------
-
-variable "validation_test_mode" {
-  description = <<-EOT
-    (Optional, **e2e testing only**) When true, flips `endpoint_public_access` on
-    the EKS cluster to `true` so the validation runner can reach the API server
-    over the internet. Public access is restricted to `validation_test_allowed_cidrs`.
-
-    !!! WARNING — DO NOT enable this in a production deployment. The example is
-    intended to run with a private API endpoint accessed only via VPN or a
-    bastion. This toggle exists only to support `terraform-kubernetes-anyscale-foundation-modules`
-    e2e tests where the validation harness lives outside the VPC.
-
-    ex:
-    ```
-    validation_test_mode = true
-    ```
-  EOT
-  type        = bool
-  default     = false
-}
-
-variable "validation_test_allowed_cidrs" {
-  description = <<-EOT
-    (Optional, **e2e testing only**) CIDR allowlist for `endpoint_public_access`
-    when `validation_test_mode = true`. Set to the runner's public IP /32 before
-    applying. Ignored when `validation_test_mode = false`.
-
-    ex:
-    ```
-    validation_test_allowed_cidrs = ["203.0.113.42/32"]
-    ```
-  EOT
-  type        = list(string)
-  default     = []
 }

@@ -174,10 +174,11 @@ module "eks" {
     } : {},
   )
 
-  # API endpoint access. Private-only by default; the validation_test_mode
-  # toggle flips it to public with a CIDR allowlist for e2e test runs only.
-  endpoint_public_access       = var.validation_test_mode
-  endpoint_public_access_cidrs = var.validation_test_mode ? var.validation_test_allowed_cidrs : []
+  # API endpoint access is private-only — reach it from inside the VPC via VPN
+  # or a bastion. The e2e harness opens it up via a Terraform override file
+  # (see `tests/e2e-validation/`); never enable public access in production.
+  endpoint_public_access       = false
+  endpoint_public_access_cidrs = []
 
   # The authentication mode for the cluster. Valid values are `CONFIG_MAP`, `API` or `API_AND_CONFIG_MAP`
   authentication_mode = "API_AND_CONFIG_MAP"
