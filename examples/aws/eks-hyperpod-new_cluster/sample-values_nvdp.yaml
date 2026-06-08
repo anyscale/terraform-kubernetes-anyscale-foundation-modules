@@ -1,0 +1,18 @@
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        # We allow a GPU deployment to be forced by setting the following label to "true"
+        - key: "nvidia.com/gpu.product"
+          operator: Exists
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  - key: node.anyscale.com/capacity-type
+    operator: Exists
+    effect: NoSchedule
+  - key: node.anyscale.com/accelerator-type
+    operator: Exists
+    effect: NoSchedule
