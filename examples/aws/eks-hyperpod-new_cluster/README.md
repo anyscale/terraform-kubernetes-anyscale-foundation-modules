@@ -141,6 +141,96 @@ kubectl get nodes -L node.kubernetes.io/instance-type -L sagemaker.amazonaws.com
 anyscale job submit --cloud <anyscale-cloud-name> --working-dir https://github.com/anyscale/docs_examples/archive/refs/heads/main.zip -- python hello_world.py
 ```
 
+### Configure head node fault tolerance (optional)
+
+Anyscale recommends enabling head node fault tolerance for all production services. Head node fault tolerance uses a Redis-compatible external storage cluster to prevent service outages due to head node instability, out-of-memory issues, or machine failure. With it enabled, Anyscale services can continue serving responses using replicas on worker nodes during head node recovery.
+
+> **Important:** Head node fault tolerance isn't supported for serverless (Anyscale-hosted) clouds.
+
+You can configure fault tolerance at the cloud level (shared by all services in the cloud) or per service. Anyscale recommends the cloud-level approach.
+
+#### Provision a Redis-compatible cluster
+
+Provision a Redis-compatible cluster that is reachable from your Kubernetes data plane. The cluster must meet the following requirements:
+
+* Accessible from your Kubernetes cluster's network.
+* Single shard configuration (multi-shard clusters aren't supported).
+* At least 1 replica for high availability (replication across availability zones is recommended).
+* At least 1 GiB of storage. A 10-node service initially requires around 20 MB; usage can grow to 100 MB or more over time.
+
+#### Enable fault tolerance at the cloud level
+
+For clouds created with `anyscale cloud register`, reference the cluster in your cloud resource YAML.
+
+1. Export your cloud configuration:
+
+```shell
+anyscale cloud get --name <anyscale-cloud-name> --output cloud-resources.yaml
+```
+
+2. Add the `redis_endpoint` field under `kubernetes_config`:
+
+```yaml
+name: my-k8s-cloud-resource
+provider: AWS
+compute_stack: K8S
+region: us-west-2
+object_storage:
+  bucket_name: s3://my-bucket
+kubernetes_config:
+  anyscale_operator_iam_identity: arn:aws:iam::123456789012:role/eks-node-role
+  zones:
+  - us-west-2a
+  - us-west-2b
+  redis_endpoint: redis.ray-system.svc.cluster.local:6379
+```
+
+The endpoint must be reachable from the data plane that runs your Anyscale workloads. Use the address pattern `<host>:<port>` for plaintext connections. For TLS, prefix the address with `rediss://`, for example `rediss://redis.ray-system.svc.cluster.local:6379`. If your Redis cluster uses TLS with a private certificate, configure `certificate_path` per service.
+
+3. Update the cloud:
+
+```shell
+anyscale cloud update --name <anyscale-cloud-name> --resources-file cloud-resources.yaml
+```
+
+Anyscale also provides Terraform modules to help configure Redis-compatible storage.
+
+#### Configure fault tolerance per service (optional)
+
+To override the cloud-level configuration for a specific service, or to enable fault tolerance without a cloud-level endpoint, add `ray_gcs_external_storage_config` to the service config:
+
+```yaml
+name: my-service
+working_dir: .
+applications:
+  - import_path: main:app
+ray_gcs_external_storage_config:
+  enabled: True
+  address: redis-cluster-hostname:6379
+  # Path to TLS certificates if enabled.
+  certificate_path: "/etc/ssl/certs/ca-certificates.crt"
+```
+
+* For AWS MemoryDB, use the address pattern `<user-provided-name>.<random-string>.clustercfg.memorydb.<region>.amazonaws.com:6379`.
+* If TLS is enabled, prefix the address with `rediss://`.
+* The `certificate_path` only needs to be set when using private certificates.
+
+To turn off fault tolerance for a specific service, set `enabled: False`:
+
+```yaml
+name: my-service
+applications:
+  - import_path: main:app
+ray_gcs_external_storage_config:
+  enabled: False
+```
+
+Disabling fault tolerance in the service config doesn't deprovision the Redis-compatible cluster. If you need help removing this infrastructure, contact Anyscale support.
+
+#### Configure alerting
+
+If the Redis-compatible cluster reaches its maximum memory capacity, your services may experience significant disruptions. Configure an AWS CloudWatch alert on the `DatabaseMemoryUsagePercentage` metric to trigger when the maximum value exceeds 80%. If the alarm triggers, Anyscale recommends either terminating services to alleviate the memory load or scaling up the cluster's memory capacity.
+
 ### Clean up
 
 ```shell
