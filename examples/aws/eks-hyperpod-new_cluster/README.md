@@ -67,9 +67,114 @@ aws eks update-kubeconfig --region <region> --name <my-eks-cluster>
 kubectl get nodes -L node.kubernetes.io/instance-type -L sagemaker.amazonaws.com/node-health-status -L sagemaker.amazonaws.com/deep-health-check-status $@
 ```
 
-### Installing K8s Components
+### Install additional EKS components
 
-#### Install the Nginx ingress controller
+In this step, you install the required components for autoscaling, load balancing, and Envoy Gateway on your EKS cluster.
+
+The Anyscale Operator requires the following components:
+* [Cluster autoscaler](https://github.com/kubernetes/autoscaler/tree/master/charts/cluster-autoscaler)
+* [AWS LBC (Load Balancer controller)](https://github.com/kubernetes-sigs/aws-load-balancer-controller/tree/main/helm/aws-load-balancer-controller)
+* An ingress or gateway controller (Envoy Gateway is recommended; Nginx is also supported)
+* (Optional) [Nvidia device plugin](https://github.com/NVIDIA/k8s-device-plugin/tree/main?tab=readme-ov-file#deployment-via-helm) (required if utilizing GPU nodes)
+
+Run the following command to connect your terminal to the EKS cluster:
+
+```shell
+aws eks update-kubeconfig --region <your_aws_region> --name <your_eks_cluster_name>
+```
+
+#### Install the Cluster autoscaler
+
+Install the Kubernetes Autoscaler Helm chart:
+
+```shell
+helm repo add autoscaler https://kubernetes.github.io/autoscaler
+helm upgrade cluster-autoscaler autoscaler/cluster-autoscaler \
+  --version 9.46.0 \
+  --namespace kube-system \
+  --set awsRegion=<your_aws_region> \
+  --set 'autoDiscovery.clusterName'=<your_eks_cluster_name> \
+  --install
+```
+
+#### Install the AWS load balancer controller
+
+```shell
+helm repo add eks https://aws.github.io/eks-charts
+helm upgrade aws-load-balancer-controller eks/aws-load-balancer-controller \
+  --version 1.13.2 \
+  --namespace kube-system \
+  --set clusterName=<your_eks_cluster_name> \
+  --install
+```
+
+#### Install an ingress or gateway controller
+
+> **Note:** Envoy Gateway is the recommended ingress controller for Anyscale on Kubernetes. Other gateway and ingress controllers are supported. See [Ingress and gateway controllers](https://docs.anyscale.com/administration/cloud-deployment/kubernetes/) for all supported options.
+
+##### Option A: Envoy Gateway (recommended)
+
+Install Envoy Gateway v1.7.0:
+
+```shell
+helm install eg oci://docker.io/envoyproxy/gateway-helm \
+  --version v1.7.0 \
+  --namespace envoy-gateway-system \
+  --create-namespace
+
+kubectl wait --for=condition=available deployment/envoy-gateway \
+  -n envoy-gateway-system --timeout=120s
+```
+
+Create a file named `envoyproxy.yaml` with the following contents:
+
+```yaml
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: envoy-proxy
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        type: LoadBalancer
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: external
+          service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: instance
+          service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+```
+
+Apply the resource:
+
+```shell
+kubectl apply -f envoyproxy.yaml
+```
+
+Create a file named `gatewayclass.yaml` with the following contents:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: envoy-proxy
+    namespace: envoy-gateway-system
+```
+
+Apply the resource:
+
+```shell
+kubectl apply -f gatewayclass.yaml
+```
+
+##### Option B: Nginx ingress controller
 
 A sample file, `sample-values_nginx.yaml` has been provided in this repo. Please review for your requirements before using.
 
@@ -81,6 +186,20 @@ helm upgrade ingress-nginx nginx/ingress-nginx \
   --version 4.12.1 \
   --namespace ingress-nginx \
   --values sample-values_nginx.yaml \
+  --create-namespace \
+  --install
+```
+
+#### (Optional) Install the Nvidia device plugin
+
+If you intend to use NVIDIA GPUs in your Anyscale workloads, install the NVIDIA device plugin. A sample file, `sample-values_nvdp.yaml` has been provided in this repo. Please review for your requirements before using.
+
+```shell
+helm repo add nvdp https://nvidia.github.io/k8s-device-plugin
+helm upgrade nvdp nvdp/nvidia-device-plugin \
+  --namespace nvidia-device-plugin \
+  --version 0.17.1 \
+  --values sample-values_nvdp.yaml \
   --create-namespace \
   --install
 ```
