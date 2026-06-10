@@ -1,6 +1,6 @@
 ---
 name: deploy-aws-eks
-description: Guide for deploying the Anyscale AWS EKS public example from examples/aws/eks-public/. Use when the user asks about deploying, setting up, or configuring EKS for Anyscale.
+description: "Configure Terraform variables, provision EKS node groups, install helm components (autoscaler, LBC, nginx, GPU plugin), and register the Anyscale cloud operator from examples/aws/eks-public/. Use when the user asks about deploying, setting up, or configuring AWS EKS for Anyscale."
 argument-hint: [step]
 allowed-tools: Read, Bash, Grep, Glob
 ---
@@ -13,11 +13,11 @@ If `$ARGUMENTS` specifies a step (e.g., "terraform", "autoscaler", "lbc", "nginx
 
 ## Prerequisites
 
-Ensure the user has:
-- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) (configured with credentials)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- [helm](https://helm.sh/docs/intro/install/)
-- [Anyscale CLI](https://docs.anyscale.com/reference/quickstart-cli/)
+Ensure the user has these tools installed and authenticated:
+- AWS CLI (configured with credentials via `aws configure` or environment variables)
+- kubectl
+- helm
+- Anyscale CLI (>= v0.26.24, authenticated via `anyscale login`)
 - Terraform >= 1.0
 
 ## Step 1: Configure Terraform Variables
@@ -61,6 +61,8 @@ Save the outputs - they contain commands for the remaining steps. Key outputs:
 aws eks update-kubeconfig --region <aws_region> --name <eks_cluster_name>
 ```
 
+**Verify**: Run `kubectl get nodes` — all nodes should show `Ready` status before proceeding.
+
 ## Step 4: Install Cluster Autoscaler
 
 ```shell
@@ -73,6 +75,8 @@ helm upgrade cluster-autoscaler autoscaler/cluster-autoscaler \
   --install
 ```
 
+**Verify**: `kubectl get pods -n kube-system | grep cluster-autoscaler` — pod should be `Running`.
+
 ## Step 5: Install AWS Load Balancer Controller
 
 ```shell
@@ -83,6 +87,8 @@ helm upgrade aws-load-balancer-controller eks/aws-load-balancer-controller \
   --set clusterName=<eks_cluster_name> \
   --install
 ```
+
+**Verify**: `kubectl get pods -n kube-system | grep aws-load-balancer` — pods should be `Running`.
 
 ## Step 6: Install Nginx Ingress Controller
 
@@ -98,6 +104,8 @@ helm upgrade ingress-nginx nginx/ingress-nginx \
 
 The sample values file is at `examples/aws/eks-public/sample-values_nginx.yaml`.
 
+**Verify**: `kubectl get pods -n ingress-nginx` — controller pod should be `Running` and an external LoadBalancer IP/hostname should appear via `kubectl get svc -n ingress-nginx`.
+
 ## Step 7 (Optional): Install Nvidia Device Plugin
 
 Only needed if using GPU node pools. The sample values file is at `examples/aws/eks-public/sample-values_nvdp.yaml`.
@@ -111,6 +119,8 @@ helm upgrade nvdp nvdp/nvidia-device-plugin \
   --create-namespace \
   --install
 ```
+
+**Verify**: `kubectl get pods -n nvidia-device-plugin` — daemonset pods should be `Running` on GPU nodes.
 
 ## Step 8: Register the Anyscale Cloud
 
@@ -129,7 +139,7 @@ anyscale cloud register --provider aws \
 
 The `--efs-id` flag is only included when `enable_efs = true`.
 
-Note the cloud deployment ID from the output - it's needed for the next step.
+Note the cloud deployment ID from the output — it's needed for the next step. If registration fails, verify the IAM role ARN and S3 bucket ID match the terraform outputs exactly.
 
 ## Step 9: Install the Anyscale Operator
 
@@ -150,6 +160,8 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
   --create-namespace \
   --install
 ```
+
+**Verify**: `kubectl get pods -n anyscale-operator` — the operator pod should reach `Running` status within ~2 minutes. If it stays in `CrashLoopBackOff`, verify the `cloudDeploymentId` matches the ID from the registration step.
 
 ## Teardown
 
