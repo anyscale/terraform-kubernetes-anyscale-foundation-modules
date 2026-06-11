@@ -1,0 +1,82 @@
+# Envoy Gateway resources for the Anyscale Operator on Azure AKS.
+#
+# Apply this file AFTER installing the envoy-gateway Helm chart and
+# AFTER `anyscale cloud register` (so you have the cloud deployment ID
+# for the certificate Secret references in the Gateway listeners).
+#
+# IMPORTANT: replace <cldrsrc-id> with the DASH-form of the cloud
+# deployment ID returned by `anyscale cloud register`. Kubernetes Secret
+# names cannot contain underscores, so the operator stores the cert
+# Secret as `anyscale-cldrsrc-<dash-form>-certificate`. If the register
+# command returned `cldrsrc_abc123xyz`, substitute `cldrsrc-abc123xyz`.
+#
+# Example one-liner that handles the conversion automatically:
+#   CLOUD_ID=cldrsrc_abc123xyz   # value from `anyscale cloud register`
+#   sed "s/<cldrsrc-id>/$(echo $CLOUD_ID | tr _ -)/g" sample-envoy-gateway.yaml \
+#     | kubectl apply -f -
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: envoy-proxy
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        type: LoadBalancer
+        annotations:
+          service.beta.kubernetes.io/azure-load-balancer-internal: "false"
+          service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: "/healthz"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: envoy-proxy
+    namespace: envoy-gateway-system
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway
+  namespace: anyscale-operator
+spec:
+  gatewayClassName: eg
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: '*.i.anyscaleuserdata.com'
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: anyscale-<cldrsrc-id>-certificate
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-session
+      port: 443
+      protocol: HTTPS
+      hostname: '*.s.anyscaleuserdata.com'
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: anyscale-svc-<cldrsrc-id>-certificate
+      allowedRoutes:
+        namespaces:
+          from: All

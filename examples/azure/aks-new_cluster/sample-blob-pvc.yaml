@@ -1,0 +1,47 @@
+# Azure Blob CSI StorageClass + PVC for Anyscale workloads.
+#
+# Apply this AFTER `terraform apply` (with enable_blob_driver = true) and AFTER
+# the `anyscale-operator` namespace exists. The StorageClass references the
+# storage account that terraform already provisioned for Anyscale's system
+# default storage; we recommend reusing it.
+#
+# Substitute the two placeholders below with values from terraform outputs:
+#   <storage-account>  -> terraform output -raw azure_storage_account_name
+#   <resource-group>   -> terraform output -raw azure_resource_group_name
+#
+# Or use the `pvc_apply_command` terraform output, which prints a ready-to-run
+# sed-and-apply one-liner with both substitutions baked in.
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: blobfuse-csi
+provisioner: blob.csi.azure.com
+parameters:
+  protocol: fuse2
+  storageAccount: <storage-account>
+  resourceGroup: <resource-group>
+  # No mountWithWorkloadIdentityToken: the CSI driver authenticates via the
+  # AKS kubelet identity using MSI, which has Storage Blob Data Contributor +
+  # Storage Account Key Operator on the storage account (granted by blob_csi.tf
+  # in this module). Enabling workload-identity token mount would require
+  # additional Federated Identity Credentials that this module does not create.
+mountOptions:
+  - -o allow_other
+  - --block-cache
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: anyscale-shared-fuse
+  namespace: anyscale-operator
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: blobfuse-csi

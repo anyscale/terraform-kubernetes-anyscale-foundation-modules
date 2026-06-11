@@ -221,3 +221,10 @@ variable "storage_use_azuread" {
   nullable    = false
   default     = false
 }
+
+variable "anyscale_control_plane_url" {
+  description = "(Optional) Anyscale control plane URL. Use https://console.anyscale.com for the AWS control plane or https://console.azure.anyscale.com for the Azure control plane."
+  type        = string
+  nullable    = false
+  default     = "https://console.anyscale.com"
+}
