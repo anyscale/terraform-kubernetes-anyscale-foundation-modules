@@ -37,6 +37,10 @@ azure_subscription_id = ""
 azure_location        = ""
 aks_cluster_name      = ""
 
+# (Optional) Control plane URL. Default connects to the AWS-hosted Anyscale control plane.
+# Set to "https://console.azure.anyscale.com" if your Anyscale organization is on the Azure control plane.
+# anyscale_control_plane_url = "https://console.azure.anyscale.com"
+
 # (Optional) Override the default GPU node pools. The default provisions
 # both T4 and A100 pools; the example below restricts it to T4 only.
 # Set to `{}` for a CPU-only cluster. Each entry's `name` must be lowercase
@@ -191,7 +195,9 @@ helm repo add anyscale https://anyscale.github.io/helm-charts
 helm repo update
 ```
 
-Using the output from the `cloud register`, install the Anyscale Operator on the AKS Cluster. It should look something like:
+Using the `helm_upgrade_command` from the Terraform output, install the Anyscale Operator on the AKS Cluster. It should look something like:
+
+> **Note:** The helm command includes `global.controlPlaneURL` set from your `anyscale_control_plane_url` variable. If you did not set this in `terraform.tfvars`, the default (`https://console.anyscale.com`) is used. Re-run `terraform apply` first if you need to correct the URL before installing the operator.
 
 ```shell
 helm upgrade anyscale-operator anyscale/anyscale-operator \
@@ -222,51 +228,6 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
   --create-namespace \
   -i
 ```
-
-### (Optional) Enable Head Node Fault Tolerance (HNFT)
-
-HNFT externalizes Ray GCS state to a Redis-compatible store so the Ray head node can restart without losing cluster state. See the [Anyscale HNFT docs](https://docs.anyscale.com/administration/resource-management/head-node-fault-tolerance) for background.
-
-On Kubernetes, Anyscale does **not** auto-provision Redis. You provide one, then opt individual services into HNFT via their service config. This example supports an opt-in in-cluster Redis (bitnami/redis) for the backend.
-
-To enable, set in your `terraform.tfvars`:
-
-```hcl
-enable_hnft = true
-
-# Optional overrides — defaults shown:
-# hnft_redis_namespace     = "ray-system"   # K8s namespace for the in-cluster Redis
-# hnft_redis_chart_version = null           # pin a bitnami/redis chart version
-```
-
-Re-run `terraform apply` (safe against an existing cluster — no Azure resources are added). Two new outputs become available: `redis_helm_install_command` and `hnft_service_config_snippet`.
-
-#### Deploy the in-cluster Redis
-
-```shell
-$(terraform output -raw redis_helm_install_command)
-```
-
-The helm command uses `--wait`, so it returns only after the Redis pods are Ready. The chart deploys a single primary + 1 replica (matching the HNFT doc's "single shard + ≥1 replica" requirement), auth disabled. The primary is reachable in-cluster at `redis-master.ray-system.svc.cluster.local:6379`.
-
-#### Enable HNFT per service
-
-HNFT is enabled per workload, not cloud-wide. For each Anyscale service that should be HNFT-protected, paste this block into its service config:
-
-```shell
-terraform output -raw hnft_service_config_snippet
-# ray_gcs_external_storage_config:
-#   enabled: true
-#   address: redis-master.ray-system.svc.cluster.local:6379
-```
-
-Services that don't include this block are unaffected — they run without HNFT as before.
-
-#### Caveats
-
-- The in-cluster Redis here shares failure domain with the AKS cluster — it protects against head-pod restarts, not full cluster loss. For production, run Azure Cache for Redis in the same VNet and replace the `address` value in your service configs with that endpoint.
-- Auth is disabled because Anyscale's documented `address` schema (`host:port` or `rediss://host:port`) has no credential field. Network reachability within the cluster is the isolation boundary.
-- No TLS in-cluster. Use Azure Cache for Redis with TLS + the `rediss://` scheme for an encrypted path; set `certificate_path` per service if the cert is private.
 
 ### (Optional) Enable Azure Blob CSI PVC for Workloads
 
@@ -370,14 +331,14 @@ See the [CloudResource schema](https://docs.anyscale.com/reference/cloud#cloudre
 ## Requirements
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0.0 |
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | 4.26.0 |
 
 ## Providers
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.26.0 |
 
 ## Modules
@@ -387,7 +348,7 @@ No modules.
 ## Resources
 
 | Name | Type |
-|------|------|
+| ---- | ---- |
 | [azurerm_federated_identity_credential.anyscale_operator_fic](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/federated_identity_credential) | resource |
 | [azurerm_kubernetes_cluster.aks](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/kubernetes_cluster) | resource |
 | [azurerm_kubernetes_cluster_node_pool.gpu_ondemand](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/kubernetes_cluster_node_pool) | resource |
@@ -395,7 +356,12 @@ No modules.
 | [azurerm_kubernetes_cluster_node_pool.ondemand_cpu](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/kubernetes_cluster_node_pool) | resource |
 | [azurerm_kubernetes_cluster_node_pool.spot_cpu](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/kubernetes_cluster_node_pool) | resource |
 | [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/resource_group) | resource |
+| [azurerm_role_assignment.aks_cp_blob_data_contributor](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/role_assignment) | resource |
+| [azurerm_role_assignment.aks_cp_blob_key_operator](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/role_assignment) | resource |
+| [azurerm_role_assignment.aks_kubelet_blob_data_contributor](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/role_assignment) | resource |
+| [azurerm_role_assignment.aks_kubelet_blob_key_operator](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/role_assignment) | resource |
 | [azurerm_role_assignment.anyscale_blob_contrib](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/role_assignment) | resource |
+| [azurerm_storage_account.nfs](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/storage_account) | resource |
 | [azurerm_storage_account.sa](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/storage_account) | resource |
 | [azurerm_storage_container.blob](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/storage_container) | resource |
 | [azurerm_subnet.nodes](https://registry.terraform.io/providers/hashicorp/azurerm/4.26.0/docs/resources/subnet) | resource |
@@ -406,25 +372,42 @@ No modules.
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| <a name="input_azure_subscription_id"></a> [azure\_subscription\_id](#input\_azure\_subscription\_id) | (Required) Azure subscription ID | `string` | n/a | yes |
+| ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_aks_cluster_dns_address"></a> [aks\_cluster\_dns\_address](#input\_aks\_cluster\_dns\_address) | (Optional) DNS address for the AKS cluster. If not set, a default will be generated from aks\_cluster\_subnet\_cidr. | `string` | `null` | no |
 | <a name="input_aks_cluster_name"></a> [aks\_cluster\_name](#input\_aks\_cluster\_name) | (Optional) Name of the AKS cluster (and related resources). | `string` | `"anyscale-demo"` | no |
+| <a name="input_aks_cluster_subnet_cidr"></a> [aks\_cluster\_subnet\_cidr](#input\_aks\_cluster\_subnet\_cidr) | (Optional) CIDR block for the AKS cluster service subnet. Cannot overlap with vnet\_cidr or nodes\_subnet\_cidr. | `string` | `"10.0.0.0/16"` | no |
+| <a name="input_anyscale_control_plane_url"></a> [anyscale\_control\_plane\_url](#input\_anyscale\_control\_plane\_url) | (Optional) Anyscale control plane URL. Use https://console.anyscale.com for the AWS control plane or https://console.azure.anyscale.com for the Azure control plane. | `string` | `"https://console.anyscale.com"` | no |
 | <a name="input_anyscale_operator_namespace"></a> [anyscale\_operator\_namespace](#input\_anyscale\_operator\_namespace) | (Optional) Kubernetes namespace for the Anyscale operator. | `string` | `"anyscale-operator"` | no |
 | <a name="input_azure_location"></a> [azure\_location](#input\_azure\_location) | (Optional) Azure region for all resources. | `string` | `"West US"` | no |
-| <a name="input_cors_rule"></a> [cors\_rule](#input\_cors\_rule) | (Optional)<br>Object containing a rule of Cross-Origin Resource Sharing.<br>The default allows GET, POST, PUT, HEAD, and DELETE<br>access for the purpose of viewing logs and other functionality<br>from within the Anyscale Web UI (*.anyscale.com).<br><br>ex:<pre>cors_rule = {<br>  allowed_headers = ["*"]<br>  allowed_methods = ["GET", "POST", "PUT", "HEAD", "DELETE"]<br>  allowed_origins = ["https://*.anyscale.com"]<br>  expose_headers  = ["Accept-Ranges", "Content-Range", "Content-Length"]<br>}</pre> | <pre>object({<br>    allowed_headers    = list(string)<br>    allowed_methods    = list(string)<br>    allowed_origins    = list(string)<br>    expose_headers     = list(string)<br>    max_age_in_seconds = optional(number, 0)<br>  })</pre> | <pre>{<br>  "allowed_headers": [<br>    "*"<br>  ],<br>  "allowed_methods": [<br>    "GET",<br>    "POST",<br>    "PUT",<br>    "HEAD",<br>    "DELETE"<br>  ],<br>  "allowed_origins": [<br>    "https://*.anyscale.com"<br>  ],<br>  "expose_headers": [<br>    "Accept-Ranges",<br>    "Content-Range",<br>    "Content-Length"<br>  ]<br>}</pre> | no |
-| <a name="input_node_group_gpu_types"></a> [node\_group\_gpu\_types](#input\_node\_group\_gpu\_types) | (Optional) The GPU types of the AKS nodes.<br>Possible values: ["T4", "A10", "A100", "H100"] | `list(string)` | <pre>[<br>  "T4",<br>  "A100"<br>]</pre> | no |
-| <a name="input_tags"></a> [tags](#input\_tags) | (Optional) Tags applied to all taggable resources. | `map(string)` | <pre>{<br>  "Environment": "dev",<br>  "Test": "true"<br>}</pre> | no |
+| <a name="input_azure_subscription_id"></a> [azure\_subscription\_id](#input\_azure\_subscription\_id) | (Required) Azure subscription ID | `string` | n/a | yes |
+| <a name="input_azure_tenant_id"></a> [azure\_tenant\_id](#input\_azure\_tenant\_id) | Azure tenant ID. Can be found by running `az account show --query tenantId -o tsv`. | `string` | n/a | yes |
+| <a name="input_cors_rule"></a> [cors\_rule](#input\_cors\_rule) | (Optional)<br/>Object containing a rule of Cross-Origin Resource Sharing.<br/>The default allows GET, POST, PUT, HEAD, and DELETE<br/>access for the purpose of viewing logs and other functionality<br/>from within the Anyscale Web UI (*.anyscale.com).<br/><br/>ex:<pre>cors_rule = {<br/>  allowed_headers = ["*"]<br/>  allowed_methods = ["GET", "POST", "PUT", "HEAD", "DELETE"]<br/>  allowed_origins = ["https://*.anyscale.com"]<br/>  expose_headers  = ["Accept-Ranges", "Content-Range", "Content-Length"]<br/>}</pre> | <pre>object({<br/>    allowed_headers    = list(string)<br/>    allowed_methods    = list(string)<br/>    allowed_origins    = list(string)<br/>    expose_headers     = list(string)<br/>    max_age_in_seconds = optional(number, 0)<br/>  })</pre> | <pre>{<br/>  "allowed_headers": [<br/>    "*"<br/>  ],<br/>  "allowed_methods": [<br/>    "GET",<br/>    "POST",<br/>    "PUT",<br/>    "HEAD",<br/>    "DELETE"<br/>  ],<br/>  "allowed_origins": [<br/>    "https://*.anyscale.com"<br/>  ],<br/>  "expose_headers": [<br/>    "Accept-Ranges",<br/>    "Content-Range",<br/>    "Content-Length"<br/>  ]<br/>}</pre> | no |
+| <a name="input_cpu_vm_size"></a> [cpu\_vm\_size](#input\_cpu\_vm\_size) | VM size for the CPU node pools (on-demand and spot). | `string` | `"Standard_D16s_v5"` | no |
+| <a name="input_enable_blob_driver"></a> [enable\_blob\_driver](#input\_enable\_blob\_driver) | (Optional) Enable the Azure Blob CSI driver on the AKS cluster. Required for mounting blob storage from pods. | `bool` | `false` | no |
+| <a name="input_enable_nfs"></a> [enable\_nfs](#input\_enable\_nfs) | (Optional) Enable provisioning of an Azure NFS (Network File System) storage account.<br/>This NFS storage can be used for file-based persistent storage needs, mounting shared volumes to AKS nodes and pods. | `bool` | `false` | no |
+| <a name="input_enable_operator_infrastructure"></a> [enable\_operator\_infrastructure](#input\_enable\_operator\_infrastructure) | (Optional) Enable blob storage, managed identity, federated identity credential,<br/>role assignment, and output registration/helm commands for the Anyscale operator.<br/>Set to false when using the Azure control plane, which provisions these via ARM templates. | `bool` | `true` | no |
+| <a name="input_gpu_pool_configs"></a> [gpu\_pool\_configs](#input\_gpu\_pool\_configs) | (Optional) Full configuration for GPU node pools. The map key is a logical label<br/>(e.g. "T4", "A100"). The `name` field is used as the AKS node pool name and must<br/>be lowercase alphanumeric, max 8 chars (spot pools append "spot"). | <pre>map(object({<br/>    name         = string<br/>    vm_size      = string<br/>    product_name = string<br/>    gpu_count    = string<br/>  }))</pre> | <pre>{<br/>  "A100": {<br/>    "gpu_count": "1",<br/>    "name": "gpua100",<br/>    "product_name": "NVIDIA-A100",<br/>    "vm_size": "Standard_NC24ads_A100_v4"<br/>  },<br/>  "T4": {<br/>    "gpu_count": "1",<br/>    "name": "gput4",<br/>    "product_name": "NVIDIA-T4",<br/>    "vm_size": "Standard_NC16as_T4_v3"<br/>  }<br/>}</pre> | no |
+| <a name="input_nodes_subnet_cidr"></a> [nodes\_subnet\_cidr](#input\_nodes\_subnet\_cidr) | (Optional) CIDR block for the AKS nodes subnet. | `string` | `"10.42.1.0/24"` | no |
+| <a name="input_storage_account_name"></a> [storage\_account\_name](#input\_storage\_account\_name) | (Optional) Name of the Azure Storage account to create for cloud storage. May be needed if generated name is already taken. | `string` | `null` | no |
+| <a name="input_storage_account_name_nfs"></a> [storage\_account\_name\_nfs](#input\_storage\_account\_name\_nfs) | (Optional) Name of the Azure NFS storage account to create. May be needed if generated name is already taken. | `string` | `null` | no |
+| <a name="input_storage_use_azuread"></a> [storage\_use\_azuread](#input\_storage\_use\_azuread) | (Optional) Determines whether the provider uses AzureAD or the SharedKey from the Storage Account to connect to the Storage Blob & Queue APIs | `bool` | `false` | no |
+| <a name="input_system_vm_size"></a> [system\_vm\_size](#input\_system\_vm\_size) | VM size for the default system node pool. | `string` | `"Standard_D2s_v5"` | no |
+| <a name="input_tags"></a> [tags](#input\_tags) | (Optional) Tags applied to all taggable resources. | `map(string)` | <pre>{<br/>  "Environment": "dev",<br/>  "Test": "true"<br/>}</pre> | no |
+| <a name="input_vnet_cidr"></a> [vnet\_cidr](#input\_vnet\_cidr) | (Optional) CIDR block for the VNet. | `string` | `"10.42.0.0/16"` | no |
 
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_aks_get_credentials_command"></a> [aks\_get\_credentials\_command](#output\_aks\_get\_credentials\_command) | The command to get the AKS cluster credentials. |
 | <a name="output_anyscale_operator_client_id"></a> [anyscale\_operator\_client\_id](#output\_anyscale\_operator\_client\_id) | Client ID of the Azure User Assigned Identity created for the cluster. |
 | <a name="output_anyscale_operator_principal_id"></a> [anyscale\_operator\_principal\_id](#output\_anyscale\_operator\_principal\_id) | Principal ID of the Azure User Assigned Identity created for the cluster. |
 | <a name="output_anyscale_registration_command"></a> [anyscale\_registration\_command](#output\_anyscale\_registration\_command) | The Anyscale registration command. |
 | <a name="output_azure_aks_cluster_name"></a> [azure\_aks\_cluster\_name](#output\_azure\_aks\_cluster\_name) | Name of the Azure AKS cluster created for the cluster. |
+| <a name="output_azure_nfs_storage_account_name"></a> [azure\_nfs\_storage\_account\_name](#output\_azure\_nfs\_storage\_account\_name) | Name of the Azure NFS Storage Account created for the cluster. |
 | <a name="output_azure_resource_group_name"></a> [azure\_resource\_group\_name](#output\_azure\_resource\_group\_name) | Name of the Azure Resource Group created for the cluster. |
 | <a name="output_azure_storage_account_name"></a> [azure\_storage\_account\_name](#output\_azure\_storage\_account\_name) | Name of the Azure Storage Account created for the cluster. |
-| <a name="output_helm_upgrade_command"></a> [helm\_upgrade\_command](#output\_helm\_upgrade\_command) | The helm upgrade command. |
+| <a name="output_azure_storage_container_name"></a> [azure\_storage\_container\_name](#output\_azure\_storage\_container\_name) | Name of the Azure Storage Container created for the cluster. |
+| <a name="output_helm_upgrade_command"></a> [helm\_upgrade\_command](#output\_helm\_upgrade\_command) | The helm upgrade command for installing the Anyscale operator. |
+| <a name="output_pvc_apply_command"></a> [pvc\_apply\_command](#output\_pvc\_apply\_command) | Ready-to-run command to apply the sample Azure Blob CSI PVC manifest with<br/>placeholders substituted. Only emitted when enable\_blob\_driver = true.<br/>Requires the `anyscale-operator` namespace to already exist (the operator<br/>helm install creates it with --create-namespace). |
 <!-- END_TF_DOCS -->
