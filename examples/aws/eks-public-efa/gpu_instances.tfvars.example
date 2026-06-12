@@ -1,0 +1,31 @@
+# GPU Instance Types for EKS
+#
+# This file contains additional GPU instance configurations beyond the default (T4).
+# Use this file directly or copy and modify as needed:
+#
+#   terraform plan -var-file="gpu_instances.tfvars.example"
+#   terraform apply -var-file="gpu_instances.tfvars.example"
+
+# GPU types configuration - node groups will be created for each entry
+gpu_instance_types = {
+  "T4" = {
+    product_name   = "Tesla-T4"
+    instance_types = ["g4dn.xlarge", "g4dn.2xlarge", "g4dn.4xlarge"]
+  }
+  "T4-4x" = {
+    product_name   = "Tesla-T4"
+    instance_types = ["g4dn.12xlarge"]
+  }
+  "A10G" = {
+    product_name   = "NVIDIA-A10G"
+    instance_types = ["g5.4xlarge"]
+  }
+  "L4" = {
+    product_name   = "NVIDIA-L4"
+    instance_types = ["g6.2xlarge", "g6.4xlarge"]
+  }
+  "L4-4x" = {
+    product_name   = "NVIDIA-L4"
+    instance_types = ["g6.24xlarge"]
+  }
+}
