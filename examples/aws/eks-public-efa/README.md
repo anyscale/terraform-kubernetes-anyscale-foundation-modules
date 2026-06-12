@@ -250,8 +250,8 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
 
 <!-- References -->
 [Terraform]: https://www.terraform.io
-[Issues]: https://github.com/anyscale/sa-sandbox-terraform/issues
-<!-- [badge-build]: https://github.com/anyscale/sa-sandbox-terraform/workflows/CI/CD%20Pipeline/badge.svg -->
+[Issues]: https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/issues
+<!-- [badge-build]: https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/workflows/CI/CD%20Pipeline/badge.svg -->
 [badge-terraform]: https://img.shields.io/badge/terraform-1.x%20-623CE4.svg?logo=terraform
 [badge-tf-aws]: https://img.shields.io/badge/AWS-5.+-F8991D.svg?logo=terraform
-[build-status]: https://github.com/anyscale/sa-sandbox-terraform/actions
+[build-status]: https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/actions
