@@ -25,9 +25,9 @@ module "h100_efa_nodegroup" {
   capacity_type           = "ON_DEMAND"
   capacity_reservation_id = var.efa_capacity_reservation_id
 
-  min_size     = 0
-  desired_size = 0
-  max_size     = 4
+  min_size     = var.efa_node_group_min_size
+  desired_size = var.efa_node_group_desired_size
+  max_size     = var.efa_node_group_max_size
 
   root_volume_size_gb = var.node_group_disk_size
 

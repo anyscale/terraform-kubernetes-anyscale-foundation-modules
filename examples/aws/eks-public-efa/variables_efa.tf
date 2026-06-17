@@ -21,6 +21,39 @@ variable "efa_workload_name" {
   }
 }
 
+variable "efa_node_group_min_size" {
+  description = "(Optional) Minimum number of P5/H100 EFA worker nodes in the EKS managed node group."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.efa_node_group_min_size >= 0
+    error_message = "efa_node_group_min_size must be greater than or equal to 0."
+  }
+}
+
+variable "efa_node_group_desired_size" {
+  description = "(Optional) Desired number of P5/H100 EFA worker nodes in the EKS managed node group."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.efa_node_group_desired_size >= 0
+    error_message = "efa_node_group_desired_size must be greater than or equal to 0."
+  }
+}
+
+variable "efa_node_group_max_size" {
+  description = "(Optional) Maximum number of P5/H100 EFA worker nodes in the EKS managed node group. Set this at least as high as the largest Anyscale compute config max_nodes value you plan to run."
+  type        = number
+  default     = 4
+
+  validation {
+    condition     = var.efa_node_group_max_size >= 1
+    error_message = "efa_node_group_max_size must be greater than or equal to 1."
+  }
+}
+
 variable "efa_private_subnet_cidr" {
   description = "(Optional) CIDR block for the private EFA subnet created in the capacity reservation AZ."
   type        = string

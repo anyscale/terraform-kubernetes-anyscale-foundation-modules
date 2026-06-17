@@ -186,6 +186,63 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
   --install
 ```
 
+### Create an EFA Runtime Workspace
+
+The sample Anyscale resource files in this example use the following EFA/UCCL
+runtime image:
+
+```text
+anyscale/image/anyscale-ray-2.55.1-cu128-torch2.8-efa-uccl:1
+```
+
+If the image is not already registered in your Anyscale organization, register
+the external image first:
+
+```shell
+anyscale image register \
+  --name anyscale-ray-2.55.1-cu128-torch2.8-efa-uccl \
+  --image-uri <external_registry_image_uri> \
+  --ray-version 2.55.1
+```
+
+You can confirm the registered image before launching a workload:
+
+```shell
+anyscale image get \
+  --name anyscale-ray-2.55.1-cu128-torch2.8-efa-uccl:1
+```
+
+Create a compute config from `sample-compute-config_efa.yaml` after replacing
+`<anyscale_cloud_name>`, `<efa_node_availability_zone>`, `<min_p5_workers>`,
+and `<max_p5_workers>`:
+
+```shell
+anyscale compute-config create \
+  --name <compute_config_name> \
+  --config-file sample-compute-config_efa.yaml
+```
+
+Then create a workspace from `sample-workspace_efa.yaml` after replacing
+`<workspace_name>`, `<anyscale_cloud_name>`, and `<compute_config_name>`:
+
+```shell
+anyscale workspace_v2 create \
+  --config-file sample-workspace_efa.yaml
+```
+
+The compute config requests one `p5.48xlarge` worker shape with 8 H100 GPUs and
+32 EFA devices per worker pod. The workspace pins the EFA/UCCL runtime image so
+that users can validate NCCL, UCCL, or Wide-EP workloads on the EFA node group
+created by this example.
+
+Set the worker count placeholders for the workload you plan to run. For a
+fixed-size two-node validation, set both `min_nodes` and `max_nodes` to `2`.
+For an eight-node workload, set both to `8`. For autoscaling, set `min_nodes`
+to the warm baseline and `max_nodes` to the largest allowed scale-out. The
+Terraform EFA node group limit, `efa_node_group_max_size`, must be at least as
+large as the compute config `max_nodes`, and the selected capacity reservation
+or AZ must have enough `p5.48xlarge` capacity.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
@@ -229,6 +286,9 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
 | <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | (Optional) The AWS region in which all resources will be created.<br/><br/>ex:<pre>aws_region = "us-east-2"</pre> | `string` | `"us-east-2"` | no |
 | <a name="input_efa_capacity_reservation_az_id"></a> [efa\_capacity\_reservation\_az\_id](#input\_efa\_capacity\_reservation\_az\_id) | (Optional) Availability Zone ID for the targeted EFA capacity reservation, for example use1-az3. | `string` | `null` | no |
 | <a name="input_efa_capacity_reservation_id"></a> [efa\_capacity\_reservation\_id](#input\_efa\_capacity\_reservation\_id) | (Optional) Targeted EC2 Capacity Reservation ID for the p5.48xlarge EFA node group. | `string` | `null` | no |
+| <a name="input_efa_node_group_desired_size"></a> [efa\_node\_group\_desired\_size](#input\_efa\_node\_group\_desired\_size) | (Optional) Desired number of P5/H100 EFA worker nodes in the EKS managed node group. | `number` | `0` | no |
+| <a name="input_efa_node_group_max_size"></a> [efa\_node\_group\_max\_size](#input\_efa\_node\_group\_max\_size) | (Optional) Maximum number of P5/H100 EFA worker nodes in the EKS managed node group. Set this at least as high as the largest Anyscale compute config max_nodes value you plan to run. | `number` | `4` | no |
+| <a name="input_efa_node_group_min_size"></a> [efa\_node\_group\_min\_size](#input\_efa\_node\_group\_min\_size) | (Optional) Minimum number of P5/H100 EFA worker nodes in the EKS managed node group. | `number` | `0` | no |
 | <a name="input_efa_private_subnet_cidr"></a> [efa\_private\_subnet\_cidr](#input\_efa\_private\_subnet\_cidr) | (Optional) CIDR block for the private EFA subnet created in the capacity reservation AZ. | `string` | `"172.24.22.0/24"` | no |
 | <a name="input_efa_workload_name"></a> [efa\_workload\_name](#input\_efa\_workload\_name) | (Optional) Workload name used for the P5/H100 EFA node group name, labels, taints, and Cluster Autoscaler template tags. | `string` | `"h100-efa"` | no |
 | <a name="input_eks_cluster_name"></a> [eks\_cluster\_name](#input\_eks\_cluster\_name) | (Optional) The name of the EKS cluster.<br/><br/>This will be used for naming resources created by this module including the EKS cluster and the S3 bucket.<br/><br/>ex:<pre>eks_cluster_name = "anyscale-eks-public-efa"</pre> | `string` | `"anyscale-eks-public-efa"` | no |
