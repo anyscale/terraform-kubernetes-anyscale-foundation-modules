@@ -2,7 +2,7 @@ cloud: <anyscale_cloud_name>
 zones:
   - <efa_node_availability_zone>
 head_node:
-  instance_type: 8CPU-32GB
+  instance_type: 16CPU-64GB
 worker_nodes:
   - name: 8xh100-190cpu-1800gb
     instance_type: P5-48XLARGE-8xH100-EFA

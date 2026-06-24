@@ -230,10 +230,10 @@ anyscale workspace_v2 create \
   --config-file sample-workspace_efa.yaml
 ```
 
-The compute config requests one `p5.48xlarge` worker shape with 8 H100 GPUs and
-32 EFA devices per worker pod. The workspace pins the EFA/UCCL runtime image so
-that users can validate NCCL, UCCL, or Wide-EP workloads on the EFA node group
-created by this example.
+The compute config uses a `16CPU-64GB` CPU head node and requests one
+`p5.48xlarge` worker shape with 8 H100 GPUs and 32 EFA devices per worker pod.
+The workspace pins the EFA/UCCL runtime image so that users can validate NCCL,
+UCCL, or Wide-EP workloads on the EFA node group created by this example.
 
 Set the worker count placeholders for the workload you plan to run. For a
 fixed-size two-node validation, set both `min_nodes` and `max_nodes` to `2`.
