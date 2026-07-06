@@ -16,10 +16,16 @@ locals {
 module "anyscale_vpc" {
   #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
   #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
-  source = "github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-vpc"
+  source = "github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-vpc?ref=v0.38.0"
 
   anyscale_vpc_name = "anyscale-${var.eks_cluster_name}"
   cidr_block        = "172.24.0.0/16"
+
+  # Optional pin for the VPC / EKS control-plane AZs. Leave empty to let the
+  # module auto-select. Pin only if you need EKS-supported AZs with NAT-gateway-
+  # per-AZ quota headroom. The EFA P5 node group always runs in its own dedicated
+  # subnet in the capacity-reservation AZ, independent of these.
+  availability_zones = var.control_plane_availability_zones
 
   public_subnets  = local.public_subnets
   private_subnets = local.private_subnets
@@ -36,7 +42,7 @@ module "anyscale_vpc" {
 module "anyscale_s3" {
   #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
   #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
-  source = "github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-s3"
+  source = "github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-s3?ref=v0.38.0"
 
   module_enabled = true
 
@@ -75,7 +81,7 @@ resource "aws_security_group" "allow_all_vpc" {
 module "anyscale_efs" {
   #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
   #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
-  source = "github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-efs"
+  source = "github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-efs?ref=v0.38.0"
 
   module_enabled = var.enable_efs
 
@@ -92,7 +98,7 @@ module "anyscale_efs" {
 module "anyscale_iam_roles" {
   #checkov:skip=CKV_TF_1: Example code should use the latest version of the module
   #checkov:skip=CKV_TF_2: Example code should use the latest version of the module
-  source = "github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-iam"
+  source = "github.com/anyscale/terraform-aws-anyscale-cloudfoundation-modules//modules/aws-anyscale-iam?ref=v0.38.0"
 
   module_enabled = true
 

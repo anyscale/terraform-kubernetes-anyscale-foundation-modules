@@ -1,0 +1,24 @@
+# Helm values for the AWS EFA Kubernetes device plugin (eks/aws-efa-k8s-device-plugin).
+#
+# The device plugin DaemonSet must land on the P5/H100 EFA node group created by
+# this example and tolerate its GPU/accelerator/workload taints. The `workload`
+# toleration value below (h100-efa) is rewritten to the deployment's
+# efa_workload_name by the provisioning automation before install.
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: "vpc.amazonaws.com/efa.present"
+              operator: Exists
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  - key: node.anyscale.com/accelerator-type
+    operator: Exists
+    effect: NoSchedule
+  - key: workload
+    operator: Equal
+    value: h100-efa
+    effect: NoSchedule

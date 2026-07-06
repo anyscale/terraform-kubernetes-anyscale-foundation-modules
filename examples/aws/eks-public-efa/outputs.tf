@@ -50,3 +50,8 @@ output "helm_upgrade_command" {
   description = "The helm upgrade command."
   value       = join(" \\\n\t", local.helm_upgrade_command_parts)
 }
+
+output "gateway_nlb_security_group_id" {
+  description = "Security group ID attached to the Anyscale Envoy Gateway NLB frontend."
+  value       = aws_security_group.gateway_nlb.id
+}

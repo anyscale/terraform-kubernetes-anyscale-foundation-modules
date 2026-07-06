@@ -59,3 +59,15 @@ variable "efa_private_subnet_cidr" {
   type        = string
   default     = "172.24.22.0/24"
 }
+
+variable "control_plane_availability_zones" {
+  description = <<-EOT
+    (Optional) Explicit AZs for the VPC subnets and EKS control plane. Empty means
+    the module auto-selects. Pin this only when you must avoid AZs that lack
+    EKS control-plane support or are at the NAT-gateway-per-AZ quota, e.g.
+    ["us-east-1c", "us-east-1d"]. The EFA P5 node group runs in its own subnet in
+    the capacity-reservation AZ regardless of this value.
+  EOT
+  type        = list(string)
+  default     = []
+}

@@ -1,0 +1,18 @@
+substitutions:
+  _BASE_IMAGE: nvcr.io/nvidia/pytorch:25.04-py3
+  _IMAGE: us-central1-docker.pkg.dev/$PROJECT_ID/gcp-rdma-uccl/gcp-rdma-uccl:dev
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - Dockerfile.gcp-rdma-uccl.fragment
+      - --build-arg
+      - BASE_IMAGE=${_BASE_IMAGE}
+      - -t
+      - ${_IMAGE}
+      - .
+
+images:
+  - ${_IMAGE}
