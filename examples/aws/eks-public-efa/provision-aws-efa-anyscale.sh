@@ -28,6 +28,9 @@ ECR_MIRROR_PREFIX="${ECR_MIRROR_PREFIX:-}"
 ANYSCALE_CLOUD_RESOURCE_ID="${ANYSCALE_CLOUD_RESOURCE_ID:-}"
 TF_WORKSPACE_NAME="${TF_WORKSPACE_NAME:-}"
 RUN_DIR="${RUN_DIR:-}"
+# Runtime image (EFA + UCCL). Not yet public: build from
+# https://github.com/jinghanyao1-hub/AWS_EFA_DOCKER, push to a registry the cloud can pull
+# (e.g. the account ECR), then `anyscale image register` and pass the registered URI here.
 RUNTIME_IMAGE_URI="${RUNTIME_IMAGE_URI:-anyscale/image/anyscale-ray-2.55.1-cu128-torch2.8-efa-uccl:1}"
 RUNTIME_RAY_VERSION="${RUNTIME_RAY_VERSION:-2.55.1}"
 RUNTIME_VALIDATION_ACTIONS="${RUNTIME_VALIDATION_ACTIONS:-quick,nccl,uccl-ll,uccl-ht}"
