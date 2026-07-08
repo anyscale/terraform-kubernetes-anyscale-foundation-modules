@@ -99,14 +99,61 @@ helm upgrade cluster-autoscaler autoscaler/cluster-autoscaler \
 
 #### Install the AWS load balancer controller
 
+> **HyperPod note:** HyperPod worker nodes use non-standard `providerID`s (`sagemaker://...`) and are not enumerable via `ec2:DescribeInstances`, so the default `instance` NLB target type cannot register them and a `LoadBalancer` Service comes up with zero targets. On HyperPod you must run the controller so that Services default to **IP target mode** (`--set defaultTargetType=ip`), and set `region` and `vpcId` explicitly because IMDS lookups fail on HyperPod nodes. HyperPod EKS clusters ship the `eks-pod-identity-agent` add-on, so wire the controller's IAM role via EKS Pod Identity (no OIDC/IRSA setup required).
+
 ```shell
+export AWS_REGION=<your_aws_region>
+export EKS_CLUSTER_NAME=<your_eks_cluster_name>
+export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export VPC_ID=$(aws eks describe-cluster --name "${EKS_CLUSTER_NAME}" --region "${AWS_REGION}" \
+  --query cluster.resourcesVpcConfig.vpcId --output text)
+
+# Create the controller IAM policy (pinned to the matching controller release) and a
+# role trusted by the EKS Pod Identity service principal, then attach the policy.
+curl -sSL https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.13.2/docs/install/iam_policy.json \
+  -o /tmp/lbc-iam-policy.json
+aws iam create-policy \
+  --policy-name AWSLoadBalancerControllerIAMPolicy-${EKS_CLUSTER_NAME} \
+  --policy-document file:///tmp/lbc-iam-policy.json
+aws iam create-role \
+  --role-name AWSLoadBalancerControllerRole-${EKS_CLUSTER_NAME} \
+  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"pods.eks.amazonaws.com"},"Action":["sts:AssumeRole","sts:TagSession"]}]}'
+aws iam attach-role-policy \
+  --role-name AWSLoadBalancerControllerRole-${EKS_CLUSTER_NAME} \
+  --policy-arn arn:aws:iam::${ACCOUNT_ID}:policy/AWSLoadBalancerControllerIAMPolicy-${EKS_CLUSTER_NAME}
+
+# Tag the VPC's public subnets so the controller can auto-discover them for internet-facing NLBs.
+aws ec2 create-tags --region ${AWS_REGION} \
+  --resources <public-subnet-id-1> <public-subnet-id-2> \
+  --tags Key=kubernetes.io/role/elb,Value=1 \
+         Key=kubernetes.io/cluster/${EKS_CLUSTER_NAME},Value=shared
+
+# Bind the IAM role to the controller's service account via EKS Pod Identity.
+aws eks create-pod-identity-association \
+  --cluster-name ${EKS_CLUSTER_NAME} --region ${AWS_REGION} \
+  --namespace kube-system --service-account aws-load-balancer-controller \
+  --role-arn arn:aws:iam::${ACCOUNT_ID}:role/AWSLoadBalancerControllerRole-${EKS_CLUSTER_NAME}
+
 helm repo add eks https://aws.github.io/eks-charts
 helm upgrade aws-load-balancer-controller eks/aws-load-balancer-controller \
   --version 1.13.2 \
   --namespace kube-system \
-  --set clusterName=<your_eks_cluster_name> \
+  --set clusterName=${EKS_CLUSTER_NAME} \
+  --set region=${AWS_REGION} \
+  --set vpcId=${VPC_ID} \
+  --set defaultTargetType=ip \
   --install
 ```
+
+> If the `helm upgrade` fails with `invalid ownership metadata` on the `elbv2.k8s.aws` CRDs or the `alb` IngressClass, the cluster already has them from the HyperPod inference add-on or a prior install. Re-label them so Helm can adopt them, then re-run the install:
+>
+> ```shell
+> for res in crd/ingressclassparams.elbv2.k8s.aws crd/targetgroupbindings.elbv2.k8s.aws ingressclass/alb ingressclassparams/alb; do
+>   kubectl label   "$res" app.kubernetes.io/managed-by=Helm --overwrite
+>   kubectl annotate "$res" meta.helm.sh/release-name=aws-load-balancer-controller --overwrite
+>   kubectl annotate "$res" meta.helm.sh/release-namespace=kube-system --overwrite
+> done
+> ```
 
 #### Install an ingress or gateway controller
 
@@ -128,6 +175,8 @@ kubectl wait --for=condition=available deployment/envoy-gateway \
 
 Create a file named `envoyproxy.yaml` with the following contents:
 
+> **HyperPod note:** the target type below is `ip`, not `instance`. On HyperPod the AWS Load Balancer Controller cannot register worker nodes as `instance` targets (`providerID ... is invalid for EC2 instances`), so the NLB comes up with zero healthy targets. IP target mode registers the Envoy Pod IPs directly and works on HyperPod.
+
 ```yaml
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
@@ -142,7 +191,7 @@ spec:
         type: LoadBalancer
         annotations:
           service.beta.kubernetes.io/aws-load-balancer-type: external
-          service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: instance
+          service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
           service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
 ```
 
@@ -176,7 +225,7 @@ kubectl apply -f gatewayclass.yaml
 
 ##### Option B: Nginx ingress controller
 
-A sample file, `sample-values_nginx.yaml` has been provided in this repo. Please review for your requirements before using.
+A sample file, `sample-values_nginx.yaml` has been provided in this repo. Please review for your requirements before using. On HyperPod the sample sets `loadBalancerClass: service.k8s.aws/nlb` with the `aws-load-balancer-nlb-target-type: ip` annotation so the AWS Load Balancer Controller (installed above) owns the NLB in IP target mode; the default in-tree `aws-load-balancer-type: nlb` uses `instance` targets, which do not register on HyperPod.
 
 Run:
 
@@ -250,7 +299,7 @@ helm list -n anyscale-operator
 ```shell
 kubectl label nodes --all eks.amazonaws.com/capacityType=ON_DEMAND
 ```
-You need to wait until the HyperPod node group is available in your EKS cluster. And re-run this if you add new instance groups in the HyperPod cluster. You can check if the HyperPod node group is available by re-running this command: 
+You need to wait until the HyperPod node group is available in your EKS cluster. And re-run this if you add new instance groups in the HyperPod cluster. You can check if the HyperPod node group is available by re-running this command:
 ```shell
 kubectl get nodes -L node.kubernetes.io/instance-type -L sagemaker.amazonaws.com/node-health-status -L sagemaker.amazonaws.com/deep-health-check-status $@
 ```

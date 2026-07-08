@@ -1,3 +1,7 @@
+## 0.4.3 (Unreleased)
+BUG FIXES:
+- eks-hyperpod-new_cluster: use IP target-mode NLB (LBC via Pod Identity) for HyperPod ingress; `instance` targets cannot register HyperPod nodes.
+
 ## 0.4.2 (Released)
 FEATURES:
 
