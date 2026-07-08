@@ -1,3 +1,7 @@
+## 0.4.3 (Unreleased)
+NOTES:
+- eks-hyperpod-new_cluster: document GPU scheduling on HyperPod (no default GPU taints; NVIDIA device plugin is preinstalled; optional GPU Feature Discovery install for accelerator-type labels).
+
 ## 0.4.2 (Released)
 FEATURES:
 

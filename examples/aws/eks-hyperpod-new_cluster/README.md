@@ -192,6 +192,8 @@ helm upgrade ingress-nginx nginx/ingress-nginx \
 
 #### (Optional) Install the Nvidia device plugin
 
+> **HyperPod note:** you can skip this step on SageMaker HyperPod. The HyperPod dependencies Helm chart (installed as part of standard HyperPod EKS setup) already bundles the NVIDIA device plugin, so `nvidia.com/gpu` capacity is advertised on GPU nodes out of the box. See [Installing packages on the Amazon EKS cluster using Helm](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-install-packages-using-helm-chart.html). Install the plugin below only on non-HyperPod EKS clusters that do not already have it.
+
 If you intend to use NVIDIA GPUs in your Anyscale workloads, install the NVIDIA device plugin. A sample file, `sample-values_nvdp.yaml` has been provided in this repo. Please review for your requirements before using.
 
 ```shell
@@ -203,6 +205,36 @@ helm upgrade nvdp nvdp/nvidia-device-plugin \
   --create-namespace \
   --install
 ```
+
+#### GPU scheduling on HyperPod
+
+Two HyperPod-specific behaviors affect how Anyscale workloads request GPU capacity.
+
+**1. No default GPU taints.** HyperPod does not apply `NoSchedule` taints to GPU worker nodes, so no toleration is required by default. Only if you choose to taint your own GPU nodes (for example `nvidia.com/gpu=present:NoSchedule`) do you need to add a matching toleration to `global.tolerations` in the Anyscale operator Helm values.
+
+**2. No accelerator-type labels by default.** The HyperPod dependencies chart installs the NVIDIA device plugin but not GPU Feature Discovery (GFD), so accelerator-type labels (`nvidia.com/gpu.product`, `.memory`, `.count`, `.family`, plus CUDA/driver labels) are not present. You have two options:
+
+- **Default: generic GPU requests.** Use generic `GPU` requests in your Anyscale [declarative compute configs](https://docs.anyscale.com/configuration/compute/declarative). This works against any GPU node HyperPod provisions:
+
+  ```yaml
+  worker_nodes:
+    - required_resources:
+        GPU: 1
+        CPU: 8
+  ```
+
+- **Opt-in: install GFD for accelerator-type selectivity.** If you need to target specific accelerators (for example `accelerator_type: A10G`), install the NVIDIA GFD Helm chart. It bundles Node Feature Discovery, so a single install brings up the `nvidia.com/*` labels within ~30s:
+
+  ```shell
+  helm repo add nvidia https://nvidia.github.io/k8s-device-plugin
+  helm upgrade --install gpu-feature-discovery nvidia/gpu-feature-discovery \
+    --version 0.18.2 \
+    --namespace gpu-feature-discovery \
+    --create-namespace \
+    --wait
+  ```
+
+  If you already run NFD (for example via the GPU Operator), disable the bundled subchart with `--set node-feature-discovery.enabled=false`. AWS documents an equivalent static-manifest GFD install for HyperPod UltraServer clusters in [Using UltraServers in Amazon SageMaker HyperPod](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-ultraserver.html).
 
 ### Register the Anyscale Cloud
 
@@ -250,7 +282,7 @@ helm list -n anyscale-operator
 ```shell
 kubectl label nodes --all eks.amazonaws.com/capacityType=ON_DEMAND
 ```
-You need to wait until the HyperPod node group is available in your EKS cluster. And re-run this if you add new instance groups in the HyperPod cluster. You can check if the HyperPod node group is available by re-running this command: 
+You need to wait until the HyperPod node group is available in your EKS cluster. And re-run this if you add new instance groups in the HyperPod cluster. You can check if the HyperPod node group is available by re-running this command:
 ```shell
 kubectl get nodes -L node.kubernetes.io/instance-type -L sagemaker.amazonaws.com/node-health-status -L sagemaker.amazonaws.com/deep-health-check-status $@
 ```
