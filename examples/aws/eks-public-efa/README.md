@@ -188,29 +188,34 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
 
 ### Create an EFA Runtime Workspace
 
-The sample Anyscale resource files in this example use the following EFA/UCCL
-runtime image:
+The `docker/` directory is a self-contained EFA/UCCL image build context. It
+installs the EFA userspace stack, the AWS OFI NCCL plugin, UCCL/UCCL-EP, and
+post-start validation tools. Build and push it to a registry that the EKS
+nodes can pull from:
 
-```text
-anyscale/image/anyscale-ray-2.55.1-cu128-torch2.8-efa-uccl:1
+```shell
+cd docker
+
+export IMAGE_URI=<registry>/anyscale-ray-2.55.1-cu128-torch2.8-efa-uccl:1
+docker build \
+  -f Dockerfile.anyscale-ray-2.55.1-cu128-efa-uccl \
+  -t "$IMAGE_URI" \
+  .
+docker push "$IMAGE_URI"
 ```
 
-If the image is not already registered in your Anyscale organization, register
-the external image first:
+Register the pushed image with Anyscale before creating the workspace:
 
 ```shell
 anyscale image register \
   --name anyscale-ray-2.55.1-cu128-torch2.8-efa-uccl \
-  --image-uri <external_registry_image_uri> \
+  --image-uri "$IMAGE_URI" \
   --ray-version 2.55.1
 ```
 
-You can confirm the registered image before launching a workload:
-
-```shell
-anyscale image get \
-  --name anyscale-ray-2.55.1-cu128-torch2.8-efa-uccl:1
-```
+See [`docker/README.md`](docker/README.md) for build arguments, local smoke
+checks, and the multi-node EFA/NCCL/UCCL validation entrypoints baked into the
+image.
 
 Create a compute config from `sample-compute-config_efa.yaml` after replacing
 `<anyscale_cloud_name>`, `<efa_node_availability_zone>`, `<min_p5_workers>`,
