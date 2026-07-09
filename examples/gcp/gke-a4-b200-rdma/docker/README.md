@@ -1,9 +1,7 @@
 # GCP RDMA/UCCL Docker layer
 
 These Dockerfiles, env, and scripts build the GCP A4/B200 RDMA + UCCL/DeepEP container
-layer. They are the canonical source for the (not-yet-public) image, also mirrored at:
-
-- https://github.com/jinghanyao1-hub/GCP_RDMA_DOCKER
+layer (the image is not yet published; build it from here).
 
 The default GCP validation flow does **not** require a prebuilt image — it runs Ray pods on
 `nvcr.io/nvidia/pytorch:25.04-py3` and compiles UCCL in the pods at runtime
