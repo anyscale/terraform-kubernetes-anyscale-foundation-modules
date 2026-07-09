@@ -38,6 +38,27 @@ terraform output get_credentials_command
 kubectl get nodes -l rdma=true -o wide
 ```
 
+## Build the RDMA/UCCL Runtime Image
+
+The self-contained `docker/` build context installs UCCL/UCCL-EP and the
+runtime validation tools for the GKE RDMA environment. Build locally and push
+to an Artifact Registry repository accessible to the worker nodes:
+
+```bash
+cd docker
+
+export IMAGE_URI=<region>-docker.pkg.dev/<project>/<repository>/gcp-b200-rdma-uccl:1
+docker build \
+  -f Dockerfile.nvcr-pytorch-25.04-gcp-rdma-uccl \
+  -t "$IMAGE_URI" \
+  .
+docker push "$IMAGE_URI"
+```
+
+Alternatively, `scripts/cloud_build_image.sh` builds and publishes the same
+context with Cloud Build. See [`docker/README.md`](docker/README.md) for the
+required GKE host integration, Cloud Build parameters, and validation commands.
+
 The Terraform layer creates the GKE cluster, gVNIC/RDMA networks, and node
 pools. You still need to install the Kubernetes RDMA/multi-network add-ons and
 run workload-level validation before relying on the cluster for production
