@@ -1,0 +1,23 @@
+# Terraform
+# NOTE: .terraform.lock.hcl is intentionally NOT ignored — it is committed so
+# public users get reproducible provider versions (HashiCorp's guidance for
+# root modules). Run `terraform providers lock` to refresh it.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+
+# Deployment-specific values and generated artifacts (embed subscription IDs)
+terraform.tfvars
+anyscale-aks-cloud.yaml
+
+# Isolated kubeconfig written by the internal-gateway polling path
+.kubeconfig
+
+# Scheduling diagnostics written by diagnose-head-pod.sh
+diagnostics/
+
+# OS
+.DS_Store
