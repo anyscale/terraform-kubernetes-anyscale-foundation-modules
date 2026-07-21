@@ -1,0 +1,44 @@
+# Copy to terraform.tfvars and fill in. The helper scripts seed some of these:
+#   ./azure-login.sh     → az login + subscription selection
+#   ./select-region.sh   → writes azure_location (quota-checked)
+#   ./select-gpu.sh      → writes gpu_pool_configs
+
+# ── required ────────────────────────────────────────────────────────────────
+azure_subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# ── common ──────────────────────────────────────────────────────────────────
+# azure_location    = "westus2"        # Anyscale-supported region; run ./select-region.sh
+aks_cluster_name    = "anyscale-demo"
+# azure_resource_group_name = null     # default: "<aks_cluster_name>-rg"
+# anyscale_cloud_name       = null     # default: "<aks_cluster_name>-cloud"
+
+tags = {
+  Environment = "dev"
+}
+
+# ── node pools ──────────────────────────────────────────────────────────────
+system_vm_size = "Standard_D4s_v5"   # always-on system pool (autoscaled 1-3)
+cpu_vm_size    = "Standard_D8s_v5"   # CPU worker pools; scale to zero when idle
+
+# GPU pools are OPT-IN. Run ./select-gpu.sh, or e.g.:
+# gpu_pool_configs = {
+#   T4 = { name = "gput4", vm_size = "Standard_NC16as_T4_v3", product_name = "NVIDIA-T4", gpu_count = "1" }
+# }
+
+# ── the combined-design switches ────────────────────────────────────────────
+# enable_monitoring             = true        # managed Prometheus + Container Insights (GA)
+# enable_otlp_app_insights      = false       # OTLP endpoints for Ray telemetry (PREVIEW)
+# gpu_driver_mode               = "operator"  # "operator" (GA, NVIDIA GPU operator) | "managed" (AKS drivers, PREVIEW for full stack)
+# enable_node_auto_provisioning = false       # NAP / managed Karpenter (PREVIEW)
+# internal_gateway              = false       # true = VNet-only data plane (re-enables LB polling)
+# enable_nfs                    = false       # Premium NFS share, subnet-restricted
+
+# ── registry ────────────────────────────────────────────────────────────────
+enable_acr = true
+acr_sku    = "Standard"                       # Premium required for Private Link
+
+# ── access to the Anyscale cloud (see variables.tf for why this is needed) ──
+# anyscale_platform_contributors = [
+#   { principal_id = "00000000-0000-0000-0000-000000000000", principal_type = "User" },
+# ]
+# assign_current_user_platform_roles = true
