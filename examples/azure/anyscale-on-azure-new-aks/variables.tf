@@ -278,6 +278,82 @@ variable "enable_blob_driver" {
   default     = false
 }
 
+variable "enable_shared_pvc" {
+  description = <<-EOT
+    (Optional) Provision shared file storage for Ray pods: a blobfuse2 StorageClass and a
+    ReadWriteMany PersistentVolumeClaim in the operator namespace, backed by a dedicated
+    container on the deployment's storage account. This is the Azure equivalent of EFS on
+    AWS / Filestore on GCP. Requires enable_blob_driver = true. See shared_pvc.tf.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = false
+}
+
+variable "shared_pvc_name" {
+  description = "(Optional) Name of the shared PersistentVolumeClaim. This is the value passed to the Anyscale cloud as file_storage.persistent_volume_claim. Only used when enable_shared_pvc is true."
+  type        = string
+  nullable    = false
+  default     = "anyscale-shared-fuse"
+}
+
+variable "shared_pvc_storage_class_name" {
+  description = "(Optional) Name of the blobfuse2 StorageClass backing the shared PVC. Only used when enable_shared_pvc is true."
+  type        = string
+  nullable    = false
+  default     = "blobfuse-csi"
+}
+
+variable "shared_pvc_size_gi" {
+  description = "(Optional) Declared size of the shared PVC, in GiB. Blob containers grow on demand, so this acts as a ceiling rather than a preallocation. Only used when enable_shared_pvc is true."
+  type        = number
+  nullable    = false
+  default     = 100
+
+  validation {
+    condition     = var.shared_pvc_size_gi > 0
+    error_message = "shared_pvc_size_gi must be greater than 0."
+  }
+}
+
+variable "shared_pvc_block_cache" {
+  description = <<-EOT
+    (Optional) blobfuse2 block-cache sizing for the shared PVC mount. The defaults are a
+    verified-working combination; a bare `--block-cache` with library defaults fails to
+    mount with "memory limit too low for configured prefetch".
+    Note prefetch_blocks has a floor of ~11 — below that the mount fails with
+    "invalid prefetch count". Only used when enable_shared_pvc is true.
+  EOT
+  type = object({
+    block_size_mb   = number
+    pool_size_mb    = number
+    prefetch_blocks = number
+  })
+  nullable = false
+  default = {
+    block_size_mb   = 16
+    pool_size_mb    = 512
+    prefetch_blocks = 12
+  }
+
+  validation {
+    condition     = var.shared_pvc_block_cache.prefetch_blocks >= 11
+    error_message = "prefetch_blocks must be >= 11; blobfuse2 rejects lower values with 'invalid prefetch count'."
+  }
+
+  validation {
+    condition     = var.shared_pvc_block_cache.pool_size_mb >= var.shared_pvc_block_cache.block_size_mb * var.shared_pvc_block_cache.prefetch_blocks
+    error_message = "pool_size_mb must be at least block_size_mb * prefetch_blocks, or blobfuse2 fails with 'memory limit too low for configured prefetch'."
+  }
+}
+
+variable "shared_pvc_container_name" {
+  description = "(Optional) Name of the blob container backing the shared PVC. Defaults to \"<aks_cluster_name>-shared\". Only used when enable_shared_pvc is true."
+  type        = string
+  nullable    = true
+  default     = null
+}
+
 variable "enable_nfs" {
   description = <<-EOT
     (Optional) Enable provisioning of an Azure NFS (Network File System) storage account.
