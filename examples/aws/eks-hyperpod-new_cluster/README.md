@@ -226,6 +226,16 @@ Output
 (anyscale +22.5s) For registering this cloud's Kubernetes Manager, use cloud deployment ID 'cldrsrc_12345abcdefgh67890ijklmnop'.
 ```
 
+### Configure the Anyscale Operator for HyperPod
+
+By default, the Anyscale operator Helm chart injects an `eks.amazonaws.com/capacityType=ON_DEMAND` nodeSelector onto every workload pod. SageMaker HyperPod rejects this reserved `eks.amazonaws.com/` label, so workload pods are left unschedulable.
+
+Pass the `sample-values_anyscale.yaml` file (provided in this example directory) to the Helm install in the next step. It sets `workloads.enableKarpenterSupport: true`, which replaces the broken `eks.amazonaws.com/capacityType` nodeSelector with the valid `karpenter.sh/capacity-type` one and preserves on-demand/spot routing. Use this when your capacity is provisioned by Karpenter (or HyperPod continuous provisioning) so nodes carry the `karpenter.sh/capacity-type` label.
+
+> If your cluster is made up solely of **static HyperPod instance-group nodes** (no Karpenter), those nodes do not carry `karpenter.sh/capacity-type` and workload pods will stay `Pending`. In that case use the commented "static-node fallback" block in `sample-values_anyscale.yaml`, which drops the capacity-type nodeSelector and keeps only the tolerations so pods schedule onto any untainted HyperPod node.
+
+> Previous versions of this guide instructed running `kubectl label nodes --all eks.amazonaws.com/capacityType=ON_DEMAND`. That label is stripped by HyperPod on node replacement and is never applied to Karpenter-provisioned nodes, so it does not provide a durable fix. Using the provided Helm values file is the supported approach.
+
 ### Install the Anyscale Operator
 
 1. Using the below example, replace `<aws_region>` with the AWS region where EKS is running, and replace `<cloud-deployment-id>` with the appropriate value from the `anyscale cloud register` output. Please note that you can also change the namespace to one that you wish to associate with Anyscale pods.
@@ -234,6 +244,7 @@ Output
 ```shell
 helm repo add anyscale https://anyscale.github.io/helm-charts
 helm upgrade anyscale-operator anyscale/anyscale-operator \
+  --values sample-values_anyscale.yaml \
   --set-string global.cloudDeploymentId=<cloud-deployment-id> \
   --set-string global.cloudProvider=aws \
   --set-string global.aws.region=<aws_region> \
@@ -246,11 +257,8 @@ helm upgrade anyscale-operator anyscale/anyscale-operator \
 ```shell
 helm list -n anyscale-operator
 ```
-### Add label to HyperPod node group(s)
-```shell
-kubectl label nodes --all eks.amazonaws.com/capacityType=ON_DEMAND
-```
-You need to wait until the HyperPod node group is available in your EKS cluster. And re-run this if you add new instance groups in the HyperPod cluster. You can check if the HyperPod node group is available by re-running this command: 
+
+You can confirm the HyperPod node group is available in your EKS cluster with:
 ```shell
 kubectl get nodes -L node.kubernetes.io/instance-type -L sagemaker.amazonaws.com/node-health-status -L sagemaker.amazonaws.com/deep-health-check-status $@
 ```
@@ -263,7 +271,7 @@ anyscale job submit --cloud <anyscale-cloud-name> --working-dir https://github.c
 ### Clean up
 
 ```shell
-kubectl delete deployment anyscale-operator -n anyscale
+kubectl delete deployment anyscale-operator -n anyscale-operator
 kubectl delete deployment ingress-nginx-controller -n ingress-nginx
-terraform -destroy
+terraform destroy
 ```

@@ -1,3 +1,13 @@
+## 0.4.3 (Unreleased)
+FEATURES:
+
+BUG FIXES:
+- eks-hyperpod-new_cluster: fix Anyscale operator scheduling on HyperPod via `sample-values_anyscale.yaml` (`workloads.enableKarpenterSupport: true`, with a static-node fallback); replaces the non-durable `kubectl label ... eks.amazonaws.com/capacityType` step and fixes the Clean up commands.
+
+BREAKING CHANGES:
+
+NOTES:
+
 ## 0.4.2 (Released)
 FEATURES:
 

@@ -1,0 +1,61 @@
+# Helm values for the Anyscale operator on SageMaker HyperPod EKS.
+#
+# By default the Anyscale chart injects an `eks.amazonaws.com/capacityType`
+# nodeSelector onto workload pods to route on-demand vs spot. HyperPod rejects
+# the reserved `eks.amazonaws.com/` prefix (it cannot be set on instance groups,
+# and Karpenter treats the domain as restricted), so that default nodeSelector
+# leaves workload pods unschedulable.
+#
+# `enableKarpenterSupport: true` swaps that broken nodeSelector for the valid
+# `karpenter.sh/capacity-type` one, which keeps on-demand/spot routing. This is
+# the recommended setting when your GPU/CPU capacity is provisioned by Karpenter
+# (or by HyperPod continuous provisioning), so nodes carry the
+# `karpenter.sh/capacity-type` label.
+#
+# NOTE: `karpenter.sh/capacity-type` only exists on Karpenter-managed nodes.
+# On a HyperPod cluster made up solely of static instance-group nodes (no
+# Karpenter), those nodes do not carry that label and workload pods will stay
+# Pending. For static-only clusters, use the "static-node fallback" block below
+# instead (comment out `enableKarpenterSupport` and uncomment the fallback).
+
+global:
+  aws:
+    region: <your_aws_region>
+
+workloads:
+  # Recommended for Karpenter-backed capacity (removes the broken
+  # eks.amazonaws.com/capacityType nodeSelector, keeps on-demand/spot routing).
+  enableKarpenterSupport: true
+
+  # ---------------------------------------------------------------------------
+  # Static-node fallback (Karpenter-less HyperPod)
+  #
+  # Comment out `enableKarpenterSupport` above and uncomment this block if your
+  # cluster is only static HyperPod instance-group nodes. It drops the
+  # capacity-type nodeSelector entirely and keeps just the capacity-type
+  # tolerations, so workload pods schedule onto any untainted HyperPod node.
+  # ---------------------------------------------------------------------------
+  # marketType:
+  #   enableDefaults: false
+  #   additional:
+  #     all:
+  #       - op: add
+  #         path: /spec/tolerations/-
+  #         value:
+  #           key: node.anyscale.com/capacity-type
+  #           value: "ON_DEMAND"
+  #           effect: NoSchedule
+  #     ondemand:
+  #       - op: add
+  #         path: /spec/tolerations/-
+  #         value:
+  #           key: node.anyscale.com/capacity-type
+  #           value: "ON_DEMAND"
+  #           effect: NoSchedule
+  #     spot:
+  #       - op: add
+  #         path: /spec/tolerations/-
+  #         value:
+  #           key: node.anyscale.com/capacity-type
+  #           value: "SPOT"
+  #           effect: NoSchedule
