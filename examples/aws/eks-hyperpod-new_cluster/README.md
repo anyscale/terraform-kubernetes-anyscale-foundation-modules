@@ -258,18 +258,20 @@ helm list -n anyscale-operator
    request canceled, context deadline exceeded
    ```
 
-   Running the Deployment with `hostNetwork: true` puts the operator in the node's network namespace, where IMDS is reachable via the node's primary ENI. The `anyscale/anyscale-operator` Helm chart does not expose `hostNetwork` as a value today, so apply it as a post-install patch:
+   Running the Deployment with `hostNetwork: true` puts the operator in the node's network namespace, where IMDS is reachable via the node's primary ENI. Pair that with `dnsPolicy: ClusterFirstWithHostNet` so the operator still resolves in-cluster DNS (kube-dns / CoreDNS) from the host network namespace. The `anyscale/anyscale-operator` Helm chart does not expose `hostNetwork` or `dnsPolicy` as values today, so apply them as a post-install patch:
 
    ```shell
    kubectl patch deployment anyscale-operator \
      -n anyscale-operator \
-     --patch '{"spec":{"template":{"spec":{"hostNetwork":true}}}}'
+     --patch '{"spec":{"template":{"spec":{"hostNetwork":true,"dnsPolicy":"ClusterFirstWithHostNet"}}}}'
 
    kubectl rollout status deployment/anyscale-operator \
      -n anyscale-operator --timeout=300s
    ```
 
    This triggers a second rolling update of the operator pod after the initial Helm-driven rollout. This patch is only needed on HyperPod clusters that hit the IMDS error above; if your operator pod already reaches `Running` and connects, it is not required (for example, clusters whose pod subnets route to IMDS/the internet). It is not needed on standard EKS clusters.
+
+   > **Note:** A later `helm upgrade` of `anyscale-operator` will reset these fields unless you re-apply the patch (or fold them into the chart once it exposes the values). Re-run the `kubectl patch` and `kubectl rollout status` commands after every Helm upgrade until then.
 
 ### Add label to HyperPod node group(s)
 ```shell

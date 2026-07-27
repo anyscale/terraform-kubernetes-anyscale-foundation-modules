@@ -2,7 +2,7 @@
 FEATURES:
 
 BUG FIXES:
-- eks-hyperpod-new_cluster: document the `hostNetwork: true` operator patch for HyperPod clusters where the pod network cannot reach IMDS (operator fails to sign its identity and CrashLoopBackOffs).
+- eks-hyperpod-new_cluster: document the `hostNetwork: true` + `dnsPolicy: ClusterFirstWithHostNet` operator patch for HyperPod clusters where the pod network cannot reach IMDS (operator fails to sign its identity and CrashLoopBackOffs), including re-apply guidance after `helm upgrade`.
 
 BREAKING CHANGES:
 
