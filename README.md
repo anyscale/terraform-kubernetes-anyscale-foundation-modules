@@ -18,6 +18,7 @@ These modules are designed with best practices in mind, ensuring a secure, effic
 The examples folder has a couple common use cases that have been tested. These include:
 * Anyscale - Azure & AKS
   * [aks-new](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/azure/aks-new_cluster) - Build everything - create a new AKS cluster and connect it to Anyscale
+  * [anyscale-on-azure-private-aks](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/azure/anyscale-on-azure-private-aks) - Build everything, fully private - private AKS API server, Azure Firewall egress, private endpoints, internal gateway for private Anyscale Services
 * Anyscale - AWS & EKS
   * [eks-public](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/aws/eks-public) - Build everything - use a common name for all resources, public networking
   * [eks-private](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/aws/eks-private) - Build everything - use a common name for all resources, private networking

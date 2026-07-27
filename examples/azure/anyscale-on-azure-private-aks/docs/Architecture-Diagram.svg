@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="900" viewBox="0 0 1500 900" role="img" aria-labelledby="title desc">
+  <title id="title">Anyscale private AKS reference architecture on Azure</title>
+  <desc id="desc">Three-module private Anyscale on Azure AKS lab diagram: durable foundation with Bastion and Linux/Windows jump hosts, AKS data plane, Gateway data plane, dependencies, controlled egress, workload proof, teardown, and managed services.</desc>
+  <defs>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563EB"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#10B981"/>
+    </marker>
+    <marker id="arrow-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#14B8A6"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#F59E0B"/>
+    </marker>
+    <marker id="arrow-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748B"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#EF4444"/>
+    </marker>
+    <style>
+      text { font-family: Inter, "Segoe UI", Arial, sans-serif; }
+      .title { font-size: 28px; font-weight: 700; fill: #111827; }
+      .subtitle { font-size: 15px; fill: #475569; }
+      .section { font-size: 16px; font-weight: 700; fill: #334155; }
+      .box-title { font-size: 15px; font-weight: 700; fill: #0F172A; }
+      .box-title-red { font-size: 15px; font-weight: 700; fill: #7F1D1D; }
+      .box-text { font-size: 13px; fill: #0F172A; }
+      .small { font-size: 12px; fill: #334155; }
+      .edge-label { font-size: 10px; }
+    </style>
+  </defs>
+
+  <rect width="1500" height="900" fill="#FFFFFF"/>
+  <text x="40" y="58" class="title">Anyscale private AKS reference architecture on Azure</text>
+  <text x="40" y="92" class="subtitle">Three-module lab: build the durable foundation (network, Bastion, jump hosts, local state), prepare the in-VNet operator host, then deploy, prove, and tear down the lab workload.</text>
+
+  <rect x="250" y="140" width="1080" height="680" rx="10" fill="#FFFFFF" stroke="#94A3B8" stroke-width="2" stroke-dasharray="8 4"/>
+  <text x="270" y="174" class="section">Azure resource group and private virtual network</text>
+
+  <rect x="40" y="390" width="180" height="110" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
+  <text x="130" y="423" text-anchor="middle" class="box-title">Operator workstation</text>
+  <text x="130" y="451" text-anchor="middle" class="box-text">az login, Bastion to host</text>
+  <text x="130" y="473" text-anchor="middle" class="box-text">module 1 / 2 / 3</text>
+
+  <rect x="300" y="360" width="200" height="150" rx="10" fill="#EFF6FF" stroke="#2563EB" stroke-width="2"/>
+  <text x="400" y="394" text-anchor="middle" class="box-title">Foundation (durable)</text>
+  <text x="400" y="420" text-anchor="middle" class="box-text">Bastion + Linux jump host</text>
+  <text x="400" y="442" text-anchor="middle" class="box-text">managed-identity auth</text>
+  <text x="400" y="464" text-anchor="middle" class="box-text">Optional Windows browser VM</text>
+  <text x="400" y="486" text-anchor="middle" class="box-text">Local Terraform state</text>
+
+  <rect x="560" y="210" width="250" height="150" rx="10" fill="#FFFFFF" stroke="#2563EB" stroke-width="2"/>
+  <text x="685" y="249" text-anchor="middle" class="box-title">Private AKS data plane</text>
+  <text x="685" y="279" text-anchor="middle" class="box-text">Private API, system/CPU/GPU pools</text>
+  <text x="685" y="303" text-anchor="middle" class="box-text">Anyscale operator</text>
+  <text x="685" y="327" text-anchor="middle" class="box-text">durable workspaces</text>
+
+  <rect x="560" y="420" width="250" height="150" rx="10" fill="#ECFDF5" stroke="#10B981" stroke-width="2"/>
+  <text x="685" y="459" text-anchor="middle" class="box-title">Private Layer 7 data plane</text>
+  <text x="685" y="489" text-anchor="middle" class="box-text">Gateway API + app-routing Istio</text>
+  <text x="685" y="513" text-anchor="middle" class="box-text">Workspace browser, dashboard</text>
+  <text x="685" y="537" text-anchor="middle" class="box-text">and services</text>
+
+  <rect x="560" y="650" width="250" height="110" rx="10" fill="#F0FDFA" stroke="#14B8A6" stroke-width="2"/>
+  <text x="685" y="682" text-anchor="middle" class="box-title">Prove the environment</text>
+  <text x="685" y="710" text-anchor="middle" class="box-text">deploy, verify --full, proof all</text>
+  <text x="685" y="734" text-anchor="middle" class="box-text">RESULTS.md records evidence</text>
+
+  <rect x="880" y="210" width="240" height="150" rx="10" fill="#FFFFFF" stroke="#10B981" stroke-width="2"/>
+  <text x="1000" y="249" text-anchor="middle" class="box-title">Private dependencies</text>
+  <text x="1000" y="279" text-anchor="middle" class="box-text">ADLS Gen2, ACR, Private Link</text>
+  <text x="1000" y="303" text-anchor="middle" class="box-text">Workload Identity</text>
+  <text x="1000" y="327" text-anchor="middle" class="box-text">and RBAC</text>
+
+  <rect x="880" y="420" width="240" height="150" rx="10" fill="#FFF7ED" stroke="#F59E0B" stroke-width="2"/>
+  <text x="1000" y="459" text-anchor="middle" class="box-title">Controlled egress</text>
+  <text x="1000" y="489" text-anchor="middle" class="box-text">Azure Firewall, DNS proxy</text>
+  <text x="1000" y="513" text-anchor="middle" class="box-text">Log Analytics, AMPLS</text>
+  <text x="1000" y="537" text-anchor="middle" class="box-text">Container Insights</text>
+
+  <rect x="880" y="650" width="240" height="110" rx="10" fill="#FEF2F2" stroke="#EF4444" stroke-width="2"/>
+  <text x="1000" y="682" text-anchor="middle" class="box-title-red">Teardown and recovery</text>
+  <text x="1000" y="710" text-anchor="middle" class="box-text">Drain services, workspaces, jobs</text>
+  <text x="1000" y="734" text-anchor="middle" class="box-text">Delete Anyscale cloud, then Azure RG</text>
+
+  <rect x="1190" y="210" width="140" height="570" rx="10" fill="#F8FAFC" stroke="#64748B" stroke-width="2"/>
+  <text x="1260" y="276" text-anchor="middle" class="box-title">Managed</text>
+  <text x="1260" y="300" text-anchor="middle" class="box-title">services</text>
+  <text x="1260" y="346" text-anchor="middle" class="box-text">Anyscale cloud</text>
+  <text x="1260" y="370" text-anchor="middle" class="box-text">ARM resource</text>
+  <text x="1260" y="394" text-anchor="middle" class="box-text">AKS extension</text>
+  <text x="1260" y="418" text-anchor="middle" class="box-text">Console</text>
+  <text x="1260" y="442" text-anchor="middle" class="box-text">Entra ID</text>
+  <text x="1260" y="466" text-anchor="middle" class="box-text">Monitor</text>
+  <text x="1260" y="490" text-anchor="middle" class="box-text">Registries</text>
+
+  <path d="M 220 445 L 300 445" fill="none" stroke="#2563EB" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="238" y="428" class="edge-label" fill="#1D4ED8">admin/client</text>
+
+  <path d="M 500 405 L 530 405 L 530 285 L 560 285" fill="none" stroke="#2563EB" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="514" y="378" class="edge-label" fill="#1D4ED8">direct private API</text>
+
+  <path d="M 500 475 L 530 475 L 530 495 L 560 495" fill="none" stroke="#14B8A6" stroke-width="2" stroke-dasharray="8 4" marker-end="url(#arrow-teal)"/>
+  <text x="504" y="530" class="edge-label" fill="#0F766E">in-VNet browser</text>
+
+  <path d="M 685 360 L 685 420" fill="none" stroke="#10B981" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="700" y="392" class="edge-label" fill="#047857">Gateway routes</text>
+
+  <path d="M 810 285 L 880 285" fill="none" stroke="#10B981" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <text x="826" y="272" class="edge-label" fill="#047857">data access</text>
+
+  <path d="M 810 495 L 880 495" fill="none" stroke="#F59E0B" stroke-width="2" marker-end="url(#arrow-amber)"/>
+  <text x="824" y="482" class="edge-label" fill="#B45309">egress/telemetry</text>
+
+  <path d="M 1120 285 L 1190 285" fill="none" stroke="#64748B" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-gray)"/>
+  <text x="1128" y="272" class="edge-label" fill="#475569">cloud config</text>
+
+  <path d="M 1120 495 L 1190 495" fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-amber)"/>
+  <text x="1128" y="482" class="edge-label" fill="#B45309">allow-list</text>
+
+  <path d="M 685 650 L 685 570" fill="none" stroke="#14B8A6" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-teal)"/>
+  <text x="698" y="612" class="edge-label" fill="#0F766E">prove</text>
+
+  <path d="M 810 705 L 880 705" fill="none" stroke="#EF4444" stroke-width="2" marker-end="url(#arrow-red)"/>
+  <text x="830" y="692" class="edge-label" fill="#991B1B">when done</text>
+
+  <path d="M 1000 650 L 1000 570" fill="none" stroke="#EF4444" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-red)"/>
+  <text x="1012" y="612" class="edge-label" fill="#991B1B">Terraform destroy</text>
+
+  <path d="M 1120 705 L 1155 705 L 1155 650 L 1190 650" fill="none" stroke="#EF4444" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-red)"/>
+  <text x="1128" y="690" class="edge-label" fill="#991B1B">drain first</text>
+
+  <text x="40" y="842" class="small">The foundation is durable across workload rebuilds; module 3 teardown destroys only the lab workload. The Linux jump host runs Terraform, kubectl, Helm, Podman, and the Anyscale CLI with</text>
+  <text x="40" y="862" class="small">managed-identity auth and direct private AKS access. Cloud teardown drains workspaces and services before deleting the cloud.</text>
+</svg>

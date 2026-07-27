@@ -1,0 +1,88 @@
+<mxfile host="app.diagrams.net" modified="2026-06-23T00:00:00.000Z" agent="project-summary generator (adapted from docs/Architecture-Diagram.drawio)" version="24.7.17" type="device">
+  <diagram id="private-aks-reference" name="High Level Flow">
+    <mxGraphModel dx="1500" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="bg" value="" style="shape=rect;html=1;strokeColor=none;fillColor=#FFFFFF;" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="1500" height="900" as="geometry"/>
+        </mxCell>
+        <mxCell id="title" value="Anyscale private AKS reference architecture on Azure" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Inter,Segoe UI,Arial;fontSize=28;fontStyle=1;fontColor=#111827;" vertex="1" parent="1">
+          <mxGeometry x="40" y="28" width="950" height="42" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="C4 container view. Five-module lab: build the durable foundation (network, Bastion, jump hosts, local state), prepare the in-VNet operator host, then deploy, prove, extend with a custom image, and verify image signatures for the Anyscale lab workload. Detailed views: docs/diagrams 02-05." style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Inter,Segoe UI,Arial;fontSize=15;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="40" y="76" width="1340" height="32" as="geometry"/>
+        </mxCell>
+        <mxCell id="operator" value="Operator workstation&#xa;az login + Bastion to reach the jump host&#xa;Module commands: module 1 / 2 / 3" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;strokeColor=#CBD5E1;fillColor=#FFFFFF;fontFamily=Inter,Segoe UI,Arial;fontSize=14;fontColor=#111827;align=center;verticalAlign=middle;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="390" width="180" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="boundary" value="Azure resource group and private virtual network" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;strokeColor=#94A3B8;dashed=1;dashPattern=8 4;fillColor=#FFFFFF;fontFamily=Inter,Segoe UI,Arial;fontSize=16;fontStyle=1;fontColor=#334155;align=left;verticalAlign=top;spacingLeft=18;spacingTop=14;" vertex="1" parent="1">
+          <mxGeometry x="250" y="140" width="1080" height="680" as="geometry"/>
+        </mxCell>
+        <mxCell id="access" value="Foundation (durable)&#xa;Bastion + Linux automation jump host (MI auth)&#xa;Optional Windows browser jump host&#xa;Local Terraform state" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;strokeColor=#2563EB;fillColor=#EFF6FF;fontFamily=Inter,Segoe UI,Arial;fontSize=14;fontColor=#0F172A;align=center;verticalAlign=middle;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="300" y="360" width="200" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="aks" value="Private AKS data plane&#xa;Private API, system/CPU/GPU pools&#xa;Anyscale operator and durable workspaces" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;strokeColor=#2563EB;fillColor=#FFFFFF;fontFamily=Inter,Segoe UI,Arial;fontSize=14;fontColor=#0F172A;align=center;verticalAlign=middle;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="560" y="210" width="250" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="gateway" value="Private Layer 7 data plane&#xa;Gateway API + app-routing Istio&#xa;Workspace browser, Ray dashboard, services" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;strokeColor=#10B981;fillColor=#ECFDF5;fontFamily=Inter,Segoe UI,Arial;fontSize=14;fontColor=#064E3B;align=center;verticalAlign=middle;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="560" y="420" width="250" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="deps" value="Private dependencies&#xa;ADLS Gen2, ACR, Private Link&#xa;Workload Identity and RBAC" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;strokeColor=#10B981;fillColor=#FFFFFF;fontFamily=Inter,Segoe UI,Arial;fontSize=14;fontColor=#0F172A;align=center;verticalAlign=middle;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="880" y="210" width="240" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="egress" value="Controlled egress and observability&#xa;Azure Firewall, DNS proxy&#xa;Log Analytics, AMPLS, Container Insights" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;strokeColor=#F59E0B;fillColor=#FFF7ED;fontFamily=Inter,Segoe UI,Arial;fontSize=14;fontColor=#0F172A;align=center;verticalAlign=middle;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="880" y="420" width="240" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="managed" value="Azure and Anyscale managed services&#xa;Anyscale cloud ARM resource, AKS extension, console, Entra ID, Monitor, registries" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;strokeColor=#64748B;fillColor=#F8FAFC;fontFamily=Inter,Segoe UI,Arial;fontSize=14;fontColor=#0F172A;align=center;verticalAlign=middle;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="210" width="140" height="570" as="geometry"/>
+        </mxCell>
+        <mxCell id="validate" value="Prove the environment&#xa;deploy, verify --full, proof all&#xa;RESULTS.md records the evidence" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;strokeColor=#14B8A6;fillColor=#F0FDFA;fontFamily=Inter,Segoe UI,Arial;fontSize=14;fontColor=#0F172A;align=center;verticalAlign=middle;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="560" y="650" width="250" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="teardown" value="Teardown and recovery&#xa;Drain services, workspaces, jobs&#xa;Delete Anyscale cloud, then Azure RG" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;strokeColor=#EF4444;fillColor=#FEF2F2;fontFamily=Inter,Segoe UI,Arial;fontSize=14;fontColor=#7F1D1D;align=center;verticalAlign=middle;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="880" y="650" width="240" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="note" value="The foundation is durable across workload rebuilds; module 3 teardown destroys only the lab workload. The Linux jump host runs Terraform/kubectl/Helm/Podman/Anyscale CLI with managed-identity auth and direct private AKS access. CLI/platform automation uses console.azure.anyscale.com; cloud teardown drains workspaces and services before deleting the Anyscale cloud ARM resource." style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Inter,Segoe UI,Arial;fontSize=12;fontColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="40" y="830" width="1340" height="48" as="geometry"/>
+        </mxCell>
+        <mxCell id="edgeOperatorAccess" value="admin/client" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#2563EB;fontSize=10;fontColor=#1D4ED8;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="operator" target="access">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edgeAccessAks" value="direct private API (jump host)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#2563EB;fontSize=10;fontColor=#1D4ED8;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="access" target="aks">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edgeAccessGateway" value="in-VNet browser path (Windows host)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;dashed=1;dashPattern=8 4;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#14B8A6;fontSize=10;fontColor=#0F766E;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="access" target="gateway">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edgeAksGateway" value="Gateway routes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#10B981;fontSize=10;fontColor=#047857;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="aks" target="gateway">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edgeAksDeps" value="data access" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#10B981;fontSize=10;fontColor=#047857;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="aks" target="deps">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edgeAksEgress" value="egress/telemetry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#F59E0B;fontSize=10;fontColor=#B45309;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="gateway" target="egress">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edgeManagedAks" value="cloud config" style="edgeStyle=orthogonalEdgeStyle;rounded=1;dashed=1;dashPattern=6 4;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#64748B;fontSize=10;fontColor=#475569;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="managed" target="deps">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edgeEgressManaged" value="allow-list" style="edgeStyle=orthogonalEdgeStyle;rounded=1;dashed=1;dashPattern=6 4;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#F59E0B;fontSize=10;fontColor=#B45309;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="egress" target="managed">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edgeValidation" value="prove" style="edgeStyle=orthogonalEdgeStyle;rounded=1;dashed=1;dashPattern=6 4;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#14B8A6;fontSize=10;fontColor=#0F766E;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="validate" target="gateway">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edgeValidationTeardown" value="when done" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#EF4444;fontSize=11;fontColor=#991B1B;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="validate" target="teardown">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edgeTeardownAks" value="Terraform destroy" style="edgeStyle=orthogonalEdgeStyle;rounded=1;dashed=1;dashPattern=6 4;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#EF4444;fontSize=10;fontColor=#991B1B;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="teardown" target="egress">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edgeTeardownManaged" value="drain first" style="edgeStyle=orthogonalEdgeStyle;rounded=1;dashed=1;dashPattern=6 4;html=1;endArrow=block;endFill=1;strokeWidth=2;strokeColor=#EF4444;fontSize=10;fontColor=#991B1B;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="teardown" target="managed">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

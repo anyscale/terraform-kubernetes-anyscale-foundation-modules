@@ -1,0 +1,26 @@
+# Ratify Verifier — verifies Notation (COSE) signatures against the certificate
+# served by the KeyManagementProvider. The trust policy is scoped to the custom
+# image repository in the private ACR and to the signing certificate subject.
+apiVersion: config.ratify.deislabs.io/v1beta1
+kind: Verifier
+metadata:
+  name: verifier-notation
+spec:
+  name: notation
+  artifactTypes: application/vnd.cncf.notary.signature
+  parameters:
+    verificationCertStores:
+      certs:
+        - certstore-inline
+    trustPolicyDoc:
+      version: "1.0"
+      trustPolicies:
+        - name: anyscale-aks
+          registryScopes:
+            - "$ANYSCALE_ACR_LOGIN_SERVER/$ANYSCALE_CUSTOM_IMAGE_REPOSITORY"
+          signatureVerification:
+            level: strict
+          trustStores:
+            - ca:certs
+          trustedIdentities:
+            - "x509.subject:$ANYSCALE_SIGNING_CERT_SUBJECT"

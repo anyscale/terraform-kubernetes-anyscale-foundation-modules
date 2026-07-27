@@ -1,0 +1,40 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name | quote }}
+  annotations:
+{{- range $key, $value := .Values.gateway.annotations }}
+    {{ $key | quote }}: {{ $value | quote }}
+{{- end }}
+spec:
+  gatewayClassName: {{ .Values.gateway.className | quote }}
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+{{ toYaml .Values.gateway.allowedRoutes | indent 8 }}
+{{- if .Values.gateway.primaryTlsSecretName }}
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: {{ .Values.gateway.sessionHostname | quote }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ .Values.gateway.primaryTlsSecretName | quote }}
+      allowedRoutes:
+{{ toYaml .Values.gateway.allowedRoutes | indent 8 }}
+{{- end }}
+{{- if .Values.gateway.serviceTlsSecretName }}
+    - name: https-service
+      port: 443
+      protocol: HTTPS
+      hostname: {{ .Values.gateway.serviceHostname | quote }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ .Values.gateway.serviceTlsSecretName | quote }}
+      allowedRoutes:
+{{ toYaml .Values.gateway.allowedRoutes | indent 8 }}
+{{- end }}
