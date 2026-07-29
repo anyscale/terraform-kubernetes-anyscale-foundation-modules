@@ -419,6 +419,7 @@ variable "anyscale_platform" {
     plan_product                     = optional(string, "anyscale-operator-aks")
     release_train                    = optional(string, "stable")
     clouds_api_version               = optional(string, "2026-02-01-preview")
+    agreements_api_version           = optional(string, "2026-07-01-preview")
   })
   default = {}
 }
