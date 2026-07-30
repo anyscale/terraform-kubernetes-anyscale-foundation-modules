@@ -59,6 +59,11 @@ output "anyscale_operator_principal_id" {
 ###############################################################################
 # Anyscale Azure-managed cloud outputs
 ###############################################################################
+output "anyscale_platform_agreement_status" {
+  value       = try(data.azapi_resource.anyscale_platform_agreement.output.properties.status, null)
+  description = "Status of the Anyscale.Platform subscription agreement (expect \"Active\"), read after the accept-and-poll step (if it ran) completes."
+}
+
 output "anyscale_cloud_name" {
   value       = local.anyscale_cloud_name
   description = "Name of the registered Anyscale cloud (visible in console.azure.anyscale.com)."
@@ -75,8 +80,8 @@ output "anyscale_cloud_resource_id" {
 }
 
 output "anyscale_extension_resource_id" {
-  value       = azurerm_kubernetes_cluster_extension.anyscale_operator.id
-  description = "Full resource ID of the Anyscale.AKS.Operator AKS extension."
+  value       = var.install_operator_extension ? azurerm_kubernetes_cluster_extension.anyscale_operator[0].id : null
+  description = "Full resource ID of the Anyscale.AKS.Operator AKS extension. Null when install_operator_extension=false (manual Helm install)."
 }
 
 output "anyscale_operator_namespace" {
@@ -135,7 +140,7 @@ resource "local_file" "cloud_summary" {
       arm_id             = "${azurerm_resource_group.rg.id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
       console_url        = var.anyscale_platform.control_plane_url
       operator_namespace = var.anyscale_operator_namespace
-      extension_id       = azurerm_kubernetes_cluster_extension.anyscale_operator.id
+      extension_id       = var.install_operator_extension ? azurerm_kubernetes_cluster_extension.anyscale_operator[0].id : null
     }
     azure = {
       resource_group    = azurerm_resource_group.rg.name

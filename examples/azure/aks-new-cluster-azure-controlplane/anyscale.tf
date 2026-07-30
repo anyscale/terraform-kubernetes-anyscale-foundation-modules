@@ -53,6 +53,111 @@ locals {
 }
 
 ###############################################################################
+# Step 0: onboard the subscription to the Anyscale.Platform resource provider.
+#
+# A subscription that has never used Anyscale.Platform needs two one-time
+# things before Step 1 below can deploy the Anyscale.Platform/clouds ARM
+# resource: the RP registered, and its marketplace-style subscription
+# agreement accepted. This mirrors the manual bootstrap:
+#   az provider register --namespace Anyscale.Platform --subscription <sub>
+#   az provider show --namespace Anyscale.Platform --subscription <sub> \
+#     --query registrationState -o tsv   # repeat until "Registered"
+#   az rest --method GET  --url ".../Anyscale.Platform/agreements/default?api-version=..."
+#   az rest --method POST --url ".../Anyscale.Platform/agreements/default/accept?api-version=..."
+#
+# azurerm_resource_provider_registration (below) already polls internally
+# until the RP shows "Registered" (its own built-in timeout is 2h), so no
+# extra wait logic is needed for that half.
+#
+# The agreement half needs its own poll: POSTing /accept does not guarantee
+# the subscription is immediately Active afterward (same class of eventual-
+# consistency lag as the Entra principal-replication retries in
+# terraform_data.anyscale_platform_self_grant below), so this checks current
+# status, accepts only if needed, then polls GET until Active or timeout —
+# mirroring the manual steps exactly:
+#   az rest --method GET  --url ".../Anyscale.Platform/agreements/default?api-version=..."
+#   az rest --method POST --url ".../Anyscale.Platform/agreements/default/accept?api-version=..."
+#   az rest --method GET  --url ".../Anyscale.Platform/agreements/default?api-version=..." # repeat until status: Active
+#
+# Both steps are gated behind their own variables so you can skip either if
+# your org handles them centrally or requires human sign-off.
+#
+# Accepting the agreement (var.accept_anyscale_platform_agreement, default
+# true) means Terraform gives this consent on your behalf, non-interactively
+# — see that variable's description for the full text and links (terms of
+# use, privacy policy, Azure Marketplace billing/consent terms).
+###############################################################################
+resource "azurerm_resource_provider_registration" "anyscale_platform" {
+  count = var.register_anyscale_resource_provider ? 1 : 0
+
+  name = "Anyscale.Platform"
+}
+
+locals {
+  anyscale_platform_agreement_base_url   = "https://management.azure.com/subscriptions/${var.azure_subscription_id}/providers/Anyscale.Platform/agreements/default"
+  anyscale_platform_agreement_url        = "${local.anyscale_platform_agreement_base_url}?api-version=${var.anyscale_platform.agreement_api_version}"
+  anyscale_platform_agreement_accept_url = "${local.anyscale_platform_agreement_base_url}/accept?api-version=${var.anyscale_platform.agreement_api_version}"
+}
+
+resource "terraform_data" "anyscale_platform_agreement_accept" {
+  count = var.accept_anyscale_platform_agreement ? 1 : 0
+
+  triggers_replace = {
+    url = local.anyscale_platform_agreement_url
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      GET_URL="${local.anyscale_platform_agreement_url}"
+      ACCEPT_URL="${local.anyscale_platform_agreement_accept_url}"
+
+      status="$(az rest --method GET --url "$GET_URL" --query properties.status -o tsv 2>/dev/null || echo "")"
+      echo "[anyscale] Agreement status: $${status:-<none>}"
+
+      if [ "$status" != "Active" ]; then
+        echo "[anyscale] Accepting Anyscale.Platform subscription agreement..."
+        az rest --method POST --url "$ACCEPT_URL" >/dev/null
+      fi
+
+      deadline=$(( $(date +%s) + 300 ))
+      while :; do
+        status="$(az rest --method GET --url "$GET_URL" --query properties.status -o tsv 2>/dev/null || echo "")"
+        if [ "$status" = "Active" ]; then
+          echo "[anyscale] Agreement is Active."
+          break
+        fi
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+          echo "[anyscale] ERROR: agreement did not reach Active within timeout (last status: $${status:-<none>})" >&2
+          exit 1
+        fi
+        echo "[anyscale] Waiting for agreement to reach Active (current: $${status:-<none>})..."
+        sleep 10
+      done
+    EOT
+  }
+
+  depends_on = [azurerm_resource_provider_registration.anyscale_platform]
+}
+
+# Read the agreement's current status for the output below and as a
+# fail-fast backstop (lifecycle.precondition on the cloud resource) in case
+# accept_anyscale_platform_agreement=false and the agreement was never
+# accepted out-of-band, or the poll above somehow didn't run.
+data "azapi_resource" "anyscale_platform_agreement" {
+  type        = "Anyscale.Platform/agreements@${var.anyscale_platform.agreement_api_version}"
+  resource_id = "/subscriptions/${var.azure_subscription_id}/providers/Anyscale.Platform/agreements/default"
+
+  response_export_values = ["properties.status"]
+
+  depends_on = [
+    azurerm_resource_provider_registration.anyscale_platform,
+    terraform_data.anyscale_platform_agreement_accept,
+  ]
+}
+
+###############################################################################
 # Step 1: deploy the Anyscale.Platform/clouds ARM resource.
 # The body of the template is the exact JSON the Azure portal exports for the
 # managed cloud onboarding flow — see `templates/anyscale-platform-cloud.template.json`.
@@ -106,7 +211,17 @@ resource "azapi_resource" "anyscale_platform" {
     azurerm_role_assignment.anyscale_blob_contrib,
     azurerm_container_registry.acr,
     azurerm_role_assignment.kubelet_acr_pull,
+    azurerm_resource_provider_registration.anyscale_platform,
+    terraform_data.anyscale_platform_agreement_accept,
+    data.azapi_resource.anyscale_platform_agreement,
   ]
+
+  lifecycle {
+    precondition {
+      condition     = try(data.azapi_resource.anyscale_platform_agreement.output.properties.status, "") == "Active"
+      error_message = "The Anyscale.Platform subscription agreement is not Active. Accept it (az rest --method POST --url \"${local.anyscale_platform_agreement_accept_url}\") or set accept_anyscale_platform_agreement=true, then re-apply."
+    }
+  }
 }
 
 # The ARM template exports `cloudResourceId` (e.g. `cldrsrc_abcd…`). The
@@ -211,6 +326,12 @@ resource "terraform_data" "anyscale_platform_self_grant" {
 ###############################################################################
 # Step 2: install the Anyscale.AKS.Operator marketplace extension.
 #
+# Gated by var.install_operator_extension (default true). Set it to false to
+# skip this and install the Anyscale operator manually via `helm install`
+# instead — see the example README for the manual Helm values, which need to
+# set networking.gateway explicitly since that config normally comes from
+# this resource's configuration_settings below.
+#
 # The extension is installed AFTER the Envoy Gateway has an LB address
 # (see envoy-gateway.tf) so we can bake the gateway hostname directly into
 # the operator's configuration_settings. This avoids the
@@ -225,6 +346,8 @@ resource "terraform_data" "anyscale_platform_self_grant" {
 # registered as the cloud's operator principal by the ARM template above).
 ###############################################################################
 resource "azurerm_kubernetes_cluster_extension" "anyscale_operator" {
+  count = var.install_operator_extension ? 1 : 0
+
   name              = var.anyscale_platform.extension_resource_name
   cluster_id        = azurerm_kubernetes_cluster.aks.id
   extension_type    = "Anyscale.AKS.Operator"

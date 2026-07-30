@@ -58,6 +58,7 @@ The `.tf` files are **not** run by hand or in filename order — Terraform build
 
 | # | Command | Purpose |
 |---|---|---|
+| 0 | `cp terraform.tfvars.example terraform.tfvars` | Create your local values file; fill in subscription ID, tenant ID, resource group, and cloud name |
 | 1 | `./azure-login.sh` | Authenticate `az` and select the target subscription |
 | 2 | `./select-region.sh` | Find a supported region with quota and write `azure_location` to `terraform.tfvars` |
 | 3 | `./select-gpu.sh` *(optional)* | Opt into GPU pools; writes `gpu_pool_configs` to `terraform.tfvars` |
@@ -69,7 +70,7 @@ The `.tf` files are **not** run by hand or in filename order — Terraform build
 
 ### How it works
 
-Steps 1–3 are a pre-flight: they make sure you're pointed at the right subscription and that the region you pick actually has the CPU/GPU **quota** to host the pools `aks.tf` will create — the most common first-apply failure is choosing a region with no capacity. They only edit `terraform.tfvars`; they create nothing.
+Step 0 seeds `terraform.tfvars` from the template (gitignored). Steps 1–3 are a pre-flight: they make sure you're pointed at the right subscription and that the region you pick actually has the CPU/GPU **quota** to host the pools `aks.tf` will create — the most common first-apply failure is choosing a region with no capacity. Steps 1–3 only edit `terraform.tfvars`; they create nothing.
 
 Step 5 is the whole deployment in one command. Terraform stands up the Azure infrastructure, then uses the new cluster's admin credentials to register the managed Anyscale cloud (`anyscale.tf`) and wire up ingress (`envoy-gateway.tf`) — all ordered automatically by resource dependencies. After it finishes, the cloud appears at `https://console.azure.anyscale.com` and you verify it (step 6). Step 7 is reactive: run it only when a workspace/job won't start, to capture exactly why the Ray head pod can't be scheduled.
 
@@ -180,6 +181,10 @@ Each GPU type you select becomes one **on-demand** pool and one **spot** pool (a
 
 ```bash
 # From the example directory
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars — at minimum: azure_subscription_id, azure_tenant_id,
+# azure_resource_group_name, anyscale_cloud_name
+
 terraform init
 terraform plan     # preview the change set; optionally save it: terraform plan -out=tfplan
 terraform apply    # or apply the saved plan exactly: terraform apply tfplan

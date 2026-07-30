@@ -128,6 +128,64 @@ variable "enable_operator_infrastructure" {
   default     = true
 }
 
+variable "register_anyscale_resource_provider" {
+  description = <<-EOT
+    (Optional) Register the Anyscale.Platform resource provider on the
+    subscription via Terraform (azurerm_resource_provider_registration).
+    Set to false if the RP is already registered or your org registers
+    resource providers centrally and disallows registering them per-deploy.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "accept_anyscale_platform_agreement" {
+  description = <<-EOT
+    (Optional) Accept the Anyscale.Platform marketplace-style subscription
+    agreement via Terraform (required once per subscription before
+    Anyscale.Platform/clouds can be deployed). Set to false if the agreement
+    has already been accepted, or if your org requires a human to review and
+    accept it out-of-band rather than have Terraform accept it automatically.
+
+    Terms of use:   https://catalogartifact.azureedge.net/publicartifacts/anyscale1750870039553.anyscale-operator-aks-73ba5252-dbbc-41fc-9f44-9a2171d23019/Artifacts/Documents/TermsOfUse.txt
+    Privacy policy: https://www.anyscale.com/privacy-policy
+
+    This mirrors the consent normally given by clicking "Create" on the
+    Marketplace offer in the Azure portal: "By clicking Create, I (a) agree
+    to the legal terms and privacy statement(s) associated with the
+    Marketplace offering(s) listed above; (b) authorize Microsoft to bill my
+    current payment method for the fees associated with the offering(s),
+    with the same billing frequency as my Azure subscription; and (c) agree
+    that Microsoft may share my contact, usage and transactional information
+    with the provider(s) of the offering(s) for support, billing and other
+    transactional activities. Microsoft does not provide rights for
+    third-party offerings." See the Azure Marketplace Terms for additional
+    details: https://azure.microsoft.com/support/legal/marketplace-terms/
+
+    Review all of the above before leaving this at its default (true) —
+    setting it to true means Terraform gives this consent on your behalf,
+    non-interactively, whenever the agreement isn't already Active.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "install_operator_extension" {
+  description = <<-EOT
+    (Optional) Install the Anyscale.AKS.Operator AKS extension via Terraform
+    (azurerm_kubernetes_cluster_extension). Set to false to skip this and install
+    the Anyscale operator manually via `helm install` instead — useful if you want
+    to control the Helm release yourself (custom values, staged rollout, pinned
+    chart version). enable_operator_infrastructure still provisions the managed
+    identity/federated credential/role assignment the operator needs either way.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
 variable "storage_account_name" {
   description = "(Optional) Name of the Azure Storage account to create for cloud storage. May be needed if generated name is already taken."
   type        = string
@@ -318,6 +376,7 @@ variable "anyscale_platform" {
     extension_resource_name          = optional(string, "anyscaleoperator")
     control_plane_url                = optional(string, "https://console.azure.anyscale.com")
     auth_audience                    = optional(string, "api://086bc555-6989-4362-ba30-fded273e432b/.default")
+    agreement_api_version            = optional(string, "2026-07-01-preview")
     extension_configuration_settings = optional(map(string), {})
     plan_name                        = optional(string, "anyscale-operator")
     plan_publisher                   = optional(string, "anyscale1750870039553")
