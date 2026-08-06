@@ -60,7 +60,7 @@ output "anyscale_operator_principal_id" {
 # Anyscale Azure-managed cloud outputs
 ###############################################################################
 output "anyscale_platform_agreement_status" {
-  value       = try(data.azapi_resource.anyscale_platform_agreement.output.properties.status, null)
+  value       = try(data.external.anyscale_platform_agreement.result.status, null)
   description = "Status of the Anyscale.Platform subscription agreement (expect \"Active\"), read after the accept-and-poll step (if it ran) completes."
 }
 

@@ -145,11 +145,20 @@ resource "terraform_data" "anyscale_platform_agreement_accept" {
 # fail-fast backstop (lifecycle.precondition on the cloud resource) in case
 # accept_anyscale_platform_agreement=false and the agreement was never
 # accepted out-of-band, or the poll above somehow didn't run.
-data "azapi_resource" "anyscale_platform_agreement" {
-  type        = "Anyscale.Platform/agreements@${var.anyscale_platform.agreement_api_version}"
-  resource_id = "/subscriptions/${var.azure_subscription_id}/providers/Anyscale.Platform/agreements/default"
-
-  response_export_values = ["properties.status"]
+#
+# This deliberately shells out instead of using a `data "azapi_resource"`:
+# on a subscription that has never accepted the agreement, GET
+# .../Anyscale.Platform/agreements/default returns
+# `422 Unprocessable Entity / ResourceReadFailed` rather than 404, which a
+# data source surfaces as a hard "Failed to retrieve resource" error and
+# aborts the run before the accept step can do anything about it. Here a
+# failed read is simply reported as an empty status.
+data "external" "anyscale_platform_agreement" {
+  program = ["/bin/bash", "-c", <<-EOT
+    status="$(az rest --method GET --url "${local.anyscale_platform_agreement_url}" --query properties.status -o tsv 2>/dev/null || true)"
+    printf '{"status":"%s"}\n' "$${status:-}"
+  EOT
+  ]
 
   depends_on = [
     azurerm_resource_provider_registration.anyscale_platform,
@@ -213,13 +222,17 @@ resource "azapi_resource" "anyscale_platform" {
     azurerm_role_assignment.kubelet_acr_pull,
     azurerm_resource_provider_registration.anyscale_platform,
     terraform_data.anyscale_platform_agreement_accept,
-    data.azapi_resource.anyscale_platform_agreement,
+    data.external.anyscale_platform_agreement,
   ]
 
   lifecycle {
     precondition {
-      condition     = try(data.azapi_resource.anyscale_platform_agreement.output.properties.status, "") == "Active"
-      error_message = "The Anyscale.Platform subscription agreement is not Active. Accept it (az rest --method POST --url \"${local.anyscale_platform_agreement_accept_url}\") or set accept_anyscale_platform_agreement=true, then re-apply."
+      # When accept_anyscale_platform_agreement=true the accept-and-poll step
+      # above is authoritative: it fails the apply unless the agreement
+      # reached Active. This check is the backstop for the opt-out path, and
+      # tolerates an unreadable status only in that authoritative case.
+      condition     = var.accept_anyscale_platform_agreement || try(data.external.anyscale_platform_agreement.result.status, "") == "Active"
+      error_message = "The Anyscale.Platform subscription agreement is not Active (or its status could not be read with the Azure CLI). Accept it (az rest --method POST --url \"${local.anyscale_platform_agreement_accept_url}\") or set accept_anyscale_platform_agreement=true, then re-apply."
     }
   }
 }
