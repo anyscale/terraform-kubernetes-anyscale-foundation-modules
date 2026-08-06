@@ -1,0 +1,116 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+SHELL ["/bin/bash", "-lc"]
+
+ARG EFA_INSTALLER_VERSION=1.43.2
+ARG AWS_OFI_NCCL_VERSION=1.19.2
+ARG AWS_OFI_NCCL_SHA512=ec578da632166fd7f885dbc8cfa3f07be19a056276a2bd82a6868fe78160f2df07338068ef1bf5367fd3e81d9b06016fc546e3ea673566ed787e3be49438bf80
+ARG UCCL_URL=https://github.com/uccl-project/uccl.git
+ARG UCCL_REF=v0.1.1
+ARG RAY_ALL_REDUCE_BENCH_URL=https://gist.githubusercontent.com/SumanthRH/d92ca3f690ece64d407423073a169fdf/raw/3b062b14ba597730855c0f14a306001cb2ed7a0e/all_reduce_bench.py
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV EFA_HOME=/opt/amazon/efa
+ENV OFI_NCCL_HOME=/opt/amazon/ofi-nccl
+ENV CUDA_HOME=/usr/local/cuda
+ENV TORCH_CUDA_ARCH_LIST=9.0
+ENV PER_EXPERT_BATCHING=1
+ENV USE_DMABUF=1
+ENV MAX_JOBS=16
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf \
+    automake \
+    build-essential \
+    ca-certificates \
+    curl \
+    git \
+    libc6-dev \
+    libhwloc-dev \
+    libnuma-dev \
+    libnl-3-dev \
+    libnl-route-3-dev \
+    librdmacm-dev \
+    libibverbs-dev \
+    libtool \
+    pciutils \
+    pkg-config \
+    rdma-core \
+    wget \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install EFA userspace in the image. Kernel modules still come from the host.
+# The --skip-kmod flag is intentional for containers.
+RUN cd /tmp \
+  && curl -fsSLO "https://efa-installer.amazonaws.com/aws-efa-installer-${EFA_INSTALLER_VERSION}.tar.gz" \
+  && tar -xf "aws-efa-installer-${EFA_INSTALLER_VERSION}.tar.gz" \
+  && cd aws-efa-installer \
+  && ./efa_installer.sh -y --skip-kmod -g --no-verify \
+  && rm -rf /tmp/aws-efa-installer /tmp/aws-efa-installer-*.tar.gz
+
+# Install the AWS OFI NCCL network plugin. Without this libnccl-net.so, NCCL
+# falls back to sockets and EFA all-reduce bandwidth is extremely low.
+RUN cd /tmp \
+  && curl -fsSLO "https://github.com/aws/aws-ofi-nccl/releases/download/v${AWS_OFI_NCCL_VERSION}/aws-ofi-nccl-${AWS_OFI_NCCL_VERSION}.tar.gz" \
+  && echo "${AWS_OFI_NCCL_SHA512}  aws-ofi-nccl-${AWS_OFI_NCCL_VERSION}.tar.gz" | sha512sum -c - \
+  && tar -xf "aws-ofi-nccl-${AWS_OFI_NCCL_VERSION}.tar.gz" \
+  && cd "aws-ofi-nccl-${AWS_OFI_NCCL_VERSION}" \
+  && ./configure \
+       --prefix="${OFI_NCCL_HOME}" \
+       --libdir="${OFI_NCCL_HOME}/lib" \
+       --with-libfabric="${EFA_HOME}" \
+       --with-cuda="${CUDA_HOME}" \
+       --enable-platform-aws \
+       --disable-tests \
+  && make -j"$(nproc)" \
+  && make install \
+  && test -f "${OFI_NCCL_HOME}/lib/libnccl-net.so" \
+  && rm -rf "/tmp/aws-ofi-nccl-${AWS_OFI_NCCL_VERSION}" "/tmp/aws-ofi-nccl-${AWS_OFI_NCCL_VERSION}.tar.gz"
+
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
+  && python -m pip install --no-cache-dir nanobind intervaltree sortedcontainers
+
+RUN git clone "${UCCL_URL}" /opt/uccl \
+  && cd /opt/uccl \
+  && git checkout "${UCCL_REF}"
+
+RUN export LD_LIBRARY_PATH="${EFA_HOME}/lib:${OFI_NCCL_HOME}/lib:${LD_LIBRARY_PATH:-}" \
+  && python -m pip install --no-cache-dir /opt/uccl \
+  && rm -rf /tmp/uccl_ep_build \
+  && cp -a /opt/uccl /tmp/uccl_ep_build \
+  && cd /tmp/uccl_ep_build/ep \
+  && python -m pip install --no-cache-dir . \
+  && cd /tmp/uccl_ep_build/ep/deep_ep_wrapper \
+  && for name in buffer.py test_internode.py utils.py; do \
+       rm -f "deep_ep/${name}"; \
+       cp "../bench/${name}" "deep_ep/${name}"; \
+     done \
+  && python -m pip install --no-cache-dir . \
+  && rm -rf /tmp/uccl_ep_build
+
+COPY env/ /opt/efa-middle/env/
+COPY scripts/ /opt/efa-middle/scripts/
+COPY detect_compute_nodes.py /opt/efa-middle/scripts/detect_compute_nodes.py
+
+RUN mkdir -p /opt/efa-middle/bench \
+  && curl -fsSL "${RAY_ALL_REDUCE_BENCH_URL}" -o /opt/efa-middle/bench/all_reduce_bench.py \
+  && chmod +x /opt/efa-middle/env/aws_efa_uccl_env.sh \
+  && chmod +x /opt/efa-middle/scripts/*.sh /opt/efa-middle/scripts/*.py \
+  && chmod a+r /opt/efa-middle/bench/all_reduce_bench.py \
+  && ln -sf /opt/efa-middle/scripts/detect_compute_nodes.py /opt/efa-middle/scripts/detect_compute_nodes \
+  && ln -sf /opt/efa-middle/scripts/validate_compute_nodes.sh /opt/efa-middle/scripts/validate_compute_nodes
+
+ENV PATH=/opt/efa-middle/scripts:/usr/local/cuda/bin:/opt/amazon/efa/bin:${PATH}
+ENV LD_LIBRARY_PATH=/opt/amazon/efa/lib:/opt/amazon/ofi-nccl/lib:${LD_LIBRARY_PATH}
+ENV FI_PROVIDER=efa
+ENV FI_EFA_USE_DEVICE_RDMA=1
+ENV NCCL_NET_PLUGIN=libnccl-net.so
+ENV NCCL_SOCKET_IFNAME=eth0
+ENV GLOO_SOCKET_IFNAME=eth0
+ENV UCCL_SOCKET_IFNAME=eth0
+ENV CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+ENV OMP_NUM_THREADS=8
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /workspace

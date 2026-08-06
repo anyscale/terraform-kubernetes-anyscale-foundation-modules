@@ -1,0 +1,32 @@
+gvnic:
+  network: b200-gvnic
+  subnet: b200-gvnic-subnet
+
+rdma:
+  network: b200-rdma
+  subnetPrefix: b200-rdma-subnet
+  count: 8
+
+gdrdrvLoader:
+  enabled: true
+  image: ubuntu:22.04
+
+nodePools:
+  cpu: cpu-head
+  gpu: a4-spot
+
+ray:
+  image: nvcr.io/nvidia/pytorch:25.04-py3
+  imagePullPolicy: IfNotPresent
+  workerCount: 2
+  head:
+    shmSize: 32Gi
+    workspaceSize: 100Gi
+    cpuRequest: "8"
+    cpuLimit: "14"
+    memoryRequest: 32Gi
+    memoryLimit: 56Gi
+  worker:
+    shmSize: 250Gi
+    workspaceSize: 200Gi
+    gpuCount: 8

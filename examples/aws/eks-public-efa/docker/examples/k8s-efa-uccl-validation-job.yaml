@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: efa-uccl-middle-layer-validation
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: validation
+          image: REPLACE_WITH_AWS_EFA_UCCL_IMAGE
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -lc
+            - |
+              source /opt/efa-middle/env/aws_efa_uccl_env.sh
+              /opt/efa-middle/scripts/validate_efa_devices.sh
+              /opt/efa-middle/scripts/validate_uccl_imports.sh
+          env:
+            - name: EXPECTED_GPUS
+              value: "8"
+            - name: FI_PROVIDER
+              value: efa
+            - name: FI_EFA_USE_DEVICE_RDMA
+              value: "1"
+            - name: NCCL_SOCKET_IFNAME
+              value: eth0
+            - name: GLOO_SOCKET_IFNAME
+              value: eth0
+            - name: UCCL_SOCKET_IFNAME
+              value: eth0
+          resources:
+            limits:
+              nvidia.com/gpu: "8"
+              vpc.amazonaws.com/efa: "32"
+          securityContext:
+            capabilities:
+              add:
+                - IPC_LOCK

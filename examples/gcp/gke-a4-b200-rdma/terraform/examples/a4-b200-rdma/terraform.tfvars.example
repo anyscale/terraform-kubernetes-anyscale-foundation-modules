@@ -1,0 +1,21 @@
+project_id = "YOUR_GCP_PROJECT_ID"
+region     = "us-central1"
+zone       = "us-central1-b"
+
+cluster_name    = "b200-rdma-gke"
+host_network    = "existing-host-vpc"
+host_subnetwork = "existing-host-subnet"
+
+gvnic_network_name          = "b200-gvnic"
+gvnic_subnetwork_name       = "b200-gvnic-subnet"
+gvnic_subnetwork_cidr       = "YOUR_GVNIC_SUBNET_CIDR"
+rdma_network_name           = "b200-rdma"
+rdma_subnetwork_name_prefix = "b200-rdma-subnet"
+rdma_subnetwork_cidr_prefix = "YOUR_RDMA_CIDR_PREFIX"
+
+worker_node_count = 2
+workload_name     = "b200-rdma"
+
+resource_labels = {
+  purpose = "gpu-rdma-validation"
+}
