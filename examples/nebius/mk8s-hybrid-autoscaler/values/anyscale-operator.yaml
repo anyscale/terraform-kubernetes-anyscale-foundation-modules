@@ -1,0 +1,119 @@
+# Comprehensive Anyscale operator configuration for Nebius eu-north1
+# - Exposes ALL available instance types in the region with autoscaling
+# - Pin operator and ingress to CPU nodes to keep GPU nodes free for workloads
+# - Nullify Nebius-packaged types we don't support
+
+# Disable all default instance types
+defaultInstanceTypes: null
+
+# Pin operator/ingress to dedicated system node (NOT used by Anyscale workloads)
+operatorNodeSelection:
+  nodeSelector:
+    anyscale.com/node-role: system
+
+# Pin ingress-nginx to dedicated system node (NOT used by Anyscale workloads)
+ingress-nginx:
+  enabled: true
+  controller:
+    service:
+      annotations:
+        service.beta.kubernetes.io/nebius-load-balancer-name: anyscale-nebius-ingress
+    nodeSelector:
+      anyscale.com/node-role: system
+
+# Define all instance types available in Nebius eu-north1 region
+additionalInstanceTypes:
+
+  # ============================================================================
+  # CPU INSTANCES - Intel Ice Lake (cpu-e2)
+  # ============================================================================
+
+  CPU-E2-8vcpu-32gb:
+    resources:
+      CPU: 7
+      memory: 30Gi
+    nodeSelector:
+      anyscale.com/instance-type: cpu-e2-8vcpu-32gb
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+
+  CPU-E2-16vcpu-64gb:
+    resources:
+      CPU: 15
+      memory: 62Gi
+    nodeSelector:
+      anyscale.com/instance-type: cpu-e2-16vcpu-64gb
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+
+  CPU-E2-32vcpu-128gb:
+    resources:
+      CPU: 31
+      memory: 126Gi
+    nodeSelector:
+      anyscale.com/instance-type: cpu-e2-32vcpu-128gb
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+
+  # ============================================================================
+  # GPU INSTANCES - NVIDIA H100 SXM (gpu-h100-sxm)
+  # ============================================================================
+
+  GPU-H100-1gpu-16vcpu-200gb:
+    resources:
+      CPU: 15
+      GPU: 1
+      'accelerator_type:H100': 1
+      memory: 190Gi
+    nodeSelector:
+      anyscale.com/instance-type: gpu-h100-sxm-1gpu-16vcpu-200gb
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+
+  # ============================================================================
+  # GPU INSTANCES - NVIDIA H200 SXM (gpu-h200-sxm)
+  # ============================================================================
+
+  GPU-H200-1gpu-16vcpu-200gb:
+    resources:
+      CPU: 15
+      GPU: 1
+      'accelerator_type:H200': 1
+      memory: 190Gi
+    nodeSelector:
+      anyscale.com/instance-type: gpu-h200-sxm-1gpu-16vcpu-200gb
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+
+  # ============================================================================
+  # GPU INSTANCES - NVIDIA L40S PCIe Intel (gpu-l40s-a)
+  # ============================================================================
+
+  GPU-L40S-A-1gpu-16vcpu-64gb:
+    resources:
+      CPU: 15
+      GPU: 1
+      'accelerator_type:L40S': 1
+      memory: 62Gi
+    nodeSelector:
+      anyscale.com/instance-type: gpu-l40s-a-1gpu-16vcpu-64gb
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
