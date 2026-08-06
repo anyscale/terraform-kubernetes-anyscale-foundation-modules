@@ -41,6 +41,7 @@ module "anyscale_s3" {
   module_enabled = true
 
   anyscale_bucket_name = "${var.eks_cluster_name}-${var.aws_region}"
+  bucket_namespace     = "global"
   force_destroy        = var.bucket_force_destroy
 
   tags = var.tags

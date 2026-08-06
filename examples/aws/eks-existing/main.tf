@@ -17,6 +17,7 @@ module "anyscale_s3" {
   module_enabled = true
 
   anyscale_bucket_name = "anyscale-eks-existing-${var.aws_region}"
+  bucket_namespace     = "global"
 
   tags = var.tags
 }

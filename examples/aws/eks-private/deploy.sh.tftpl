@@ -68,7 +68,7 @@ EG_CRD_DIR=$(mktemp -d)
 trap 'rm -rf "$${EG_CRD_DIR}"' EXIT
 helm pull oci://docker.io/envoyproxy/gateway-helm --version v1.7.0 \
   --untar --untardir "$${EG_CRD_DIR}"
-kubectl apply --server-side --force-conflicts -f "$${EG_CRD_DIR}/gateway-helm/crds/"
+kubectl apply --server-side --force-conflicts -R -f "$${EG_CRD_DIR}/gateway-helm/crds/"
 helm upgrade eg oci://docker.io/envoyproxy/gateway-helm \
   --version v1.7.0 \
   --namespace envoy-gateway-system \
