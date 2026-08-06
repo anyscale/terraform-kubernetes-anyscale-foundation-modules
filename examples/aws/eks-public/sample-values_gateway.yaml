@@ -1,0 +1,108 @@
+# Anyscale Envoy Gateway resources for AWS EKS with **public** networking.
+#
+# This file matches the canonical Anyscale Envoy Gateway setup documented at
+# https://docs.anyscale.com/clouds/kubernetes/gateway-envoy. The NLB is
+# `aws-load-balancer-scheme: internet-facing` so the gateway is reachable from
+# the public internet via Anyscale's DNS (`*.i.anyscaleuserdata.com` →
+# customer NLB).
+#
+# Four documents below — apply with a single `kubectl apply -f` after the
+# Envoy Gateway helm chart is installed:
+#   1. Namespace anyscale-operator — created up front so the Gateway and the
+#      Anyscale Operator (installed later) both land in the same place.
+#   2. EnvoyProxy in envoy-gateway-system — configures the AWS NLB annotations.
+#   3. GatewayClass `eg` — replaces the helm-chart default so it references
+#      the EnvoyProxy via `parametersRef`. controllerName matches the chart.
+#   4. Gateway in the anyscale-operator namespace with three listeners:
+#      - http:80           (bootstrap; carries no app traffic)
+#      - https:443         (head-node ingress, *.i.anyscaleuserdata.com)
+#      - https-session:443 (services traffic,  *.s.anyscaleuserdata.com)
+#
+# The http:80 listener exists so Envoy Gateway will program the Gateway (and
+# the AWS NLB) BEFORE the Anyscale Operator has created the TLS Secrets that
+# the HTTPS listeners reference. Once the operator install (later in the
+# deploy script) provisions the Secrets, the HTTPS listeners flip to
+# ResolvedRefs=True automatically. The http listener itself never carries
+# user traffic — Anyscale workspace URLs are all HTTPS.
+#
+# Before applying, substitute the `<cldrsrc-with-dashes>` placeholders with the
+# cloud deployment id returned by `anyscale cloud register` (`cldrsrc_xxx`),
+# **with the underscore(s) replaced by dashes** — e.g. `cldrsrc_tbtjs3jrtvbrw5uvsuwcikp43c`
+# becomes `cldrsrc-tbtjs3jrtvbrw5uvsuwcikp43c`. The operator names the TLS Secret
+# it creates as `anyscale-<that slug>-certificate`, so pasting the underscored
+# id verbatim looks valid but leaves the listener stuck at `ResolvedRefs: False`.
+# See the README's `sed` step.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: anyscale-operator
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: envoy-proxy
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        type: LoadBalancer
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: external
+          service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: instance
+          service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+          service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: envoy-proxy
+    namespace: envoy-gateway-system
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway
+  namespace: anyscale-operator
+spec:
+  gatewayClassName: eg
+  listeners:
+    # Bootstrap listener — see file header for why this exists.
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: '*.i.anyscaleuserdata.com'
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: anyscale-<cldrsrc-with-dashes>-certificate
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-session
+      port: 443
+      protocol: HTTPS
+      hostname: '*.s.anyscaleuserdata.com'
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: anyscale-svc-<cldrsrc-with-dashes>-certificate
+      allowedRoutes:
+        namespaces:
+          from: All

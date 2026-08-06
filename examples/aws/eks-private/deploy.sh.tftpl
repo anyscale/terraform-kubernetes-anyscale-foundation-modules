@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# Anyscale on EKS (private networking) — post-terraform deployment commands.
+#
+# Rendered by Terraform for cluster '${eks_cluster_name}' in ${aws_region}.
+# Run these steps in order. Steps 5-8 depend on $CLOUD_DEPLOYMENT_ID
+# (captured from step 1) and $GATEWAY_HOSTNAME (captured from step 5).
+#
+# Note: the gateway NLB is `scheme: internal`, so steps 2-8 must run
+# from inside the VPC (VPN or bastion).
+set -euo pipefail
+
+# ------------------------------------------------------------------
+# 1. Register the Anyscale cloud  (returns a cldrsrc_... id)
+# ------------------------------------------------------------------
+echo "==> Step 1/8: Registering Anyscale cloud '${anyscale_cloud_name}'..."
+register_output=$(${registration_command} 2>&1)
+echo "$register_output"
+export CLOUD_DEPLOYMENT_ID=$(echo "$register_output" | grep -oE 'cldrsrc_[a-zA-Z0-9]+' | head -1 || true)
+: "$${CLOUD_DEPLOYMENT_ID:?failed to capture cldrsrc_ id from registration output}"
+echo "    Captured CLOUD_DEPLOYMENT_ID=$CLOUD_DEPLOYMENT_ID"
+
+# ------------------------------------------------------------------
+# 2. Authenticate to the EKS cluster
+# ------------------------------------------------------------------
+echo "==> Step 2/8: Updating kubeconfig for cluster '${eks_cluster_name}'..."
+aws eks update-kubeconfig --region ${aws_region} --name ${eks_cluster_name}
+
+# ------------------------------------------------------------------
+# 3. Cluster Autoscaler
+# ------------------------------------------------------------------
+echo "==> Step 3/8: Installing Cluster Autoscaler..."
+helm repo add autoscaler https://kubernetes.github.io/autoscaler 2>/dev/null || true
+helm repo update
+helm upgrade cluster-autoscaler autoscaler/cluster-autoscaler \
+  --version 9.46.0 \
+  --namespace kube-system \
+  --set awsRegion=${aws_region} \
+  --set autoDiscovery.clusterName=${eks_cluster_name} \
+  --install
+
+# ------------------------------------------------------------------
+# 4. AWS Load Balancer Controller  (region + vpcId explicit so it
+#    does not need IMDSv2 access to introspect them)
+# ------------------------------------------------------------------
+echo "==> Step 4/8: Installing AWS Load Balancer Controller..."
+helm repo add eks https://aws.github.io/eks-charts 2>/dev/null || true
+helm repo update
+helm upgrade aws-load-balancer-controller eks/aws-load-balancer-controller \
+  --version 1.13.2 \
+  --namespace kube-system \
+  --set clusterName=${eks_cluster_name} \
+  --set region=${aws_region} \
+  --set vpcId=${vpc_id} \
+  --install
+
+# ------------------------------------------------------------------
+# 5. Envoy Gateway + Anyscale gateway manifests
+#    (substitutes the cldrsrc slug into the gateway YAML on the fly
+#    so the TLS Secret refs are correct from the first apply)
+#
+#    CRDs are applied separately because `helm upgrade --install`
+#    skips `chart/crds/` on subsequent runs by design — so reruns
+#    with a newer chart version would otherwise leave Gateway API
+#    and Envoy Gateway CRDs stale.
+# ------------------------------------------------------------------
+echo "==> Step 5/8: Installing Envoy Gateway v1.7.0 and applying Anyscale gateway manifests..."
+EG_CRD_DIR=$(mktemp -d)
+trap 'rm -rf "$${EG_CRD_DIR}"' EXIT
+helm pull oci://docker.io/envoyproxy/gateway-helm --version v1.7.0 \
+  --untar --untardir "$${EG_CRD_DIR}"
+kubectl apply --server-side --force-conflicts -R -f "$${EG_CRD_DIR}/gateway-helm/crds/"
+helm upgrade eg oci://docker.io/envoyproxy/gateway-helm \
+  --version v1.7.0 \
+  --namespace envoy-gateway-system \
+  --create-namespace \
+  --skip-crds \
+  --install
+kubectl wait --for=condition=available deployment/envoy-gateway \
+  -n envoy-gateway-system --timeout=120s
+
+SECRET_SLUG="$${CLOUD_DEPLOYMENT_ID//_/-}"   # cldrsrc_xxx → cldrsrc-xxx
+echo "    Substituting SECRET_SLUG=$SECRET_SLUG into sample-values_gateway.yaml..."
+sed "s/<cldrsrc-with-dashes>/$${SECRET_SLUG}/g" sample-values_gateway.yaml | kubectl apply -f -
+
+echo "    Waiting for Gateway to be Programmed (up to 5 min)..."
+kubectl wait -n anyscale-operator --for=condition=Programmed gateway/gateway --timeout=300s
+export GATEWAY_HOSTNAME=$(kubectl get gateway gateway -n anyscale-operator \
+  -o jsonpath='{.status.addresses[0].value}')
+echo "    Captured GATEWAY_HOSTNAME=$GATEWAY_HOSTNAME"
+%{ if enable_s3_pvc ~}
+
+# ------------------------------------------------------------------
+# 6. Apply the Mountpoint-S3 PV/PVC  (enable_s3_pvc = true)
+# ------------------------------------------------------------------
+echo "==> Step 6/8: Applying S3 PersistentVolume + PersistentVolumeClaim..."
+kubectl apply -f ./generated/pv-pvc.yaml
+echo "    Waiting for PVC anyscale-shared-fuse to bind (up to 2 min)..."
+kubectl wait -n anyscale-operator --for=jsonpath='{.status.phase}'=Bound \
+  pvc/anyscale-shared-fuse --timeout=120s
+%{ endif ~}
+
+# ------------------------------------------------------------------
+# 7. Anyscale Operator
+# ------------------------------------------------------------------
+echo "==> Step 7/8: Installing the Anyscale Operator helm chart..."
+helm repo add anyscale https://anyscale.github.io/helm-charts 2>/dev/null || true
+helm repo update
+helm upgrade anyscale-operator anyscale/anyscale-operator \
+  --set-string global.cloudDeploymentId="$CLOUD_DEPLOYMENT_ID" \
+  --set-string global.cloudProvider=aws \
+  --set-string global.aws.region=${aws_region} \
+  --set-string workloads.serviceAccount.name=anyscale-operator \
+  --set networking.gateway.enabled=true \
+  --set-string networking.gateway.name=gateway \
+  --set-string networking.gateway.namespace=anyscale-operator \
+  --set-string networking.gateway.apiVersion=gateway.networking.k8s.io/v1 \
+  --set-string networking.gateway.hostname="$GATEWAY_HOSTNAME" \
+  --namespace anyscale-operator \
+  --install \
+  --wait --timeout 10m
+
+echo "    Waiting for the operator to create the head-node TLS Secret (up to 5 min)..."
+kubectl wait --for=create secret/anyscale-$${SECRET_SLUG}-certificate \
+  -n anyscale-operator --timeout=300s
+
+# ------------------------------------------------------------------
+# 8. Verify
+# ------------------------------------------------------------------
+echo "==> Step 8/8: Verifying the deployment..."
+echo "    Cert Secret:"
+kubectl get secret "anyscale-$${SECRET_SLUG}-certificate" -n anyscale-operator
+echo "    Gateway listener status:"
+kubectl get gateway gateway -n anyscale-operator \
+  -o jsonpath='{range .status.listeners[*]}{.name}: ResolvedRefs={.conditions[?(@.type=="ResolvedRefs")].status}{"\n"}{end}'
+echo "    HTTPRoutes (operator-managed, none until workloads launch):"
+kubectl get httproutes -n anyscale-operator
+echo "==> Done. Anyscale cloud $CLOUD_DEPLOYMENT_ID is ready."

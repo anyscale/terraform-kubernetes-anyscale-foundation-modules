@@ -1,0 +1,62 @@
+# Sample static PersistentVolume + PersistentVolumeClaim manifests for mounting
+# the Anyscale S3 bucket as shared storage via the Mountpoint for Amazon S3 CSI
+# driver.
+#
+# Terraform renders an equivalent file at `generated/pv-pvc.yaml` with the
+# bucket name and region already substituted. This file is kept here as a
+# reference / starting point if you'd rather author the manifests yourself.
+#
+# Replace the placeholder values before applying:
+#   - <bucket-name>: the bucket name from `terraform output s3_pvc_bucket_name`
+#   - <aws-region>: the AWS region from `terraform output aws_region`
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: anyscale-shared-s3
+spec:
+  # Mountpoint-for-S3 supports ReadWriteMany / ReadOnlyMany only.
+  accessModes:
+    - ReadWriteMany
+  # Capacity is required by Kubernetes but ignored by the Mountpoint driver
+  # because S3 has no fixed capacity.
+  capacity:
+    storage: 1200Gi
+  # Empty string is required for static provisioning with the CSI driver.
+  storageClassName: ""
+  # claimRef binds this PV to a single PVC so no other PVCs can claim it.
+  claimRef:
+    namespace: anyscale-operator
+    name: anyscale-shared-fuse
+  # Mountpoint flags. See:
+  # https://github.com/awslabs/mountpoint-s3/blob/main/doc/CONFIGURATION.md
+  mountOptions:
+    - allow-other
+    - region <aws-region>
+    # Restrict Anyscale shared-storage data to a dedicated prefix in the bucket
+    # so it doesn't collide with logs/snapshots/etc. written by Anyscale itself.
+    - prefix anyscale-shared/
+  csi:
+    driver: s3.csi.aws.com
+    volumeHandle: anyscale-shared-s3-volume
+    volumeAttributes:
+      bucketName: <bucket-name>
+      # `driver` uses the IAM role attached to the CSI driver service account
+      # via the EKS Pod Identity association you created with `aws eks
+      # create-pod-identity-association`.
+      authenticationSource: driver
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: anyscale-shared-fuse
+  namespace: anyscale-operator
+spec:
+  accessModes:
+    - ReadWriteMany
+  # Empty string for static provisioning.
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 1200Gi
+  volumeName: anyscale-shared-s3

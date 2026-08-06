@@ -37,45 +37,65 @@ locals {
     }
   }
 
-  # Base configuration for GPU node groups
+  # v21 of the EKS module sets http_put_response_hop_limit = 1 by default,
+  # which prevents pods (AWS Load Balancer Controller, cluster-autoscaler,
+  # anything reaching the EC2 metadata service from inside a pod) from
+  # assuming the node IAM role via IMDSv2. We restore the v20 default of 2
+  # so the canonical helm installs work out of the box. For a tighter
+  # security posture, set this back to 1 and switch each AWS-API-consuming
+  # workload to IRSA or EKS Pod Identity.
+  node_group_metadata_options = {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+
+  # Base configuration for GPU node groups.
+  # use_custom_launch_template = true so the launch template controls disk
+  # (via block_device_mappings) AND the IMDS metadata_options are guaranteed
+  # to apply — the module's metadata_options input is only authoritative when
+  # the module is also managing the launch template.
   gpu_node_group_base = {
     ami_type                     = "AL2023_x86_64_NVIDIA"
     min_size                     = 0
     max_size                     = 10
     desired_size                 = 0
-    disk_size                    = var.node_group_disk_size
-    use_custom_launch_template   = false
+    use_custom_launch_template   = true
+    block_device_mappings        = local.node_group_block_device_mappings
     iam_role_additional_policies = local.anyscale_iam
+    metadata_options             = local.node_group_metadata_options
   }
 
-  gpu_node_taints_base = [
-    {
-      key    = "nvidia.com/gpu",
-      value  = "present",
-      effect = "NO_SCHEDULE",
-    },
-    {
-      key    = "node.anyscale.com/accelerator-type",
-      value  = "GPU",
-      effect = "NO_SCHEDULE",
+  # Node group taints. v21 of the EKS module takes `taints` as a map (keyed by
+  # a stable identifier of your choosing) rather than a list.
+  gpu_node_taints_base = {
+    gpu = {
+      key    = "nvidia.com/gpu"
+      value  = "present"
+      effect = "NO_SCHEDULE"
     }
-  ]
+    accelerator_type = {
+      key    = "node.anyscale.com/accelerator-type"
+      value  = "GPU"
+      effect = "NO_SCHEDULE"
+    }
+  }
 
-  gpu_node_taints_ondemand = concat(local.gpu_node_taints_base, [
-    {
-      key    = "node.anyscale.com/capacity-type",
-      value  = "ON_DEMAND",
-      effect = "NO_SCHEDULE",
+  gpu_node_taints_ondemand = merge(local.gpu_node_taints_base, {
+    capacity_type = {
+      key    = "node.anyscale.com/capacity-type"
+      value  = "ON_DEMAND"
+      effect = "NO_SCHEDULE"
     }
-  ])
+  })
 
-  gpu_node_taints_spot = concat(local.gpu_node_taints_base, [
-    {
-      key    = "node.anyscale.com/capacity-type",
-      value  = "SPOT",
-      effect = "NO_SCHEDULE",
+  gpu_node_taints_spot = merge(local.gpu_node_taints_base, {
+    capacity_type = {
+      key    = "node.anyscale.com/capacity-type"
+      value  = "SPOT"
+      effect = "NO_SCHEDULE"
     }
-  ])
+  })
 
   # Create a map of GPU node groups based on gpu_instance_types
   gpu_node_groups = {
@@ -115,20 +135,47 @@ locals {
 module "eks" {
   #checkov:skip=CKV_TF_1: Use the given version of the module
   source  = "terraform-aws-modules/eks/aws"
-  version = "20.33.1"
+  version = "21.20.0"
 
-  # Cluster basic configuration
-  cluster_name    = var.eks_cluster_name
-  cluster_version = var.eks_cluster_version
+  # Cluster basic configuration (v21 input names: cluster_* prefix dropped,
+  # cluster_version -> kubernetes_version).
+  name               = var.eks_cluster_name
+  kubernetes_version = var.eks_cluster_version
 
-  cluster_addons = {
-    coredns                = {}
-    eks-pod-identity-agent = {}
-    kube-proxy             = {}
-  }
+  addons = merge(
+    {
+      # vpc-cni and kube-proxy must come up before the managed node groups —
+      # without the CNI, kubelet can't initialise its network plugin and nodes
+      # stay NotReady forever. v21 of the terraform-aws-eks module does not
+      # auto-install default addons, so they must be declared explicitly.
+      vpc-cni = {
+        before_compute = true
+      }
+      kube-proxy = {
+        before_compute = true
+      }
+      coredns                = {}
+      eks-pod-identity-agent = {}
+    },
+    var.enable_s3_pvc ? {
+      aws-mountpoint-s3-csi-driver = {
+        # Mountpoint-for-S3 CSI driver installed as an EKS managed addon (vs. helm)
+        # so AWS manages upgrades. The bundled pod_identity_association atomically
+        # binds the s3-csi-driver-sa service account to the IAM role created in
+        # s3_csi.tf, so the controller pods start with bucket access from the
+        # first reconcile.
+        pod_identity_association = [
+          {
+            role_arn        = aws_iam_role.s3_csi_driver[0].arn
+            service_account = "s3-csi-driver-sa"
+          }
+        ]
+      }
+    } : {},
+  )
 
-  # API endpoint access configuration
-  cluster_endpoint_public_access = true
+  # Public API endpoint (this is the public-networking example).
+  endpoint_public_access = true
 
   # The authentication mode for the cluster. Valid values are `CONFIG_MAP`, `API` or `API_AND_CONFIG_MAP`
   authentication_mode = "API_AND_CONFIG_MAP"
@@ -165,7 +212,7 @@ module "eks" {
 
   eks_managed_node_groups = merge(
     {
-      # This node group is for management components such as CoreDNS, Cluster Autoscaler, AWS-LB controller, ingress-nginx, Anyscale Operator, etc.
+      # This node group is for management components such as CoreDNS, Cluster Autoscaler, AWS-LB controller, Anyscale Operator, etc.
       # Note that small instance types of Anyscale workloads can still be scheduled onto this node group.
       default = {
         ami_type       = "AL2023_x86_64_STANDARD"
@@ -174,6 +221,8 @@ module "eks" {
         min_size     = 1
         max_size     = 10
         desired_size = 2
+
+        metadata_options = local.node_group_metadata_options
 
         iam_role_additional_policies = merge(local.anyscale_iam, {
           cluster_autoscaler_policy = aws_iam_policy.autoscaler_policy.arn
@@ -194,14 +243,15 @@ module "eks" {
         desired_size               = 0
         block_device_mappings      = local.node_group_block_device_mappings
         use_custom_launch_template = true
+        metadata_options           = local.node_group_metadata_options
 
-        taints = [
-          {
-            key    = "node.anyscale.com/capacity-type",
-            value  = "ON_DEMAND",
-            effect = "NO_SCHEDULE",
+        taints = {
+          capacity_type = {
+            key    = "node.anyscale.com/capacity-type"
+            value  = "ON_DEMAND"
+            effect = "NO_SCHEDULE"
           }
-        ]
+        }
 
         iam_role_additional_policies = local.anyscale_iam
       }
@@ -219,14 +269,15 @@ module "eks" {
         desired_size               = 0
         block_device_mappings      = local.node_group_block_device_mappings
         use_custom_launch_template = true
+        metadata_options           = local.node_group_metadata_options
 
-        taints = [
-          {
-            key    = "node.anyscale.com/capacity-type",
-            value  = "SPOT",
-            effect = "NO_SCHEDULE",
+        taints = {
+          capacity_type = {
+            key    = "node.anyscale.com/capacity-type"
+            value  = "SPOT"
+            effect = "NO_SCHEDULE"
           }
-        ]
+        }
 
         iam_role_additional_policies = local.anyscale_iam
       }

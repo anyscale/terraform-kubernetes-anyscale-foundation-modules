@@ -1,0 +1,22 @@
+################################################################################
+# E2E validation override — DO NOT COPY INTO A PRODUCTION DEPLOYMENT.
+#
+# Used by the e2e harness that runs the eks-private example from outside the
+# VPC (where kubectl / helm cannot reach the private EKS API endpoint).
+#
+# Harness usage:
+#   1. Copy this file to ../../_override.tf in the eks-private example root.
+#   2. Substitute <runner-cidr> with the runner's public IP /32.
+#   3. terraform apply, run validation, terraform destroy, remove _override.tf.
+#
+# Terraform override files merge their attributes into the matching block in
+# the example, so this opens up endpoint_public_access without modifying the
+# customer-facing module "eks" block.
+#
+# See: https://developer.hashicorp.com/terraform/language/files/override
+################################################################################
+
+module "eks" {
+  endpoint_public_access       = true
+  endpoint_public_access_cidrs = ["<runner-cidr>"]
+}

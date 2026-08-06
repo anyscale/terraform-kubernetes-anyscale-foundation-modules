@@ -69,13 +69,16 @@ variable "eks_cluster_version" {
   description = <<-EOT
     (Optional) The Kubernetes version of the EKS cluster.
 
+    Default tracks the latest version available on EKS Standard support.
+    Envoy Gateway v1.7.0 requires Kubernetes >= 1.30.
+
     ex:
     ```
-    eks_cluster_version = "1.32"
+    eks_cluster_version = "1.35"
     ```
   EOT
   type        = string
-  default     = "1.32"
+  default     = "1.35"
 }
 
 variable "gpu_instance_types" {
@@ -127,7 +130,7 @@ variable "enable_efs" {
   description = <<-EOT
     (Optional) Enable the creation of an EFS instance.
 
-    This is optional for Anyscale deployments. EFS is used for shared storage between nodes.
+    Provisions an EFS file system as Anyscale shared storage. Mutually useful with — but typically an alternative to — `enable_s3_pvc`: only one backend is normally attached to an Anyscale cloud at a time.
 
     ex:
     ```
@@ -136,4 +139,110 @@ variable "enable_efs" {
   EOT
   type        = bool
   default     = false
+}
+
+variable "bucket_force_destroy" {
+  description = <<-EOT
+    (Optional) When true, `terraform destroy` will delete the Anyscale S3 bucket
+    even if it still contains objects (operator logs, cluster metadata, mounted
+    PVC data, etc.). Default is `false` so accidental destroys do not wipe data.
+
+    Set to `true` for ephemeral dev / e2e test deployments where you want
+    teardown to be one command. See `dev-overrides.tfvars.example` for a ready-made
+    override file.
+
+    ex:
+    ```
+    bucket_force_destroy = true
+    ```
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "anyscale_cloud_name" {
+  description = <<-EOT
+    (Optional) Anyscale cloud name passed to `anyscale cloud register --name`.
+
+    Pick a name that is unique within your Anyscale organization.
+
+    ex:
+    ```
+    anyscale_cloud_name = "my-eks-private-cloud"
+    ```
+  EOT
+  type        = string
+  default     = "anyscale-eks-private"
+}
+
+variable "enable_s3_pvc" {
+  description = <<-EOT
+    (Optional) Provision the IAM role + EKS Pod Identity association for the Mountpoint for Amazon S3 CSI driver, and render a `generated/pv-pvc.yaml` that mounts the Anyscale S3 bucket as a PersistentVolumeClaim used as Anyscale shared storage.
+
+    This is the AWS equivalent of the Azure blob PVC pattern documented at
+    https://docs.anyscale.com/clouds/azure/pvc — wired up at registration time
+    via `file_storage.persistent_volume_claim` in the rendered cloud-resource
+    YAML, rather than via post-hoc `anyscale cloud update`.
+
+    ex:
+    ```
+    enable_s3_pvc = true
+    ```
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "enable_memorydb" {
+  description = <<-EOT
+    (Optional) Provision an AWS MemoryDB (Redis) cluster in the private subnets via the `aws-anyscale-memorydb` cloudfoundation submodule, and emit its endpoint as `kubernetes_config.redis_endpoint` in the rendered cloud-resource YAML.
+
+    This wires Anyscale Services head-node fault tolerance (Anyscale CLI/SDK >= 0.26.99 required).
+
+    ex:
+    ```
+    enable_memorydb = true
+    ```
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "memorydb_node_type" {
+  description = <<-EOT
+    (Optional) MemoryDB node type. Only used when `enable_memorydb = true`.
+
+    See https://docs.aws.amazon.com/memorydb/latest/devguide/nodes.supportedtypes.html.
+
+    ex:
+    ```
+    memorydb_node_type = "db.r7g.large"
+    ```
+  EOT
+  type        = string
+  default     = "db.t4g.small"
+}
+
+variable "memorydb_num_shards" {
+  description = <<-EOT
+    (Optional) Number of MemoryDB shards. Only used when `enable_memorydb = true`.
+  EOT
+  type        = number
+  default     = 1
+}
+
+variable "memorydb_num_replicas_per_shard" {
+  description = <<-EOT
+    (Optional) Number of replicas per MemoryDB shard. Only used when `enable_memorydb = true`.
+  EOT
+  type        = number
+  default     = 1
+}
+
+variable "memorydb_port" {
+  description = <<-EOT
+    (Optional) Port on which the MemoryDB cluster listens. Only used when `enable_memorydb = true`.
+  EOT
+  type        = number
+  default     = 6379
 }
