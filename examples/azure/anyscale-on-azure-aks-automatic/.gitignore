@@ -1,0 +1,34 @@
+# Terraform
+# NOTE: .terraform.lock.hcl is ignored repo-wide by the root .gitignore, so no
+# example here commits one — provider versions are pinned by the constraints in
+# versions.tf instead. (HashiCorp's guidance for root modules is to commit the
+# lock file; changing that is a repo-wide decision, not this example's.)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+
+# Apply/destroy transcripts. These embed subscription IDs, ARM resource paths,
+# and OIDC issuer URLs, so they must never be committed.
+*.log
+
+# Deployment-specific values and generated artifacts (embed subscription IDs)
+terraform.tfvars
+anyscale-aks-cloud.yaml
+
+# Manifests rendered by gateway.tf / gpu.tf and applied by the bootstrap.
+# Regenerated on every apply; the Gateway one embeds the cloud resource ID.
+anyscale-namespace.yaml
+anyscale-gateway.yaml
+nvidia-nodepool.yaml
+
+# Isolated kubeconfig written by the in-cluster bootstrap (never ~/.kube/config)
+.kubeconfig
+
+# Scheduling diagnostics written by diagnose-head-pod.sh
+diagnostics/
+
+# OS
+.DS_Store

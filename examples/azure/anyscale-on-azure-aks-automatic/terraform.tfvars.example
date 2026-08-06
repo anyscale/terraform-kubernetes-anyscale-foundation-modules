@@ -1,0 +1,73 @@
+# Copy to terraform.tfvars and fill in. The helper scripts seed some of these:
+#   ./azure-login.sh     → az login + subscription selection
+#   ./select-region.sh   → writes azure_location (quota-checked)
+#   ./select-gpu.sh      → writes gpu_nodepool_configs
+
+# ── required ────────────────────────────────────────────────────────────────
+azure_subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# ── common ──────────────────────────────────────────────────────────────────
+# Must be supported by BOTH Anyscale and AKS Automatic. Run ./select-region.sh.
+# NOTE: westcentralus is valid in the `anyscale-on-azure-new-aks` sibling but
+# NOT here — Anyscale supports it, AKS Automatic does not.
+# azure_location    = "westus2"
+aks_cluster_name = "anyscale-auto"
+# azure_resource_group_name = null     # default: "<aks_cluster_name>-rg"
+# anyscale_cloud_name       = null     # default: "<aks_cluster_name>-cloud"
+# anyscale_cloud_location   = null     # default: azure_location (single-region)
+
+tags = {
+  Environment = "dev"
+}
+
+# ── compute ─────────────────────────────────────────────────────────────────
+# There is no system_vm_size / cpu_vm_size here. AKS Automatic manages the
+# system pool and provisions CPU capacity on demand through its built-in
+# Karpenter NodePool. Only GPU capacity is declared, and it is OPT-IN.
+#
+# Run ./select-gpu.sh, or e.g.:
+# gpu_nodepool_configs = {
+#   T4 = {
+#     name         = "gput4"
+#     vm_size      = "Standard_NC16as_T4_v3"
+#     product_name = "NVIDIA-T4"
+#     gpu_count    = "1"
+#     # enable_spot = true    # also create a spot NodePool (default true)
+#     # max_gpus    = 16      # ceiling on GPUs this NodePool may provision
+#   }
+# }
+
+# ── networking (three subnets — see variables.tf) ───────────────────────────
+# vnet_cidr                = "10.42.0.0/16"
+# apiserver_subnet_cidr    = "10.42.0.0/28"   # delegated, /28 minimum
+# nodes_subnet_cidr        = "10.42.1.0/24"   # Karpenter workload nodes
+# system_nodes_subnet_cidr = "10.42.2.0/24"   # AKS-managed system pool
+
+# ── feature switches ────────────────────────────────────────────────────────
+# enable_monitoring                      = true   # managed Prometheus + Container Insights (GA)
+# enable_otlp_app_insights               = false  # OTLP endpoints for Ray telemetry (PREVIEW)
+# internal_gateway                       = false  # true = VNet-only data plane (re-enables LB polling)
+# enable_nfs                             = false  # Premium NFS share, subnet-restricted
+# enable_default_nginx_ingress_controller = false # keep app routing's nginx controller too
+# enable_deployment_safeguards_exclusion  = true  # LEAVE ON — the operator is rejected without it
+
+# ── hardening (see the production-readiness table in the README) ────────────
+# api_server_authorized_ip_ranges = ["203.0.113.4/32"]   # must include YOUR egress IP
+#
+# There is no private_cluster_enabled: the in-cluster bootstrap needs data-plane
+# reach to the API server. For a private API server use the
+# anyscale-on-azure-private-aks example instead.
+
+# ── registry ────────────────────────────────────────────────────────────────
+enable_acr = true
+acr_sku    = "Standard" # Premium required for Private Link
+
+# ── cluster access (Entra RBAC; local accounts are disabled on Automatic) ───
+# assign_current_principal_cluster_access = true   # needed by the bootstrap
+# aks_cluster_admin_principal_ids = ["00000000-0000-0000-0000-000000000000"]
+
+# ── access to the Anyscale cloud (see variables.tf for why this is needed) ──
+# anyscale_platform_contributors = [
+#   { principal_id = "00000000-0000-0000-0000-000000000000", principal_type = "User" },
+# ]
+# assign_current_user_platform_roles = true
