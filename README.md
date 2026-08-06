@@ -23,6 +23,7 @@ The examples folder has a couple common use cases that have been tested. These i
   * [eks-private](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/aws/eks-private) - Build everything - use a common name for all resources, private networking
 * Anyscale - GCP & GKE
   * [gke-existing_cluster](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/gcp/gke-existing_cluster) - Use an existing GKE cluster, build additional resources such as object storage, service accounts, filestore.
+  * [gke-b200-rdma](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/gcp/gke-b200-rdma) - Build a GKE A4/B200 cluster with GPUDirect RDMA networking for GPU collectives.
 
 Additional examples can be requested via an [issues] ticket.
 
