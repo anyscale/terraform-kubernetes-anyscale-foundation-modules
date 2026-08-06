@@ -39,7 +39,32 @@ That hostname is baked directly into the operator extension's `networking.gatewa
 | `enable_node_auto_provisioning` | `false` | NAP / managed Karpenter via azapi patch + GPU NodePool (**preview**; needs `NodeAutoProvisioningPreview`) |
 | `internal_gateway` | `false` | Internal Standard LB — VNet-only data plane; falls back to LB polling |
 | `enable_nfs` | `false` | Premium NFS FileStorage account locked to the node subnet |
+| `enable_shared_pvc` | `false` | Shared file storage for Ray pods: blobfuse2 StorageClass + RWX PVC (requires `enable_blob_driver`) |
 | `enable_acr` | `true` | Customer-owned ACR + pull/push/tasks role assignments |
+
+### Shared file storage (`enable_shared_pvc`)
+
+On AWS and GCP, Anyscale gets shared POSIX storage from EFS/Filestore, mounted by ID.
+Azure has no mount-by-ID equivalent — the supported path is a `ReadWriteMany`
+PersistentVolumeClaim backed by the Azure Blob CSI driver (blobfuse2).
+
+Setting `enable_shared_pvc = true` (alongside `enable_blob_driver = true`) provisions,
+in `shared_pvc.tf`:
+
+- a dedicated blob container on the deployment's storage account,
+- a `blobfuse-csi` StorageClass authenticating via Entra workload identity
+  (`mountWithWorkloadIdentityToken`) — no account keys reach pods,
+- an RWX PVC named `anyscale-shared-fuse` in the operator namespace,
+- `Storage Blob Data Contributor` + `Storage Account Key Operator Service Role` for the
+  CSI driver's principals (the cluster and kubelet identities), which are distinct from
+  the operator identity already granted in `identity.tf`.
+
+**One manual step remains.** Terraform creates the volume but does not register it with
+the Anyscale cloud, because that is only settable through a complete cloud resource YAML
+(`anyscale cloud update --resources-file`) and a partial file risks clearing other
+fields. After apply, `terraform output shared_pvc_registration_instructions` prints the
+`file_storage.persistent_volume_claim` snippet and the command. Per-workload mounts via
+`advanced_instance_config` need no registration at all.
 
 ## Prerequisites
 

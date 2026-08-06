@@ -32,6 +32,8 @@ cpu_vm_size    = "Standard_D8s_v5"   # CPU worker pools; scale to zero when idle
 # enable_node_auto_provisioning = false       # NAP / managed Karpenter (PREVIEW)
 # internal_gateway              = false       # true = VNet-only data plane (re-enables LB polling)
 # enable_nfs                    = false       # Premium NFS share, subnet-restricted
+# enable_blob_driver            = false       # Azure Blob CSI driver on the cluster
+# enable_shared_pvc             = false       # shared RWX PVC for Ray pods (needs enable_blob_driver)
 
 # ── registry ────────────────────────────────────────────────────────────────
 enable_acr = true

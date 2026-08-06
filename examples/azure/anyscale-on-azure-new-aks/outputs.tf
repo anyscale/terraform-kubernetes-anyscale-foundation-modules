@@ -21,6 +21,37 @@ output "azure_nfs_storage_account_name" {
   description = "Name of the optional Azure NFS Storage Account."
 }
 
+output "shared_pvc_name" {
+  value       = var.enable_shared_pvc ? kubernetes_persistent_volume_claim_v1.shared_pvc[0].metadata[0].name : null
+  description = "Name of the shared ReadWriteMany PVC for Ray pods. Null when enable_shared_pvc=false."
+}
+
+locals {
+  shared_pvc_registration_instructions = <<-EOT
+    The PVC "${var.shared_pvc_name}" exists in namespace "${var.anyscale_operator_namespace}",
+    but Anyscale does not yet attach it to workloads. There is no `anyscale cloud update` flag
+    for this — it is set through the cloud resource YAML. Add to your resources file:
+
+        file_storage:
+          persistent_volume_claim: ${var.shared_pvc_name}
+
+    then apply it:
+
+        anyscale cloud update --name ${local.anyscale_cloud_name} --resources-file <file>.yaml
+
+    The resources file must be a COMPLETE cloud resource spec — passing a fragment containing
+    only file_storage may clear other fields. Schema: https://docs.anyscale.com/reference/cloud#cloudresource
+
+    Alternatively, skip cloud-wide registration and mount the PVC per workload via
+    advanced_instance_config in a compute config.
+  EOT
+}
+
+output "shared_pvc_registration_instructions" {
+  value       = var.enable_shared_pvc ? local.shared_pvc_registration_instructions : null
+  description = "How to register the shared PVC with the Anyscale cloud after apply. Null when enable_shared_pvc=false."
+}
+
 output "azure_aks_cluster_name" {
   value       = azurerm_kubernetes_cluster.aks.name
   description = "Name of the AKS cluster."
