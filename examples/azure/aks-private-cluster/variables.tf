@@ -57,7 +57,7 @@ variable "tags" {
     Test        = "true"
     Environment = "dev"
     Repo        = "terraform-kubernetes-anyscale-foundation-modules"
-    Example     = "azure/aks-private-cpu"
+    Example     = "azure/aks-private-cluster"
   }
 }
 
