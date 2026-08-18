@@ -45,9 +45,18 @@ variable "azure_location" {
 }
 
 variable "aks_cluster_name" {
-  description = "(Optional) Name of the AKS cluster, and the base name for related resources."
+  description = <<-EOT
+    (Optional) Name of the AKS cluster, and the base name for related resources.
+
+    Every resource here is named from it - resource group, VNet, NSG, node
+    pools, and the generated storage account and ACR names - so a distinct value
+    is what keeps two deployments in one subscription from colliding.
+
+    Keep it short. The storage account name is the first 17 characters with "sa"
+    and a 5-character random suffix appended, against a 24-character cap.
+  EOT
   type        = string
-  default     = "pei-private"
+  default     = "anyscale-private"
 }
 
 variable "tags" {
@@ -728,7 +737,7 @@ variable "anyscale_control_plane_url" {
 
     For the Azure-hosted production control plane this is
     `https://console.azure.anyscale.com`. For a per-deployment dev endpoint it
-    looks like `https://cld-<id>.azure.anyscale-cloud-dev.dev`.
+    looks like `https://cld-<id>.azure.anyscale-cloud.dev`.
 
     This value is emitted in the helm command from outputs.tf as
     `global.controlPlaneURL`.
@@ -806,19 +815,22 @@ variable "anyscale_private_dns_zone_name" {
     Only used when `enable_privatelink` is true. The zone is linked to this
     example's VNet, so it resolves only from inside the VNet.
 
-    **The zone is authoritative for its whole domain inside the VNet.** Once
-    `azure.anyscale-cloud-dev.dev` exists as a private zone linked to this VNet,
-    no other name in that domain resolves publicly from inside it. Use the
-    narrowest zone that covers your control plane hostname, or keep the wildcard
-    record below.
+    Confirm the exact zone with Anyscale rather than assuming - it differs by
+    environment. Observed values: `azure.anyscale-cloud.dev` for production and
+    `azure.anyscale-cloud-predeploy.dev` for predeploy.
+
+    **The zone is authoritative for its whole domain inside the VNet.** Once it
+    exists as a private zone linked to this VNet, no other name in that domain
+    resolves publicly from inside it. Use the narrowest zone that covers your
+    control plane hostname, and keep the wildcard record below.
 
     ex:
     ```
-    anyscale_private_dns_zone_name = "azure.anyscale-cloud-dev.dev"
+    anyscale_private_dns_zone_name = "azure.anyscale-cloud.dev"
     ```
   EOT
   type        = string
-  default     = "azure.anyscale-cloud-dev.dev"
+  default     = "azure.anyscale-cloud.dev"
 }
 
 variable "anyscale_privatelink_record_names" {
@@ -828,7 +840,7 @@ variable "anyscale_privatelink_record_names" {
     Every entry becomes an A record pointing at the private endpoint's IP.
     Combined with `anyscale_private_dns_zone_name`, an entry forms the FQDN that
     resolves to the endpoint, e.g.
-    `cld-abc123.azure.anyscale-cloud-dev.dev`.
+    `cld-abc123.azure.anyscale-cloud.dev`.
 
     `"*"` creates a wildcard record. Because the private zone is authoritative
     for the whole domain inside the VNet, any name in it without a record fails
