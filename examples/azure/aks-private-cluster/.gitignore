@@ -1,0 +1,16 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+
+# Filled-in helm values contain the cloud deployment ID and identity client ID.
+values.yaml
+!sample-values_*.yaml
+
+.kubeconfig
+crash.log
+
+# Personal working reference - full networking detail, failure post-mortems and
+# design archaeology. The README is self-contained without it.
+NOTES.md
