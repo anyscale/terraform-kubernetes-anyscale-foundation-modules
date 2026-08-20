@@ -177,8 +177,12 @@ module "firewall" {
 
   firewall_subnet_id = local.net_subnet_ids.firewall
 
-  aks_nodes_cidr           = var.subnet_cidrs.aks_nodes
-  anyscale_fqdns           = var.anyscale_fqdns
+  aks_nodes_cidr = var.subnet_cidrs.aks_nodes
+  # Filtered in locals.tf: when enable_anyscale_privatelink is true, FQDNs under
+  # the Anyscale private DNS zone are dropped because they resolve in-VNet and
+  # can never match an outbound firewall rule. Identical to var.anyscale_fqdns
+  # otherwise.
+  anyscale_fqdns           = local.firewall_anyscale_fqdns
   azure_identity_fqdns     = var.azure_identity_fqdns
   azure_monitor_fqdns      = var.azure_monitor_fqdns
   container_registry_fqdns = var.container_registry_fqdns

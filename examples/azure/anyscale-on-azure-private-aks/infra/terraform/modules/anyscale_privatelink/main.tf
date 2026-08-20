@@ -24,6 +24,13 @@
 #     VNet. Once the zone exists and is linked, no other name in that domain
 #     resolves publicly from inside the VNet — which is why the record list
 #     defaults to a wildcard rather than an enumeration of hostnames.
+#
+#   * The connection is cross-tenant and manual (is_manual_connection = true
+#     below). `terraform apply` SUCCEEDS with the endpoint left in Pending, so
+#     a green apply is not evidence the path actually works — Anyscale has to
+#     approve the connection on their side first. Verify with a DNS lookup
+#     from inside the cluster afterwards, and check the connection state with:
+#       az network private-endpoint-connection list --id <endpoint_id> -o table
 ###############################################################################
 
 locals {

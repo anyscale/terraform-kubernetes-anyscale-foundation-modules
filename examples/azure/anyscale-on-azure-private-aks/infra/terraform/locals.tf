@@ -94,4 +94,23 @@ locals {
   net_vnet_dns_servers        = azurerm_virtual_network_dns_servers.workload.dns_servers
 
   jump_host_rbac_scope = var.jump_host_rbac_scope != "" ? var.jump_host_rbac_scope : "/subscriptions/${var.azure_subscription_id}"
+
+  # Once the Anyscale private DNS zone is authoritative for the Anyscale cloud
+  # domain inside the VNet, the firewall's outbound FQDN rules for that domain
+  # can never match: the private endpoint IP is in-VNet, so the 0.0.0.0/0 route
+  # to the firewall does not apply to it. Drop the superseded entries so the
+  # allow-list keeps describing the real egress surface instead of carrying an
+  # inert wildcard. Everything else in anyscale_fqdns (console/api hosts, the S3
+  # asset bucket, etc.) still egresses through the firewall and stays.
+  privatelink_superseded_fqdn_suffixes = var.enable_anyscale_privatelink ? [
+    var.anyscale_privatelink_dns_zone_name,
+  ] : []
+
+  firewall_anyscale_fqdns = [
+    for fqdn in var.anyscale_fqdns : fqdn
+    if length([
+      for suffix in local.privatelink_superseded_fqdn_suffixes : suffix
+      if suffix != "" && (fqdn == suffix || endswith(fqdn, ".${suffix}"))
+    ]) == 0
+  ]
 }

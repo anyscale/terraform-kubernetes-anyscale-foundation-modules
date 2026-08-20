@@ -388,11 +388,24 @@ output "anyscale_operator_workload_identity" {
 }
 
 output "anyscale_privatelink" {
-  description = "Anyscale control-plane Private Link endpoint details, or nulls/empty when enable_anyscale_privatelink is false."
+  description = <<-EOT
+    Anyscale control-plane Private Link state, DNS records, and the firewall
+    FQDNs it supersedes. Nulls/empty when enable_anyscale_privatelink is false.
+
+    The cross-tenant approval status is deliberately absent: azurerm does not
+    export it on azurerm_private_endpoint, and Terraform would report a stale
+    value if it did. Check it against Azure directly:
+
+      az network private-endpoint-connection list --id <endpoint_id> -o table
+  EOT
   value = {
     enabled      = var.enable_anyscale_privatelink
     endpoint_id  = module.anyscale_privatelink.endpoint_id
     private_ip   = module.anyscale_privatelink.private_ip
     record_fqdns = module.anyscale_privatelink.record_fqdns
+    superseded_firewall_fqdns = [
+      for fqdn in var.anyscale_fqdns : fqdn
+      if !contains(local.firewall_anyscale_fqdns, fqdn)
+    ]
   }
 }
