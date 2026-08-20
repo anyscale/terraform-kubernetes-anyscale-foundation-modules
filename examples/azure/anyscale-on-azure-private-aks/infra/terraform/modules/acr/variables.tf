@@ -40,3 +40,17 @@ variable "diagnostic_settings_enabled" {
   type        = bool
   default     = false
 }
+
+variable "acr_cache_rules" {
+  description = <<-EOT
+    Cache rules that mirror upstream image repositories into this registry,
+    keyed by rule name. Use this to serve third-party images (registry.k8s.io,
+    Docker Hub, quay.io, ...) from inside the private registry when node
+    egress to the public internet is locked down.
+  EOT
+  type = map(object({
+    source_repo = string
+    target_repo = string
+  }))
+  default = {}
+}

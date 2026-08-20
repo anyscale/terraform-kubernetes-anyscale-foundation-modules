@@ -138,7 +138,7 @@ Reference links used by the sample:
   - `networking.gateway.namespace=anyscale-operator`
   - `networking.gateway.apiVersion=gateway.networking.k8s.io/v1`
   - `networking.gateway.hostname=<gateway-lb-address>`
-- The ingress-nginx quickstart is retained for legacy scenarios, but Microsoft and upstream Kubernetes are moving customers away from NGINX Ingress toward Gateway API. This sample should not rely on NGINX for Anyscale workspace or service ingress.
+- The ingress-nginx quickstart is retained for legacy scenarios, but Microsoft and upstream Kubernetes are moving customers away from NGINX Ingress toward Gateway API. This sample should not rely on NGINX for Anyscale workspace or service ingress. A reference values file for the legacy path is kept at `docs/reference/sample-values_nginx.yaml`.
 
 ## Container Image Builds And ACR
 

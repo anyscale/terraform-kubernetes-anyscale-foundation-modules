@@ -235,6 +235,15 @@ module "acr" {
   zone_redundancy_enabled     = var.acr_zone_redundancy_enabled
   log_analytics_workspace_id  = module.observability.log_analytics_workspace_id
   diagnostic_settings_enabled = var.terraform_managed_diagnostic_settings_enabled
+  acr_cache_rules             = var.acr_cache_rules
+}
+
+# Module 4 builds and pushes the custom Ray image with Podman from the jump
+# host — AcrPush must be in place before `preflight` there passes.
+resource "azurerm_role_assignment" "jump_host_acr_push" {
+  scope                = module.acr.acr_id
+  role_definition_name = "AcrPush"
+  principal_id         = module.jump_host.principal_id
 }
 
 ###############################################################################
@@ -428,6 +437,30 @@ module "image_integrity" {
 
   name_suffix     = local.suffix
   oidc_issuer_url = module.aks.oidc_issuer_url
+}
+
+###############################################################################
+# Private Link to the Anyscale control plane (optional)
+# Off by default — the firewall's anyscale_fqdns allow-list already covers
+# outbound control-plane traffic. Enable this when the environment requires
+# the SaaS control plane to be reachable without ever leaving the VNet.
+###############################################################################
+module "anyscale_privatelink" {
+  source = "./modules/anyscale_privatelink"
+
+  enabled = var.enable_anyscale_privatelink
+
+  resource_group_name = local.resource_group_name
+  location            = local.resource_group_location
+  tags                = var.tags
+
+  name_prefix  = local.names.aks
+  pe_subnet_id = local.net_subnet_ids.private_endpoints
+  vnet_id      = local.net_vnet_id
+
+  privatelink_service_alias = var.anyscale_privatelink_service_alias
+  dns_zone_name             = var.anyscale_privatelink_dns_zone_name
+  record_names              = var.anyscale_privatelink_record_names
 }
 
 # Jump host signs images: read the signing certificate + sign with its key.

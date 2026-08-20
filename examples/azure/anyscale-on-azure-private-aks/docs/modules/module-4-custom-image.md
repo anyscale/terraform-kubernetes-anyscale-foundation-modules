@@ -212,8 +212,10 @@ under the backward-compat alias `module 3 custom-image <action>`.
 
 ## Troubleshooting
 
-- **Custom-image push denied** — `preflight` checks `AcrPush`; grant it on the
-  registry to the jump-host managed identity.
+- **Custom-image push denied** — `preflight` checks `AcrPush`. Terraform grants
+  it on the registry to the jump-host managed identity (`azurerm_role_assignment.jump_host_acr_push`
+  in `infra/terraform/main.tf`); re-run `apply` if role propagation hasn't
+  finished yet.
 - **`preflight` fails DNS** — run `prepare` from the Linux jump host; the private
   ACR data endpoint must resolve via the private DNS zone inside the VNet.
 - **ACR name not found on jump host** — the harness derives the ACR name directly

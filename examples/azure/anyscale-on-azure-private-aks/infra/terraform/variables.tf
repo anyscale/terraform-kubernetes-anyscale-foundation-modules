@@ -171,6 +171,36 @@ variable "anyscale_fqdns" {
   }
 }
 
+###############################################################################
+# Private Link to the Anyscale control plane (optional)
+# Ask your Anyscale contact for the Private Link Service alias and the DNS
+# zone / hostnames to use before enabling this — they are specific to your
+# cloud deployment.
+###############################################################################
+variable "enable_anyscale_privatelink" {
+  description = "Reach the Anyscale control plane over Private Link instead of the public internet. Off by default; when off, anyscale_fqdns governs egress instead."
+  type        = bool
+  default     = false
+}
+
+variable "anyscale_privatelink_service_alias" {
+  description = "Alias of the Private Link Service Anyscale provides for this cloud deployment. Required when enable_anyscale_privatelink is true."
+  type        = string
+  default     = ""
+}
+
+variable "anyscale_privatelink_dns_zone_name" {
+  description = "Private DNS zone the Anyscale control-plane hostnames live under. Required when enable_anyscale_privatelink is true."
+  type        = string
+  default     = ""
+}
+
+variable "anyscale_privatelink_record_names" {
+  description = "Record names to create in the Anyscale private DNS zone, pointed at the Private Link endpoint. \"*\" produces the wildcard record *.<zone>; \"@\" is the apex."
+  type        = list(string)
+  default     = ["*"]
+}
+
 variable "container_registry_fqdns" {
   description = "Public container registries permitted egress (in addition to private ACR via Private Link)."
   type        = list(string)
@@ -866,6 +896,21 @@ variable "acr_zone_redundancy_enabled" {
   description = "Whether the Premium ACR uses zone redundancy in zone-capable regions."
   type        = bool
   default     = true
+}
+
+variable "acr_cache_rules" {
+  description = <<-EOT
+    Cache rules that mirror upstream image repositories into the private ACR,
+    keyed by rule name. Populate this when firewall egress is locked down and
+    a workload needs an image ACR does not already carry (registry.k8s.io,
+    Docker Hub, quay.io, ...) — e.g.:
+      { k8s_pause = { source_repo = "registry.k8s.io/pause", target_repo = "k8s-cache/pause" } }
+  EOT
+  type = map(object({
+    source_repo = string
+    target_repo = string
+  }))
+  default = {}
 }
 
 ###############################################################################

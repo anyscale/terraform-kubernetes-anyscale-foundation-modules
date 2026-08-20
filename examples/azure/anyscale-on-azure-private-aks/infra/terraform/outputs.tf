@@ -386,3 +386,13 @@ output "anyscale_operator_workload_identity" {
     }
   }
 }
+
+output "anyscale_privatelink" {
+  description = "Anyscale control-plane Private Link endpoint details, or nulls/empty when enable_anyscale_privatelink is false."
+  value = {
+    enabled      = var.enable_anyscale_privatelink
+    endpoint_id  = module.anyscale_privatelink.endpoint_id
+    private_ip   = module.anyscale_privatelink.private_ip
+    record_fqdns = module.anyscale_privatelink.record_fqdns
+  }
+}
