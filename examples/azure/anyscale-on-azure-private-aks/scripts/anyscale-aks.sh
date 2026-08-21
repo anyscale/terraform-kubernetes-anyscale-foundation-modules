@@ -448,6 +448,94 @@ t4_quota_limit() {
 # its warm node, so the deploy would fail late, after AKS is already built.
 T4_VCPUS_PER_NODE=16
 
+# Generalizes t4_quota_limit to an arbitrary vCPU quota family (the
+# `.name.value` az vm list-usage reports, e.g. "standardDSv5Family").
+family_quota_limit() {
+  local location="$1" family="$2"
+  az vm list-usage --location "${location}" --only-show-errors -o json 2>/dev/null \
+    | jq -r --arg family "${family}" 'map(select(.name.value == $family)) | first | .limit // empty' 2>/dev/null
+}
+
+# The quota family a VM size belongs to, or empty when the lookup fails (a
+# SKU can be renamed/retired between regions; empty means "don't know", not
+# "no family").
+vm_size_family() {
+  local location="$1" size="$2"
+  az vm list-skus --location "${location}" --size "${size}" --only-show-errors -o json 2>/dev/null \
+    | jq -r '.[0].family // empty' 2>/dev/null
+}
+
+vm_size_vcpus() {
+  local location="$1" size="$2"
+  az vm list-skus --location "${location}" --size "${size}" --only-show-errors -o json 2>/dev/null \
+    | jq -r '.[0].capabilities[]? | select(.name == "vCPUs") | .value' 2>/dev/null
+}
+
+# Availability zones a VM size actually offers in a region, as a JSON array
+# of zone number strings (e.g. ["1","2","3"]), or "[]" when the size is
+# non-zonal there. Some regions (and some subscriptions within a region)
+# only light up a subset of zones for a given SKU -- assuming ["1","2","3"]
+# everywhere causes AvailabilityZoneNotSupported failures deep into a deploy.
+vm_size_zones() {
+  local location="$1" size="$2"
+  az vm list-skus --location "${location}" --size "${size}" --only-show-errors -o json 2>/dev/null \
+    | jq -c '.[0].locationInfo[0].zones // []' 2>/dev/null
+}
+
+# Warns (does not block -- an unreadable quota API is not evidence of a
+# problem) when the jump host, AKS system pool, and CPU pool would together
+# exceed the subscription's vCPU quota for their SKU family in a region.
+# GPU has its own check (t4_quota_limit) because it can be disabled
+# automatically; these three are load-bearing and cannot be, so this can only
+# warn and point at remediation, matching how the westus3 baseline first hit
+# this: the deploy built the jump host and part of AKS, then failed on a
+# family-wide 10-vCPU subscription cap that was only visible after the fact.
+foundation_quota_check() {
+  local location="$1" linux_jump_host_size="$2" system_size="$3" system_min_count="$4" cpu_size="$5"
+  # Parallel arrays instead of an associative array: this script targets
+  # bash 3.2 (macOS system bash), which has no declare -A. Only a handful of
+  # distinct families are ever in play here, so a linear scan is fine.
+  local -a family_names=() family_totals=()
+  local spec size count family vcpus needed idx found
+
+  for spec in \
+    "${linux_jump_host_size}:1" \
+    "${system_size}:${system_min_count}" \
+    "${cpu_size}:1"
+  do
+    size="${spec%%:*}"
+    count="${spec##*:}"
+    [[ -n "${size}" ]] || continue
+    family="$(vm_size_family "${location}" "${size}")"
+    vcpus="$(vm_size_vcpus "${location}" "${size}")"
+    [[ -n "${family}" && -n "${vcpus}" ]] || continue
+    needed=$(( vcpus * count ))
+
+    found=false
+    for (( idx = 0; idx < ${#family_names[@]}; idx++ )); do
+      if [[ "${family_names[idx]}" == "${family}" ]]; then
+        family_totals[idx]=$(( family_totals[idx] + needed ))
+        found=true
+        break
+      fi
+    done
+    if [[ "${found}" != true ]]; then
+      family_names+=("${family}")
+      family_totals+=("${needed}")
+    fi
+  done
+
+  for (( idx = 0; idx < ${#family_names[@]}; idx++ )); do
+    family="${family_names[idx]}"
+    needed="${family_totals[idx]}"
+    local limit
+    limit="$(family_quota_limit "${location}" "${family}")"
+    if [[ -n "${limit}" ]] && (( limit < needed )); then
+      warn "Quota family ${family} in ${location}: only ${limit} vCPUs available, but the jump host + AKS system pool (min ${system_min_count} nodes) + CPU pool need ~${needed} vCPUs. The deploy will likely build partway and then fail on this quota. Request a ${family} quota increase in ${location} (az vm list-usage --location ${location}), or re-run init with a different --location."
+    fi
+  done
+}
+
 # Rewrite KEY=... in .env, or append it when the template does not carry the key.
 # Values go through the environment so quoting in the value never has to be
 # escaped into an awk program.
@@ -517,6 +605,17 @@ and disabled when it does not, so a missing quota never blocks the deploy. A
 CPU-only run still builds the entire private landing zone and proves it; only
 the GPU, train, and serve stages are skipped. Force either way with --gpu or
 --no-gpu, or edit TF_VAR_gpu_pool_configs in .env afterwards.
+
+The jump host, AKS system pool, and CPU pool are load-bearing and cannot be
+auto-disabled the way GPU pools can, so init instead checks their vCPU family
+quota up front and warns (it does not block) if the subscription's quota in
+the target region looks too small for them to all come up together --
+catching the failure before any Azure resource exists instead of after the
+jump host and part of AKS are already built. It also detects which
+availability zones the subscription can actually use for the AKS node pools
+in that region and overrides the ["1","2","3"] default when the region/
+subscription only offers a subset, avoiding an AvailabilityZoneNotSupported
+failure partway through deploy.
 
 Everything else in .env-template already carries a reviewed default, so the
 normal flow is:
@@ -590,6 +689,28 @@ USAGE
       ;;
   esac
 
+  # These three are load-bearing (no auto-disable like GPU above), so this can
+  # only warn -- but it warns up front, before any Azure resource exists,
+  # instead of after the jump host and part of AKS have already been built.
+  foundation_quota_check "${location}" "Standard_D4s_v5" "Standard_D2s_v5" 3 "Standard_D16s_v5"
+
+  # Availability zones a SKU offers vary by region and by subscription within
+  # a region -- the westus2 baseline only offers zone "3" for some sizes even
+  # though the template default assumes ["1","2","3"]. Detect it once here
+  # instead of letting `deploy` fail on AvailabilityZoneNotSupported partway
+  # through building AKS.
+  local detected_zones zones_summary=""
+  detected_zones="$(vm_size_zones "${location}" "Standard_D2s_v5")"
+  if [[ -z "${detected_zones}" || "${detected_zones}" == "null" ]]; then
+    zones_summary="could not verify; leaving the [\"1\",\"2\",\"3\"] default in place"
+  elif [[ "${detected_zones}" == "[]" ]]; then
+    zones_summary="non-zonal in ${location}; leaving the [\"1\",\"2\",\"3\"] default in place (TF_VAR_availability_zones is unused when a SKU is non-zonal)"
+  elif [[ "$(jq -c 'sort' <<<"${detected_zones}")" == "$(jq -c 'sort' <<<'["1","2","3"]')" ]]; then
+    zones_summary="[\"1\",\"2\",\"3\"] (matches the default)"
+  else
+    zones_summary="${detected_zones} (subscription/region only offers a subset; overriding the [\"1\",\"2\",\"3\"] default)"
+  fi
+
   if [[ -f "${ROOT_DIR}/.env" ]]; then
     local backup="${ROOT_DIR}/.env.backup.$(date -u '+%Y%m%dT%H%M%SZ')"
     cp "${ROOT_DIR}/.env" "${backup}"
@@ -620,6 +741,11 @@ USAGE
     env_file_set TF_VAR_gpu_pool_configs '{}' "'"
   fi
 
+  if [[ -n "${detected_zones}" && "${detected_zones}" != "null" && "${detected_zones}" != "[]" \
+    && "$(jq -c 'sort' <<<"${detected_zones}")" != "$(jq -c 'sort' <<<'["1","2","3"]')" ]]; then
+    env_file_set TF_VAR_availability_zones "${detected_zones}" "'"
+  fi
+
   local ssh_key="${SSH_PRIVATE_KEY_PATH:-${HOME}/.ssh/id_ed25519}"
   env_file_set SSH_PRIVATE_KEY_PATH "${ssh_key}"
   if [[ ! -f "${ssh_key}" ]]; then
@@ -641,6 +767,7 @@ Wrote ${ROOT_DIR}/.env (mode 600, git-ignored):
   project/env    ${project} / ${environment}
   ssh key        ${ssh_key}
   gpu pools      ${gpu_summary}
+  zones          ${zones_summary}
 
 Every other setting keeps its reviewed default from .env-template. Review them
 before a real deploy — especially the VNet address plan (TF_VAR_vnet_address_space,

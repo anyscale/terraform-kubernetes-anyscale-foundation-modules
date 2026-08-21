@@ -2964,6 +2964,7 @@ ensure_azure_cli_login() {
 preflight() {
   log "Checking required CLI tools..."
   for tool_name in az terraform kubectl kubelogin helm jq; do require_cmd "${tool_name}"; done
+  check_terraform_lock_state
   render_tfvars
 
   log "Checking az login..."
