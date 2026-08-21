@@ -4036,9 +4036,19 @@ privatelink_status() {
   log "Private IP:       ${private_ip}"
   log "DNS records:      ${record_fqdns}"
 
-  connection_state="$(run_with_timeout "${SETUP_TIMEOUT_AZURE_COMMAND_SECONDS}" az network private-endpoint-connection list \
-    --id "${endpoint_id}" \
-    --query '[0].properties.privateLinkServiceConnectionState.status' \
+  # `az network private-endpoint-connection list --id` expects the ID of the
+  # PaaS resource that OWNS the connection (storage account, ACR, ...) and
+  # validates it against a fixed allow-list of first-party resource types --
+  # a cross-tenant connection to an externally-vended Private Link Service
+  # (like Anyscale's) is never on that list, so it always errors here. Read
+  # the connection state directly off the private endpoint instead, which is
+  # exactly what it exposes regardless of what's on the other end. A
+  # connection created against an alias (rather than a resource ID) lands in
+  # manualPrivateLinkServiceConnections, not privateLinkServiceConnections --
+  # check both since which one populates isn't something callers control.
+  connection_state="$(run_with_timeout "${SETUP_TIMEOUT_AZURE_COMMAND_SECONDS}" az network private-endpoint show \
+    --ids "${endpoint_id}" \
+    --query '[privateLinkServiceConnections[], manualPrivateLinkServiceConnections[]][] | [0].privateLinkServiceConnectionState.status' \
     --output tsv \
     --only-show-errors)"
 
@@ -4061,6 +4071,7 @@ privatelink_status() {
     log "Resolving Private Link DNS records from inside the cluster"
     local namespace host
     namespace="$(validation_namespace)"
+    prepare_validation_namespace
     host="$(printf '%s\n' "${record_fqdns}" | cut -d, -f1 | xargs)"
     kubectl delete job --namespace "${namespace}" anyscale-privatelink-dns --ignore-not-found >/dev/null 2>&1 || true
     kubectl apply --validate=false -f - <<EOF
