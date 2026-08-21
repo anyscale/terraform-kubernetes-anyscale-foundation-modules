@@ -74,6 +74,7 @@ where you want the VM to own the applies, and what it costs.
 - [Deployment workflow](#deployment-workflow)
 - [Validation and workload proofs](#validation-and-workload-proofs)
 - [Private access options](#private-access-options)
+  - [Private Link to the Anyscale control plane](#private-link-to-the-anyscale-control-plane)
 - [Gateway API, app-routing Istio, and TLS lifecycle](#gateway-api-app-routing-istio-and-tls-lifecycle)
 - [Day-2 operations](#day-2-operations)
 - [Teardown](#teardown)
@@ -310,6 +311,7 @@ The most important inputs are:
 | `TF_VAR_anyscale_platform_role_assignments` | Optional Azure RBAC assignments for additional Anyscale Platform Administrator, Contributor, or Reader principals at subscription, resource group, cloud, or custom scope. |
 | `TF_VAR_anyscale_platform_admin_role_assignments` | Legacy cloud-scoped admin assignment map retained for compatibility. Prefer `TF_VAR_anyscale_platform_role_assignments`. |
 | `TF_VAR_gpu_pool_configs` | GPU pool sizing. The default keeps one T4 node warm. Set it to `{}` for a CPU-only deploy when you have no T4 quota. |
+| `TF_VAR_enable_anyscale_privatelink`, `TF_VAR_anyscale_privatelink_service_alias`, `TF_VAR_anyscale_privatelink_dns_zone_name` | Optional: reach the Anyscale control plane over Private Link instead of the public internet. Off by default. See [Private Link to the Anyscale control plane](#private-link-to-the-anyscale-control-plane). |
 
 ## Deployment workflow
 
@@ -440,6 +442,19 @@ Stop them with:
 ./scripts/anyscale-aks.sh head stop
 ```
 
+### Private Link to the Anyscale control plane
+
+By default, workloads reach the Anyscale SaaS control plane over the public internet through the firewall's `TF_VAR_anyscale_fqdns` allow-list — everything else in this sample (storage, ACR, Key Vault, the AKS API server) is already private-only. `module.anyscale_privatelink` (`infra/terraform/modules/anyscale_privatelink`) is an opt-in alternative that replaces that one remaining public path with an Azure Private Endpoint against the Private Link Service Anyscale exposes for your cloud deployment, plus a private DNS zone so in-VNet hosts resolve the control-plane hostname to the endpoint's private IP.
+
+This is off by default because it requires values only Anyscale can give you, and because it needs a manual approval step on Anyscale's side that Terraform cannot complete for you:
+
+1. Ask your Anyscale contact for the Private Link Service alias (`epr-0-production-pls.<guid>.<region>.azure.privatelinkservice`) and the private DNS zone name your control-plane hostnames live under, for the cloud deployment you're connecting to.
+2. Set `TF_VAR_enable_anyscale_privatelink="true"`, `TF_VAR_anyscale_privatelink_service_alias`, and `TF_VAR_anyscale_privatelink_dns_zone_name` in `.env` (see `.env-template` for the full block, including `TF_VAR_anyscale_privatelink_record_names`).
+3. Run `./scripts/anyscale-aks.sh deploy` as usual. Terraform also removes any `anyscale_fqdns`/`azure_identity_fqdns`/etc. entries superseded by the new private DNS zone from the firewall allow-list (`local.firewall_anyscale_fqdns` in `locals.tf`), so egress isn't left double-configured.
+4. **`terraform apply` succeeding here is not proof the path works.** The private endpoint's connection is cross-tenant and manual (`is_manual_connection = true`) — it stays in a `Pending` state until Anyscale approves the request on their side. Run `./scripts/setup.sh privatelink-status` after deploy to check the real connection state and confirm the DNS records resolve to the private endpoint's IP from inside the cluster; ask your Anyscale contact to approve the connection if it reports `Pending`.
+
+Private Link carries control-plane traffic only — nodes still need public egress for Microsoft Entra tokens, MCR system images, and Azure Resource Manager regardless of whether this is enabled.
+
 ## Gateway API, app-routing Istio, and TLS lifecycle
 
 This sample treats AKS-managed Gateway API and app-routing Istio as the target private Layer 7 path.
@@ -460,6 +475,7 @@ For normal operation, use the same proof-first loop from the quickstart: `deploy
 ```bash
 ./scripts/anyscale-aks.sh status
 ./scripts/anyscale-aks.sh doctor
+./scripts/anyscale-aks.sh privatelink-status  # only meaningful when Private Link is enabled
 ```
 
 For image signing and the Ratify + Azure Policy audit demo, see [Module 5: Image integrity](docs/modules/module-5-image-integrity.md).

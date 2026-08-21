@@ -94,6 +94,13 @@ Compatibility commands:
   doctor
       Check local tool and auth readiness without deploying.
 
+  privatelink-status
+      Check the real connection state of the optional Anyscale control-plane
+      Private Link path (module.anyscale_privatelink) and, if reachable,
+      resolve its DNS records from inside the cluster. A successful
+      `deploy` alone does not prove this path works -- Anyscale must approve
+      the cross-tenant connection first.
+
   tunnel {start|status|stop} [--port PORT]
       Manage the Bastion-backed AKS API tunnel.
 
@@ -1597,6 +1604,11 @@ main() {
       shift
       [[ $# -eq 0 ]] || die "doctor does not accept arguments."
       doctor
+      ;;
+    privatelink-status)
+      shift
+      [[ $# -eq 0 ]] || die "privatelink-status does not accept arguments."
+      run_setup privatelink-status
       ;;
     tunnel)
       shift

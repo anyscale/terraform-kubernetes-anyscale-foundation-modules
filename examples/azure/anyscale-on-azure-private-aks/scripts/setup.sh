@@ -652,6 +652,12 @@ render_tfvars() {
   tfvars_put_json assign_current_principal_cluster_access
   tfvars_put_json aks_cluster_admin_principal_ids
   tfvars_put_json aks_cluster_user_principal_ids
+  tfvars_put_json acr_cache_rules
+
+  tfvars_put_json enable_anyscale_privatelink
+  tfvars_put_string anyscale_privatelink_service_alias
+  tfvars_put_string anyscale_privatelink_dns_zone_name
+  tfvars_put_json anyscale_privatelink_record_names
 
   printf '%s\n' "${TFVARS_JSON}" > "${GENERATED_TFVARS}"
 
@@ -3996,6 +4002,94 @@ bastion() {
   else
     log "Opening Entra-backed Bastion shell. Run setup.sh kubeconfig inside the shell if kubectl needs conversion."
     az aks bastion --name "${cluster}" --resource-group "${rg}" --bastion "${bastion_id}" --yes
+  fi
+}
+
+###############################################################################
+# Check whether the optional Private Link path to the Anyscale control plane
+# (module.anyscale_privatelink) is actually connected, not just deployed.
+# `terraform apply` succeeds with the endpoint left Pending -- Anyscale must
+# approve the cross-tenant connection on their side before it carries
+# traffic -- so this is the only way to know the feature really works.
+###############################################################################
+privatelink_status() {
+  load_env
+  require_cmd az
+  require_cmd jq
+
+  local enabled endpoint_id private_ip record_fqdns connection_state
+  enabled="$(terraform output -json anyscale_privatelink | jq -r '.enabled')"
+
+  if [[ "${enabled}" != "true" ]]; then
+    log "Private Link to the Anyscale control plane is disabled (TF_VAR_enable_anyscale_privatelink is not \"true\"). Nothing to check."
+    return 0
+  fi
+
+  endpoint_id="$(terraform output -json anyscale_privatelink | jq -r '.endpoint_id')"
+  private_ip="$(terraform output -json anyscale_privatelink | jq -r '.private_ip')"
+  record_fqdns="$(terraform output -json anyscale_privatelink | jq -r '.record_fqdns | join(", ")')"
+
+  [[ -n "${endpoint_id}" && "${endpoint_id}" != "null" ]] || die "anyscale_privatelink.endpoint_id output is empty. Run ./scripts/setup.sh deploy first."
+
+  log "Private endpoint: ${endpoint_id}"
+  log "Private IP:       ${private_ip}"
+  log "DNS records:      ${record_fqdns}"
+
+  connection_state="$(run_with_timeout "${SETUP_TIMEOUT_AZURE_COMMAND_SECONDS}" az network private-endpoint-connection list \
+    --id "${endpoint_id}" \
+    --query '[0].properties.privateLinkServiceConnectionState.status' \
+    --output tsv \
+    --only-show-errors)"
+
+  case "${connection_state}" in
+    Approved)
+      log "Connection state: Approved. The Private Link path is live."
+      ;;
+    Pending)
+      warn "Connection state: Pending. Anyscale has not approved this connection yet -- traffic will NOT flow until they do. Ask your Anyscale contact to approve the private endpoint connection for ${endpoint_id}, then re-run this command."
+      ;;
+    Rejected|Disconnected|"")
+      warn "Connection state: ${connection_state:-<empty>}. The Private Link path is not usable. Contact Anyscale about the connection for ${endpoint_id}."
+      ;;
+    *)
+      warn "Connection state: ${connection_state} (unrecognized)."
+      ;;
+  esac
+
+  if kubectl get nodes --request-timeout=15s >/dev/null 2>&1; then
+    log "Resolving Private Link DNS records from inside the cluster"
+    local namespace host
+    namespace="$(validation_namespace)"
+    host="$(printf '%s\n' "${record_fqdns}" | cut -d, -f1 | xargs)"
+    kubectl delete job --namespace "${namespace}" anyscale-privatelink-dns --ignore-not-found >/dev/null 2>&1 || true
+    kubectl apply --validate=false -f - <<EOF
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: anyscale-privatelink-dns
+  namespace: ${namespace}
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      tolerations:
+      - key: node.anyscale.com/capacity-type
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: privatelink-dns
+        image: curlimages/curl:8.11.1
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -eu
+          echo "== resolving ${host} (expect ${private_ip}) =="
+          nslookup "${host}"
+EOF
+    wait_for_job "${namespace}" anyscale-privatelink-dns 5m || warn "DNS check job did not complete cleanly; inspect it with kubectl logs -n ${namespace} job/anyscale-privatelink-dns."
+  else
+    log "kubectl cannot reach the private API server from this shell, so the in-cluster DNS check was skipped. Run ./scripts/setup.sh verify --live or start a Bastion tunnel first, then re-run this command."
   fi
 }
 
@@ -9395,6 +9489,7 @@ Commands:
   status
   health
   outputs
+  privatelink-status
   bastion-tunnel {start|status|stop}
   kubeconfig-bastion [--admin] [--print-path|--export]
   kubeconfig [--admin]
@@ -9415,6 +9510,7 @@ USAGE
     status) shift; status "$@" ;;
     health) shift; health "$@" ;;
     outputs) shift; outputs "$@" ;;
+    privatelink-status) shift; privatelink_status "$@" ;;
     bastion) shift; bastion "$@" ;;
     bastion-tunnel) shift; bastion_tunnel "$@" ;;
     kubeconfig-bastion) shift; kubeconfig_bastion "$@" ;;
