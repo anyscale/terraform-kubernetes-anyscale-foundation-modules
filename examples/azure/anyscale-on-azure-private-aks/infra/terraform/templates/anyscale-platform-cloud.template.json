@@ -14,6 +14,13 @@
         "description": "The name of the Anyscale cloud."
       }
     },
+    "controlPlaneUrl": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional override for the Anyscale control plane URL the operator talks to. Leave empty (the default) to use the per-cloud endpoint derived from the created cloud's ID -- e.g. https://cld-abc123.azure.anyscale-cloud.dev. Set an explicit URL (e.g. https://console.azure.anyscale.com) only to pin a cloud to the shared console endpoint."
+      }
+    },
     "storageAccountName": {
       "type": "string",
       "metadata": {
@@ -36,12 +43,6 @@
       "defaultValue": "",
       "metadata": {
         "description": "The full resource ID of an existing storage account (only for 'existing' mode)."
-      }
-    },
-    "storageContainerName": {
-      "type": "string",
-      "metadata": {
-        "description": "The blob container name Anyscale will use inside the selected storage account."
       }
     },
     "workloadIdentityName": {
@@ -109,13 +110,6 @@
         "description": "The principal ID of the AKS kubelet identity for AcrPull role assignment."
       }
     },
-    "manageAksKubeletAcrPullRoleAssignment": {
-      "type": "bool",
-      "defaultValue": true,
-      "metadata": {
-        "description": "Whether the template should manage the kubelet AcrPull assignment. Disable this when Terraform already owns that role assignment."
-      }
-    },
     "storageBlobServiceDeploymentName": {
       "type": "string",
       "defaultValue": "[concat('StorageBlobServiceDeployment-', utcNow('yyyyMMddHHmmss'))]",
@@ -143,13 +137,29 @@
       "metadata": {
         "description": "The name for the ACR role assignments nested deployment."
       }
+    },
+    "manageAksKubeletAcrPullRoleAssignment": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Whether the template should manage the kubelet AcrPull assignment. Disable this when Terraform already owns that role assignment."
+      }
+    },
+    "storageContainerName": {
+      "type": "string",
+      "metadata": {
+        "description": "The blob container name Anyscale will use inside the selected storage account."
+      }
     }
   },
   "variables": {
     "containerName": "[parameters('storageContainerName')]",
     "storageBlobDataOwnerRoleId": "b7e6dc6d-f1e8-4753-8033-0f276bb0955b",
-    "abfssUrl": "[concat('abfss://', variables('containerName'), '@', parameters('storageAccountName'), '.dfs.core.windows.net')]",
-    "blobEndpoint": "[concat('https://', parameters('storageAccountName'), '.blob.core.windows.net')]",
+    "kubernetesServiceAccountNamespace": "anyscale-operator",
+    "kubernetesServiceAccountName": "anyscale-operator",
+    "edgeParentDomain": "azure.anyscale-cloud.dev",
+    "abfssLocation": "[format('abfss://{0}@{1}.dfs.{2}', variables('containerName'), parameters('storageAccountName'), environment().suffixes.storage)]",
+    "blobEndpoint": "[format('https://{0}.blob.{1}', parameters('storageAccountName'), environment().suffixes.storage)]",
     "effectiveStorageResourceId": "[if(equals(parameters('storageMode'), 'managed'), resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), parameters('storageAccountResourceId'))]",
     "effectiveBlobServicesResourceId": "[concat(variables('effectiveStorageResourceId'), '/blobServices/default')]",
     "effectiveIdentityResourceId": "[if(equals(parameters('identityMode'), 'managed'), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('workloadIdentityName')), parameters('identityResourceId'))]",
@@ -166,7 +176,7 @@
     {
       "condition": "[equals(parameters('storageMode'), 'managed')]",
       "type": "Microsoft.Storage/storageAccounts",
-      "apiVersion": "2023-01-01",
+      "apiVersion": "2025-08-01",
       "name": "[parameters('storageAccountName')]",
       "location": "[parameters('location')]",
       "sku": {
@@ -185,7 +195,7 @@
     },
     {
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "[parameters('storageBlobServiceDeploymentName')]",
       "resourceGroup": "[variables('storageResourceGroup')]",
       "dependsOn": [
@@ -199,17 +209,17 @@
           "resources": [
             {
               "type": "Microsoft.Storage/storageAccounts/blobServices",
-              "apiVersion": "2023-01-01",
+              "apiVersion": "2025-08-01",
               "name": "[concat(parameters('storageAccountName'), '/default')]",
               "properties": {
                 "cors": {
-                  "corsRules": "[if(equals(parameters('storageMode'), 'existing'), if(contains(string(reference(variables('effectiveBlobServicesResourceId'), '2023-01-01').cors.corsRules), 'https://*.anyscale.com'), reference(variables('effectiveBlobServicesResourceId'), '2023-01-01').cors.corsRules, concat(reference(variables('effectiveBlobServicesResourceId'), '2023-01-01').cors.corsRules, createArray(createObject('allowedOrigins', createArray('https://*.anyscale.com'), 'allowedMethods', createArray('GET', 'HEAD', 'PUT', 'POST', 'DELETE'), 'allowedHeaders', createArray('*'), 'exposedHeaders', createArray('*'), 'maxAgeInSeconds', 3600)))), createArray(createObject('allowedOrigins', createArray('https://*.anyscale.com'), 'allowedMethods', createArray('GET', 'HEAD', 'PUT', 'POST', 'DELETE'), 'allowedHeaders', createArray('*'), 'exposedHeaders', createArray('*'), 'maxAgeInSeconds', 3600)))]"
+                  "corsRules": "[if(equals(parameters('storageMode'), 'existing'), if(contains(string(reference(variables('effectiveBlobServicesResourceId'), '2025-08-01').cors.corsRules), 'https://*.anyscale.com'), reference(variables('effectiveBlobServicesResourceId'), '2025-08-01').cors.corsRules, concat(reference(variables('effectiveBlobServicesResourceId'), '2025-08-01').cors.corsRules, createArray(createObject('allowedOrigins', createArray('https://*.anyscale.com'), 'allowedMethods', createArray('GET', 'HEAD', 'PUT', 'POST', 'DELETE'), 'allowedHeaders', createArray('*'), 'exposedHeaders', createArray('*'), 'maxAgeInSeconds', 3600)))), createArray(createObject('allowedOrigins', createArray('https://*.anyscale.com'), 'allowedMethods', createArray('GET', 'HEAD', 'PUT', 'POST', 'DELETE'), 'allowedHeaders', createArray('*'), 'exposedHeaders', createArray('*'), 'maxAgeInSeconds', 3600)))]"
                 }
               }
             },
             {
               "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
-              "apiVersion": "2023-01-01",
+              "apiVersion": "2025-08-01",
               "name": "[concat(parameters('storageAccountName'), '/default/', variables('containerName'))]",
               "dependsOn": [
                 "[variables('effectiveBlobServicesResourceId')]"
@@ -225,7 +235,7 @@
     {
       "condition": "[equals(parameters('identityMode'), 'managed')]",
       "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
-      "apiVersion": "2023-01-31",
+      "apiVersion": "2024-11-30",
       "name": "[parameters('workloadIdentityName')]",
       "location": "[parameters('location')]",
       "tags": "[union(if(contains(parameters('tagsByResource'), 'Microsoft.ManagedIdentity/userAssignedIdentities'), parameters('tagsByResource')['Microsoft.ManagedIdentity/userAssignedIdentities'], json('{}')), createObject('anyscale-cloud', parameters('cloudName')))]"
@@ -233,7 +243,7 @@
     {
       "condition": "[equals(parameters('identityMode'), 'managed')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "[parameters('federatedIdentityDeploymentName')]",
       "resourceGroup": "[variables('identityResourceGroup')]",
       "properties": {
@@ -244,7 +254,7 @@
           "resources": [
             {
               "type": "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials",
-              "apiVersion": "2023-01-31",
+              "apiVersion": "2024-11-30",
               "name": "[concat(parameters('workloadIdentityName'), '/kubernetes-federated-credential')]",
               "properties": {
                 "issuer": "[reference(parameters('aksClusterResourceId'), '2025-10-01').oidcIssuerProfile.issuerUrl]",
@@ -263,7 +273,7 @@
     },
     {
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "[parameters('storageRoleAssignmentDeploymentName')]",
       "resourceGroup": "[variables('storageResourceGroup')]",
       "dependsOn": [
@@ -271,19 +281,50 @@
         "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('workloadIdentityName'))]"
       ],
       "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "Inner"
+        },
         "mode": "Incremental",
+        "parameters": {
+          "principalId": {
+            "value": "[reference(variables('effectiveIdentityResourceId'), '2024-11-30').principalId]"
+          },
+          "scopeResourceId": {
+            "value": "[variables('effectiveStorageResourceId')]"
+          },
+          "identityResourceId": {
+            "value": "[variables('effectiveIdentityResourceId')]"
+          },
+          "roleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('storageBlobDataOwnerRoleId'))]"
+          }
+        },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
+          "parameters": {
+            "principalId": {
+              "type": "string"
+            },
+            "scopeResourceId": {
+              "type": "string"
+            },
+            "identityResourceId": {
+              "type": "string"
+            },
+            "roleDefinitionId": {
+              "type": "string"
+            }
+          },
           "resources": [
             {
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "name": "[guid(variables('effectiveStorageResourceId'), variables('effectiveIdentityResourceId'), variables('storageBlobDataOwnerRoleId'))]",
-              "scope": "[variables('effectiveStorageResourceId')]",
+              "name": "[guid(parameters('scopeResourceId'), parameters('identityResourceId'), last(split(parameters('roleDefinitionId'), '/')))]",
+              "scope": "[parameters('scopeResourceId')]",
               "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('storageBlobDataOwnerRoleId'))]",
-                "principalId": "[reference(variables('effectiveIdentityResourceId'), '2023-01-31').principalId]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalId": "[parameters('principalId')]",
                 "principalType": "ServicePrincipal"
               }
             }
@@ -294,7 +335,7 @@
     {
       "condition": "[not(equals(parameters('acrMode'), 'none'))]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "[parameters('acrRoleAssignmentsDeploymentName')]",
       "resourceGroup": "[variables('acrResourceGroup')]",
       "dependsOn": [
@@ -302,44 +343,99 @@
         "[resourceId('Microsoft.ContainerRegistry/registries', variables('acrSafeName'))]"
       ],
       "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "Inner"
+        },
         "mode": "Incremental",
+        "parameters": {
+          "workloadPrincipalId": {
+            "value": "[reference(variables('effectiveIdentityResourceId'), '2024-11-30').principalId]"
+          },
+          "kubeletPrincipalId": {
+            "value": "[parameters('aksKubeletPrincipalId')]"
+          },
+          "acrResourceId": {
+            "value": "[variables('acrResourceId')]"
+          },
+          "identityResourceId": {
+            "value": "[variables('effectiveIdentityResourceId')]"
+          },
+          "acrPushRoleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPushRoleId'))]"
+          },
+          "acrTaskContributorRoleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrTaskContributorRoleId'))]"
+          },
+          "acrPullRoleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPullRoleId'))]"
+          },
+          "manageAksKubeletAcrPullRoleAssignment": {
+            "value": "[parameters('manageAksKubeletAcrPullRoleAssignment')]"
+          }
+        },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
+          "parameters": {
+            "workloadPrincipalId": {
+              "type": "string"
+            },
+            "kubeletPrincipalId": {
+              "type": "string"
+            },
+            "acrResourceId": {
+              "type": "string"
+            },
+            "identityResourceId": {
+              "type": "string"
+            },
+            "acrPushRoleDefinitionId": {
+              "type": "string"
+            },
+            "acrTaskContributorRoleDefinitionId": {
+              "type": "string"
+            },
+            "acrPullRoleDefinitionId": {
+              "type": "string"
+            },
+            "manageAksKubeletAcrPullRoleAssignment": {
+              "type": "bool"
+            }
+          },
           "resources": [
             {
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "name": "[guid(variables('acrResourceId'), variables('effectiveIdentityResourceId'), variables('acrPushRoleId'))]",
-              "scope": "[variables('acrResourceId')]",
+              "name": "[guid(parameters('acrResourceId'), parameters('identityResourceId'), last(split(parameters('acrPushRoleDefinitionId'), '/')))]",
+              "scope": "[parameters('acrResourceId')]",
               "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPushRoleId'))]",
-                "principalId": "[reference(variables('effectiveIdentityResourceId'), '2023-01-31').principalId]",
+                "roleDefinitionId": "[parameters('acrPushRoleDefinitionId')]",
+                "principalId": "[parameters('workloadPrincipalId')]",
                 "principalType": "ServicePrincipal"
               }
             },
             {
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "name": "[guid(variables('acrResourceId'), variables('effectiveIdentityResourceId'), variables('acrTaskContributorRoleId'))]",
-              "scope": "[variables('acrResourceId')]",
+              "name": "[guid(parameters('acrResourceId'), parameters('identityResourceId'), last(split(parameters('acrTaskContributorRoleDefinitionId'), '/')))]",
+              "scope": "[parameters('acrResourceId')]",
               "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrTaskContributorRoleId'))]",
-                "principalId": "[reference(variables('effectiveIdentityResourceId'), '2023-01-31').principalId]",
+                "roleDefinitionId": "[parameters('acrTaskContributorRoleDefinitionId')]",
+                "principalId": "[parameters('workloadPrincipalId')]",
                 "principalType": "ServicePrincipal"
               }
             },
             {
-              "condition": "[parameters('manageAksKubeletAcrPullRoleAssignment')]",
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "name": "[guid(variables('acrResourceId'), parameters('aksKubeletPrincipalId'), variables('acrPullRoleId'))]",
-              "scope": "[variables('acrResourceId')]",
+              "name": "[guid(parameters('acrResourceId'), parameters('kubeletPrincipalId'), last(split(parameters('acrPullRoleDefinitionId'), '/')))]",
+              "scope": "[parameters('acrResourceId')]",
               "properties": {
-                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPullRoleId'))]",
-                "principalId": "[parameters('aksKubeletPrincipalId')]",
+                "roleDefinitionId": "[parameters('acrPullRoleDefinitionId')]",
+                "principalId": "[parameters('kubeletPrincipalId')]",
                 "principalType": "ServicePrincipal"
-              }
+              },
+              "condition": "[parameters('manageAksKubeletAcrPullRoleAssignment')]"
             }
           ]
         }
@@ -348,7 +444,7 @@
     {
       "condition": "[equals(parameters('acrMode'), 'managed')]",
       "type": "Microsoft.ContainerRegistry/registries",
-      "apiVersion": "2023-07-01",
+      "apiVersion": "2025-11-01",
       "name": "[variables('acrSafeName')]",
       "location": "[parameters('location')]",
       "sku": {
@@ -385,9 +481,9 @@
       "properties": {
         "provider": "Azure",
         "computeStack": "K8S",
-        "cloudStorageBucketName": "[variables('abfssUrl')]",
+        "cloudStorageBucketName": "[variables('abfssLocation')]",
         "cloudStorageBucketEndpoint": "[variables('blobEndpoint')]",
-        "anyscaleOperatorIamIdentity": "[reference(variables('effectiveIdentityResourceId'), '2023-01-31').principalId]"
+        "anyscaleOperatorIamIdentity": "[reference(variables('effectiveIdentityResourceId'), '2024-11-30').principalId]"
       },
       "tags": "[union(if(contains(parameters('tagsByResource'), 'Anyscale.Platform/clouds/cloudResources'), parameters('tagsByResource')['Anyscale.Platform/clouds/cloudResources'], json('{}')), createObject('anyscale-cloud', parameters('cloudName')))]"
     }
@@ -397,21 +493,29 @@
       "type": "string",
       "value": "[reference(resourceId('Anyscale.Platform/clouds/cloudResources', parameters('cloudName'), 'default'), '2026-02-01-preview').cloudResourceId]"
     },
+    "cloudId": {
+      "type": "string",
+      "value": "[last(split(reference(resourceId('Anyscale.Platform/clouds', parameters('cloudName')), '2026-02-01-preview').ssoUrl, '/'))]"
+    },
+    "controlPlaneEndpoint": {
+      "type": "string",
+      "value": "[if(empty(parameters('controlPlaneUrl')), concat('https://', toLower(replace(last(split(reference(resourceId('Anyscale.Platform/clouds', parameters('cloudName')), '2026-02-01-preview').ssoUrl, '/')), '_', '-')), '.', variables('edgeParentDomain')), parameters('controlPlaneUrl'))]"
+    },
     "storageAccountName": {
       "type": "string",
       "value": "[parameters('storageAccountName')]"
     },
     "managedIdentityClientId": {
       "type": "string",
-      "value": "[reference(variables('effectiveIdentityResourceId'), '2023-01-31').clientId]"
+      "value": "[reference(variables('effectiveIdentityResourceId'), '2024-11-30').clientId]"
     },
     "managedIdentityPrincipalId": {
       "type": "string",
-      "value": "[reference(variables('effectiveIdentityResourceId'), '2023-01-31').principalId]"
+      "value": "[reference(variables('effectiveIdentityResourceId'), '2024-11-30').principalId]"
     },
-    "abfssUrl": {
+    "abfssLocation": {
       "type": "string",
-      "value": "[variables('abfssUrl')]"
+      "value": "[variables('abfssLocation')]"
     },
     "blobEndpoint": {
       "type": "string",
@@ -425,7 +529,7 @@
     "acrLoginServer": {
       "condition": "[equals(parameters('acrMode'), 'managed')]",
       "type": "string",
-      "value": "[if(equals(parameters('acrMode'), 'managed'), reference(resourceId('Microsoft.ContainerRegistry/registries', variables('acrSafeName')), '2023-07-01').loginServer, '')]"
+      "value": "[if(equals(parameters('acrMode'), 'managed'), reference(resourceId('Microsoft.ContainerRegistry/registries', variables('acrSafeName')), '2025-11-01').loginServer, '')]"
     }
   }
 }
