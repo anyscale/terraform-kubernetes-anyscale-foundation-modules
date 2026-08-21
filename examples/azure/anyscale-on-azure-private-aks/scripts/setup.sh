@@ -5850,6 +5850,7 @@ wait_for_anyscale_workspace_running() {
   ANYSCALE_WORKSPACE_WAIT_RESULT=""
   : > "${wait_log}"
   deadline=$(( $(date +%s) + SETUP_TIMEOUT_ANYSCALE_WORKSPACE_WAIT_SECONDS ))
+  local terminal_status_streak=""
 
   while true; do
     if ! raw_status="$(run_with_timeout "${SETUP_TIMEOUT_ANYSCALE_COMMAND_SECONDS}" \
@@ -5878,8 +5879,26 @@ wait_for_anyscale_workspace_running() {
         return 0
         ;;
       TERMINATED|TERMINATING|CREATE_FAILED|FAILED|ERROR)
-        ANYSCALE_WORKSPACE_WAIT_RESULT="${current_status}"
-        return 1
+        # A freshly-created workspace can transiently report TERMINATED/ERROR for one poll
+        # before its controller actually starts provisioning. Only treat this as fatal once
+        # the same terminal status is confirmed on a second consecutive poll.
+        if [[ "${terminal_status_streak}" == "${current_status}" ]]; then
+          ANYSCALE_WORKSPACE_WAIT_RESULT="${current_status}"
+          return 1
+        fi
+        terminal_status_streak="${current_status}"
+        warn "Workspace ${workspace_name} reported ${current_status}; re-checking once before treating it as fatal (can be transient right after creation)."
+        current_epoch=$(date +%s)
+        if (( current_epoch >= deadline )); then
+          ANYSCALE_WORKSPACE_WAIT_RESULT="Timed out waiting for RUNNING; last observed state=${current_status}"
+          return 1
+        fi
+        sleep "$(workspace_wait_sleep_seconds "${attempt}")"
+        attempt=$((attempt + 1))
+        continue
+        ;;
+      *)
+        terminal_status_streak=""
         ;;
     esac
 
@@ -5908,6 +5927,7 @@ wait_for_anyscale_workspace_running_attempts() {
   local max_attempts="$4"
   local interval_seconds="$5"
   local attempt raw_status current_status previous_status=""
+  local terminal_status_streak=""
 
   require_positive_integer_arg "--max-attempts" "${max_attempts}"
   require_positive_integer_arg "--interval-seconds" "${interval_seconds}"
@@ -5944,8 +5964,22 @@ wait_for_anyscale_workspace_running_attempts() {
         return 0
         ;;
       TERMINATED|TERMINATING|CREATE_FAILED|FAILED|ERROR)
-        ANYSCALE_WORKSPACE_WAIT_RESULT="${current_status}"
-        return 1
+        # See wait_for_anyscale_workspace_running: a freshly-created workspace can
+        # transiently report a terminal-looking status for one poll before its
+        # controller starts provisioning. Confirm on a second consecutive poll.
+        if [[ "${terminal_status_streak}" == "${current_status}" ]]; then
+          ANYSCALE_WORKSPACE_WAIT_RESULT="${current_status}"
+          return 1
+        fi
+        terminal_status_streak="${current_status}"
+        warn "Workspace ${workspace_name} reported ${current_status}; re-checking once before treating it as fatal (can be transient right after creation)."
+        if (( attempt < max_attempts )); then
+          sleep "${interval_seconds}"
+        fi
+        continue
+        ;;
+      *)
+        terminal_status_streak=""
         ;;
     esac
 

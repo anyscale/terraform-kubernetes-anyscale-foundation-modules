@@ -230,10 +230,12 @@ variable "container_registry_fqdns" {
     "authn.nvidia.com",
     "arcmktplaceprod.azurecr.io",
     "*.data.azurecr.io",
-    # registry.k8s.io redirects image layer pulls to the geographically nearest
-    # S3 mirror. Missing the bucket for your region surfaces as ErrImagePull
+    # registry.k8s.io serves image layer/manifest blobs from its CDN frontend
+    # (cdn.registry.k8s.io) and, for older clients/regions, redirects to a
+    # geographically nearest S3 mirror. Missing either surfaces as ErrImagePull
     # ("failed to do request: ... EOF") on any registry.k8s.io image, not as a
     # firewall denial. us-west-2 serves westus2/westus3 deployments.
+    "cdn.registry.k8s.io",
     "prod-registry-k8s-io-us-west-1.s3.dualstack.us-west-1.amazonaws.com",
     "prod-registry-k8s-io-us-west-2.s3.dualstack.us-west-2.amazonaws.com",
     "prod-registry-k8s-io-us-east-1.s3.dualstack.us-east-1.amazonaws.com",
