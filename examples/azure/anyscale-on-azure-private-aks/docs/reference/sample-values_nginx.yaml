@@ -1,0 +1,100 @@
+# Sample ingress-nginx values for this example. Review before using.
+#
+# The load balancer is PUBLIC. Only the API server, storage, ACR and (when
+# enabled) the Anyscale control plane path are private in this example -
+# workspace and service traffic still arrives from the internet.
+#
+# To make the data plane VNet-only instead, uncomment the internal annotation
+# below. Note that you then cannot open an Anyscale workspace from a browser
+# outside the VNet.
+#
+# Use this ONLY with `ingress-nginx.enabled: false` in the operator values (or
+# `--configuration-settings "ingress-nginx.enabled=false"` on the AKS
+# extension). Running the subchart and this chart together leaves two
+# controllers competing for the same Ingress resources.
+#
+# NOTE ON THE ANNOTATIONS BELOW: they can only be set this way, from a values
+# file. They cannot be passed through `az k8s-extension --configuration-settings`
+# - those keys are split on `.`, and every Azure load balancer annotation starts
+# with `service.beta.kubernetes.io/`, so the key is mangled into `service\` and
+# the Service fails to validate. That mismatch is the main reason to prefer this
+# standalone path over the bundled subchart when you need LB annotations.
+controller:
+  progressDeadlineSeconds: 600
+
+  # The class here must match `spec.ingressClassName` on the Ingress resources
+  # the Anyscale operator creates. Check what it actually emits:
+  #
+  #   kubectl get ingress -A -o custom-columns=\
+  #     NS:.metadata.namespace,NAME:.metadata.name,CLASS:.spec.ingressClassName
+  #
+  # The operator uses `nginx`, which is the chart default - so these are left at
+  # their defaults deliberately rather than customised.
+  #
+  # Do not be misled by `controller.ingressClass: anyscale-nginx` in the older
+  # aks-new_cluster values file. That key is the LEGACY
+  # `kubernetes.io/ingress.class` annotation, not the IngressClass resource name
+  # - the resource name comes from `ingressClassResource.name` and stays `nginx`
+  # regardless. Setting it does not rename anything, and matching it here would
+  # produce a controller that quietly ignores every Ingress the operator makes.
+  ingressClassResource:
+    name: nginx
+    enabled: true
+    default: false
+    controllerValue: k8s.io/ingress-nginx
+
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: "/healthz"
+      # service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+  allowSnippetAnnotations: true
+  config:
+    enable-underscores-in-headers: true
+    annotations-risk-level: "Critical"
+  # Fixed replica count rather than autoscaling.
+  #
+  # The chart's autoscaling defaults are a trap on a small cluster: maxReplicas
+  # is 11, with BOTH a 50% CPU and a 50% memory target. The controller requests
+  # ~90Mi and uses more than 45Mi at idle, so the memory target is breached
+  # immediately and the HPA scales straight to 11 replicas serving no traffic.
+  #
+  # Turn autoscaling back on with explicit bounds if you need it:
+  #   autoscaling:
+  #     enabled: true
+  #     minReplicas: 2
+  #     maxReplicas: 4
+  #     targetMemoryUtilizationPercentage: 80
+  replicaCount: 2
+  autoscaling:
+    enabled: false
+
+  # REQUIRED when block_public_internet_egress = true. registry.k8s.io is not an
+  # Azure endpoint, so the nodes cannot reach it - the images have to come from
+  # the ACR instead. Substitute the `acr_login_server` output for both.
+  #
+  # Note that the `acr_cache_rules` in acr.tf do NOT put anything in the registry
+  # by themselves: a cache rule is pull-triggered, so nothing is fetched until
+  # something asks ACR for that path. Omit the override below and the nodes ask
+  # registry.k8s.io directly, ACR is never contacted, and the cache stays empty.
+  #
+  # The upstream fetch runs on ACR's own service infrastructure rather than your
+  # subnet, which is why it works with the Deny in place.
+  #
+  # `digest` and `digestChroot` are cleared deliberately. The chart pins images
+  # by digest, which renders as `<acr>/ingress-nginx/controller:v1.12.1@sha256:…`
+  # - and a cache rule has to resolve the TAG upstream to populate itself, so a
+  # digest-pinned pull of content it has never seen is the fragile path. Clearing
+  # them trades digest pinning for a plain tag pull.
+  #
+  # image:
+  #   registry: <acr_login_server>
+  #   image: ingress-nginx/controller
+  #   digest: ""
+  #   digestChroot: ""
+  # admissionWebhooks:
+  #   patch:
+  #     image:
+  #       registry: <acr_login_server>
+  #       image: ingress-nginx/kube-webhook-certgen
+  #       digest: ""

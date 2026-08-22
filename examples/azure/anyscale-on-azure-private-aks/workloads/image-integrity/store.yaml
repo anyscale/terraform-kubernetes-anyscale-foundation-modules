@@ -1,0 +1,13 @@
+# Ratify Store — reads image artifacts (and the Notation signature referrer)
+# from the private ACR using the Ratify workload identity.
+apiVersion: config.ratify.deislabs.io/v1beta1
+kind: Store
+metadata:
+  name: store-oras
+spec:
+  name: oras
+  parameters:
+    cacheEnabled: false
+    authProvider:
+      name: azureWorkloadIdentity
+      clientID: "$ANYSCALE_RATIFY_CLIENT_ID"

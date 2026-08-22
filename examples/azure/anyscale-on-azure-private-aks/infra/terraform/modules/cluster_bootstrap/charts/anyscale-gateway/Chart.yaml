@@ -1,0 +1,6 @@
+apiVersion: v2
+name: anyscale-gateway
+description: Gateway API resources for Anyscale on AKS app-routing Istio.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
