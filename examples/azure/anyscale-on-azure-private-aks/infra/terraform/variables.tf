@@ -163,6 +163,12 @@ variable "anyscale_fqdns" {
     "anyscale-public.s3.us-west-2.amazonaws.com",
     "anyscale.com",
     "learn.microsoft.com",
+    # Anyscale job/workspace pods pip-install the anyscale CLI at runtime
+    # (e.g. job proof working-directory submission); without these the AKS
+    # node subnet can reach every other Anyscale endpoint but job submission
+    # still fails with a PyPI TLS/connect error.
+    "pypi.org",
+    "files.pythonhosted.org",
   ]
 
   validation {

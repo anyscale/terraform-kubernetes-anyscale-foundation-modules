@@ -3412,11 +3412,27 @@ invoke_jump_host_bootstrap() {
   fi
 
   # ---- Open Bastion tunnel to jump host port 22 ----------------------------
+  # A prior invocation of this stage that was killed hard (not a clean exit)
+  # leaves its `az network bastion tunnel` child orphaned, still holding its
+  # local port -- the EXIT trap below never gets to run. Reap any such stale
+  # tunnel on a candidate port before giving up on it, the same way
+  # bastion_tunnel start() self-heals its own port, so an interrupted prior
+  # run doesn't permanently burn through the 20-port search window.
   local jh_port requested_jh_port candidate_jh_port jh_pid known_hosts_file outer_exit_trap
   requested_jh_port="${BOOTSTRAP_BASTION_SSH_PORT:-50023}"
   jh_port="${requested_jh_port}"
+  if listener_is_ready "${jh_port}" && port_listeners_are_bastion_tunnels "${jh_port}"; then
+    warn "Removing stale Bastion tunnel listener on 127.0.0.1:${jh_port} before opening a fresh one."
+    stop_bastion_listeners_on_port "${jh_port}" || true
+    wait_for_listener_shutdown "${jh_port}" 10 || true
+  fi
   if listener_is_ready "${jh_port}"; then
     for ((candidate_jh_port = requested_jh_port + 1; candidate_jh_port <= requested_jh_port + 20; candidate_jh_port++)); do
+      if listener_is_ready "${candidate_jh_port}" && port_listeners_are_bastion_tunnels "${candidate_jh_port}"; then
+        warn "Removing stale Bastion tunnel listener on 127.0.0.1:${candidate_jh_port} before opening a fresh one."
+        stop_bastion_listeners_on_port "${candidate_jh_port}" || true
+        wait_for_listener_shutdown "${candidate_jh_port}" 10 || true
+      fi
       if ! listener_is_ready "${candidate_jh_port}"; then
         jh_port="${candidate_jh_port}"
         warn "Local bootstrap SSH port ${requested_jh_port} is already in use; using ${jh_port} instead."
@@ -3424,7 +3440,7 @@ invoke_jump_host_bootstrap() {
       fi
     done
     if [[ "${jh_port}" == "${requested_jh_port}" ]]; then
-      die "Local bootstrap SSH port ${requested_jh_port} and the next 20 ports are already in use. Free a port or set BOOTSTRAP_BASTION_SSH_PORT to an open port."
+      die "Local bootstrap SSH port ${requested_jh_port} and the next 20 ports are already in use by non-Bastion-tunnel listeners. Free a port or set BOOTSTRAP_BASTION_SSH_PORT to an open port."
     fi
   fi
   known_hosts_file="$(mktemp "${TMPDIR:-/tmp}/anyscale-bastion-known-hosts.XXXXXX")"
