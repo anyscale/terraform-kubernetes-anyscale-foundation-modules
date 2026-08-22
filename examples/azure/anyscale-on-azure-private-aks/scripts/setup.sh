@@ -3090,10 +3090,60 @@ apply() {
   rm -f tfplan
 }
 
+add_exit_trap() {
+  local new_cmd="$1"
+  local existing
+
+  existing="$(trap -p EXIT | sed -E "s/^trap -- '(.*)' EXIT\$/\1/")"
+  if [[ -n "${existing}" ]]; then
+    trap "${existing}; ${new_cmd}" EXIT
+  else
+    trap "${new_cmd}" EXIT
+  fi
+}
+
+run_lock_file() {
+  printf '%s/run.lock' "${HARNESS_DIR}"
+}
+
+# terraform's own state lock only protects a single apply/destroy call, and
+# run_terraform_command_with_retry (see "Error acquiring the state lock"
+# handling above) treats lock contention as transient and retries -- so two
+# overlapping `deploy`/`teardown` invocations don't fail fast against each
+# other, they interleave for as long as both keep running, each retrying past
+# the other's lock and issuing conflicting Azure API calls (observed live as
+# repeated "AnotherOperationInProgress" 409s during a stuck private-endpoint
+# destroy). Fail the second invocation immediately instead.
+acquire_run_lock() {
+  local lock_file existing_pid
+  lock_file="$(run_lock_file)"
+  mkdir -p "${HARNESS_DIR}"
+  if [[ -f "${lock_file}" ]]; then
+    existing_pid="$(cat "${lock_file}" 2>/dev/null || true)"
+    if [[ -n "${existing_pid}" ]] && pid_is_running "${existing_pid}"; then
+      die "Another deploy/teardown/verify/proof run (pid ${existing_pid}) is already active for this environment (${lock_file}). Wait for it to finish, or confirm that pid is really dead, before retrying."
+    fi
+    warn "Removing stale run lock ${lock_file} (pid ${existing_pid:-unknown} is not running)."
+  fi
+  printf '%s\n' "$$" > "${lock_file}"
+  add_exit_trap release_run_lock
+}
+
+release_run_lock() {
+  local lock_file existing_pid
+  lock_file="$(run_lock_file)"
+  [[ -f "${lock_file}" ]] || return 0
+  existing_pid="$(cat "${lock_file}" 2>/dev/null || true)"
+  [[ "${existing_pid}" == "$$" ]] && rm -f "${lock_file}"
+  return 0
+}
+
 setup_run_init() {
   local run_name="$1"
   local stage_total="$2"
   local run_id
+
+  acquire_run_lock
 
   run_id="$(date -u +%Y%m%dT%H%M%SZ)"
   SETUP_RUN_DIR="${HARNESS_DIR}/runs/${run_id}-${run_name}"
