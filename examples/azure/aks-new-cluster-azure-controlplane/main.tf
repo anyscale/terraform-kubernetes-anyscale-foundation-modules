@@ -27,6 +27,11 @@ locals {
   storage_account_name_base_nfs = length(local.storage_account_name_base) > 16 ? substr(local.storage_account_name_base, 0, 16) : local.storage_account_name_base
   storage_account_name          = coalesce(var.storage_account_name, "${local.storage_account_name_base_sa}sa${local.name_suffix}")
   storage_account_name_nfs      = coalesce(var.storage_account_name_nfs, "${local.storage_account_name_base_nfs}nfs${local.name_suffix}")
+
+  # Named here rather than inline on the resource because the ARM template
+  # needs the same name when it provisions the container itself
+  # (enable_operator_infrastructure = false).
+  storage_container_name = "${var.aks_cluster_name}-blob"
 }
 
 ############################################
@@ -101,7 +106,7 @@ resource "azurerm_storage_container" "blob" {
 
   #checkov:skip=CKV2_AZURE_21: "Ensure Storage logging is enabled for Blob service for read requests"
 
-  name                  = "${var.aks_cluster_name}-blob"
+  name                  = local.storage_container_name
   storage_account_id    = azurerm_storage_account.sa[0].id
   container_access_type = "private" # blobs are private but reachable via the public endpoint
 }

@@ -300,7 +300,23 @@ It also carries `workloads.instanceTypes.enableDefaults` and the GPU tolerations
 
 Two caveats. The generated command drops `--create-namespace`, because `create_operator_namespace` defaults to `true` and Terraform already made the namespace; if you set that to `false`, the flag comes back automatically. And overrides passed through `anyscale_platform.extension_configuration_settings` apply to the **extension path only** — they're flat dotted keys and are not merged into the generated YAML, so edit the file directly if you need them.
 
-> `enable_operator_infrastructure` is a *different* flag and is **not** the one for this. See the note in `variables.tf`.
+> `enable_operator_infrastructure` is a *different* flag and is **not** the one for this — see below.
+
+### Who owns the operator's storage and identity
+
+`enable_operator_infrastructure` picks which side provisions the operator's blob storage, workload identity, federated credential and storage role assignment. Both modes produce the same working cloud.
+
+| | `true` (default) | `false` |
+| --- | --- | --- |
+| Created by | Terraform | the Anyscale.Platform ARM template |
+| ARM `storageMode` / `identityMode` | `existing` | `managed` |
+| Visible in the plan | yes | no — owned by the cloud resource |
+| Tagged with `var.tags` | yes | no |
+| Removed by `terraform destroy` | yes | with the cloud |
+
+Names are identical either way (`local.storage_account_name`, `local.storage_container_name`, `local.anyscale_operator_identity_name` are shared by both paths), and the operator's client and principal IDs are read back from the ARM deployment's outputs when the template owns them — so `anyscale_operator_client_id`, the generated Helm values and the operator install behave the same in both modes.
+
+Prefer `true` unless you specifically want the Anyscale resource provider to own that infrastructure's lifecycle.
 
 ### Deployment summary file
 

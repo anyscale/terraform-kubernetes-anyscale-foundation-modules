@@ -137,6 +137,11 @@ acr_zone_redundancy_enabled = false        # Premium SKU only
 # ---------------------------------------------------------------------------
 anyscale_operator_namespace      = "anyscale-operator"
 anyscale_operator_serviceaccount = "anyscale-operator"
+# true  = Terraform creates the operator's storage, identity, federated
+#         credential and role assignment, and the ARM template binds to them.
+# false = the ARM template provisions them itself, and they belong to the
+#         Anyscale cloud rather than to Terraform state. Same working result;
+#         see "Who owns the operator's storage and identity" in README.md.
 enable_operator_infrastructure   = true
 
 # Set to false to skip Terraform's automatic Anyscale.AKS.Operator extension

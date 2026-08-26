@@ -217,19 +217,27 @@ variable "enable_blob_driver" {
 
 variable "enable_operator_infrastructure" {
   description = <<-EOT
-    (Optional) Enable blob storage, managed identity, federated identity credential,
-    role assignment, and output registration/helm commands for the Anyscale operator.
+    (Optional) Decides who provisions the operator's blob storage, workload
+    identity, federated identity credential and storage role assignment.
 
-    KNOWN BROKEN: setting this to false fails at plan. anyscale.tf references
-    azurerm_storage_account.sa[0], azurerm_storage_container.blob[0] and
-    azurerm_user_assigned_identity.anyscale_operator[0] without guarding on this
-    variable, so they resolve to an invalid index. It could not work as described
-    in any case — the ARM deployment passes storageMode/identityMode = "existing",
-    binding to the resources this flag would have skipped rather than creating its
-    own. Leave it at true.
+    true (default) — Terraform creates them, and the Anyscale.Platform ARM
+    deployment binds to them with storageMode/identityMode = "existing". You
+    keep them in Terraform state, so they are visible in the plan, tagged with
+    var.tags, and removed by `terraform destroy`.
 
-    If you want to install the operator yourself rather than via the AKS
-    marketplace extension, the flag you want is `install_operator_extension`.
+    false — the ARM template provisions them itself in "managed" mode, using
+    the same names Terraform would have used. They belong to the
+    Anyscale.Platform/clouds resource rather than to Terraform, so they do not
+    appear as separate resources in the plan. Their IDs are still surfaced:
+    the operator's client and principal IDs are read back from the ARM
+    deployment's outputs, so the outputs and the operator install work the
+    same either way.
+
+    Either mode produces the same working cloud. Prefer true unless you
+    specifically want the Anyscale RP to own that infrastructure's lifecycle.
+
+    Note this is NOT the flag for installing the operator yourself instead of
+    via the AKS marketplace extension — that is `install_operator_extension`.
   EOT
   type        = bool
   nullable    = false

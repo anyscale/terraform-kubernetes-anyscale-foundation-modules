@@ -7,12 +7,12 @@ output "azure_resource_group_name" {
 }
 
 output "azure_storage_account_name" {
-  value       = var.enable_operator_infrastructure ? azurerm_storage_account.sa[0].name : null
+  value       = local.storage_account_name
   description = "Name of the Azure Storage Account."
 }
 
 output "azure_storage_container_name" {
-  value       = var.enable_operator_infrastructure ? azurerm_storage_container.blob[0].name : null
+  value       = local.storage_container_name
   description = "Name of the Azure Storage Container."
 }
 
@@ -47,12 +47,12 @@ output "acr_login_server" {
 }
 
 output "anyscale_operator_client_id" {
-  value       = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].client_id : null
+  value       = local.anyscale_operator_client_id
   description = "Client ID of the Anyscale operator user-assigned managed identity."
 }
 
 output "anyscale_operator_principal_id" {
-  value       = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].principal_id : null
+  value       = local.anyscale_operator_principal_id
   description = "Principal ID of the Anyscale operator user-assigned managed identity."
 }
 
@@ -146,13 +146,13 @@ resource "local_file" "cloud_summary" {
       resource_group    = local.rg_name
       aks_cluster       = local.aks_name
       oidc_issuer_url   = local.aks_oidc_issuer_url
-      storage_account   = var.enable_operator_infrastructure ? azurerm_storage_account.sa[0].name : null
-      storage_container = var.enable_operator_infrastructure ? azurerm_storage_container.blob[0].name : null
+      storage_account   = local.storage_account_name
+      storage_container = local.storage_container_name
       acr_login_server  = var.enable_acr ? azurerm_container_registry.acr[0].login_server : null
     }
     operator_identity = {
-      client_id    = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].client_id : null
-      principal_id = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].principal_id : null
+      client_id    = local.anyscale_operator_client_id
+      principal_id = local.anyscale_operator_principal_id
     }
     gateway = {
       lb_hostname                = data.external.gateway_lb.result.address

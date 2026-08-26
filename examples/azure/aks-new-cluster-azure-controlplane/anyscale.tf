@@ -19,6 +19,11 @@
 locals {
   anyscale_cloud_name = coalesce(var.anyscale_cloud_name, "${var.aks_cluster_name}-cloud")
 
+  # Named here rather than inline on the resource because the ARM template
+  # needs the same name when it provisions the identity itself
+  # (enable_operator_infrastructure = false).
+  anyscale_operator_identity_name = "${var.aks_cluster_name}-anyscale-operator-mi"
+
   # ARM resource ID of the Anyscale.Platform/clouds resource the deployment
   # below creates. Used by the destroy-ordering hook so the cloud is removed
   # before the AKS cluster (see terraform_data.anyscale_cloud_predelete).
@@ -181,21 +186,30 @@ resource "azapi_resource" "anyscale_platform" {
   response_export_values = {
     cloud_deployment_id = "properties.outputs.cloudResourceId.value"
     provisioning_state  = "properties.provisioningState"
+    # Resolved from effectiveIdentityResourceId, so these are populated whether
+    # the identity was passed in as "existing" or provisioned as "managed".
+    managed_identity_client_id    = "properties.outputs.managedIdentityClientId.value"
+    managed_identity_principal_id = "properties.outputs.managedIdentityPrincipalId.value"
   }
   body = {
     properties = {
       mode     = "Incremental"
       template = jsondecode(file("${path.module}/templates/anyscale-platform-cloud.template.json"))
       parameters = {
-        location                 = { value = local.rg_location }
-        cloudName                = { value = local.anyscale_cloud_name }
-        storageAccountName       = { value = azurerm_storage_account.sa[0].name }
-        storageMode              = { value = "existing" }
-        storageAccountResourceId = { value = azurerm_storage_account.sa[0].id }
-        storageContainerName     = { value = azurerm_storage_container.blob[0].name }
-        workloadIdentityName     = { value = azurerm_user_assigned_identity.anyscale_operator[0].name }
-        identityMode             = { value = "existing" }
-        identityResourceId       = { value = azurerm_user_assigned_identity.anyscale_operator[0].id }
+        location  = { value = local.rg_location }
+        cloudName = { value = local.anyscale_cloud_name }
+        # enable_operator_infrastructure decides who owns the storage account,
+        # container and workload identity. When true (the default) Terraform
+        # creates them and binds the template to them as "existing"; when false
+        # the template provisions them itself in "managed" mode, and only needs
+        # the names to use.
+        storageAccountName       = { value = local.storage_account_name }
+        storageMode              = { value = var.enable_operator_infrastructure ? "existing" : "managed" }
+        storageAccountResourceId = { value = var.enable_operator_infrastructure ? azurerm_storage_account.sa[0].id : "" }
+        storageContainerName     = { value = local.storage_container_name }
+        workloadIdentityName     = { value = local.anyscale_operator_identity_name }
+        identityMode             = { value = var.enable_operator_infrastructure ? "existing" : "managed" }
+        identityResourceId       = { value = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].id : "" }
         tagsByResource           = { value = var.anyscale_platform.tags_by_resource }
         acrMode                  = { value = var.enable_acr ? "existing" : "none" }
         acrName                  = { value = var.enable_acr ? azurerm_container_registry.acr[0].name : "" }
@@ -243,6 +257,18 @@ resource "azapi_resource" "anyscale_platform" {
 locals {
   anyscale_cloud_resource_id            = azapi_resource.anyscale_platform.output.cloud_deployment_id
   anyscale_cloud_resource_id_hyphenated = replace(local.anyscale_cloud_resource_id, "_", "-")
+
+  # Who owns the operator's workload identity depends on
+  # enable_operator_infrastructure, so read its IDs from whichever side made
+  # it: the resource below, or the ARM deployment's outputs.
+  anyscale_operator_client_id = (var.enable_operator_infrastructure
+    ? azurerm_user_assigned_identity.anyscale_operator[0].client_id
+    : azapi_resource.anyscale_platform.output.managed_identity_client_id
+  )
+  anyscale_operator_principal_id = (var.enable_operator_infrastructure
+    ? azurerm_user_assigned_identity.anyscale_operator[0].principal_id
+    : azapi_resource.anyscale_platform.output.managed_identity_principal_id
+  )
 
   anyscale_gateway_certificate_secret_name         = "anyscale-${local.anyscale_cloud_resource_id_hyphenated}-certificate"
   anyscale_gateway_service_certificate_secret_name = "anyscale-svc-${local.anyscale_cloud_resource_id_hyphenated}-certificate"
@@ -377,7 +403,7 @@ resource "azurerm_kubernetes_cluster_extension" "anyscale_operator" {
     {
       "global.cloudDeploymentId"      = local.anyscale_cloud_resource_id
       "global.controlPlaneURL"        = var.anyscale_platform.control_plane_url
-      "global.auth.iamIdentity"       = azurerm_user_assigned_identity.anyscale_operator[0].client_id
+      "global.auth.iamIdentity"       = local.anyscale_operator_client_id
       "global.auth.audience"          = var.anyscale_platform.auth_audience
       "workloads.serviceAccount.name" = var.anyscale_operator_serviceaccount
 
@@ -510,7 +536,7 @@ locals {
       cloudProvider     = "azure"
       controlPlaneURL   = var.anyscale_platform.control_plane_url
       auth = {
-        iamIdentity      = azurerm_user_assigned_identity.anyscale_operator[0].client_id
+        iamIdentity      = local.anyscale_operator_client_id
         audience         = var.anyscale_platform.auth_audience
         anyscaleCliToken = ""
       }

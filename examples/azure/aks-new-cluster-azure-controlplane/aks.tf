@@ -267,7 +267,7 @@ moved {
 
 resource "azurerm_user_assigned_identity" "anyscale_operator" {
   count               = var.enable_operator_infrastructure ? 1 : 0
-  name                = "${var.aks_cluster_name}-anyscale-operator-mi"
+  name                = local.anyscale_operator_identity_name
   location            = local.rg_location
   resource_group_name = local.rg_name
 }
