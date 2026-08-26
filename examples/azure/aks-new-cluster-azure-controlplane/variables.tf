@@ -219,7 +219,17 @@ variable "enable_operator_infrastructure" {
   description = <<-EOT
     (Optional) Enable blob storage, managed identity, federated identity credential,
     role assignment, and output registration/helm commands for the Anyscale operator.
-    Set to false when using the Azure control plane, which provisions these via ARM templates.
+
+    KNOWN BROKEN: setting this to false fails at plan. anyscale.tf references
+    azurerm_storage_account.sa[0], azurerm_storage_container.blob[0] and
+    azurerm_user_assigned_identity.anyscale_operator[0] without guarding on this
+    variable, so they resolve to an invalid index. It could not work as described
+    in any case — the ARM deployment passes storageMode/identityMode = "existing",
+    binding to the resources this flag would have skipped rather than creating its
+    own. Leave it at true.
+
+    If you want to install the operator yourself rather than via the AKS
+    marketplace extension, the flag you want is `install_operator_extension`.
   EOT
   type        = bool
   nullable    = false
@@ -538,8 +548,42 @@ variable "assign_current_user_platform_roles" {
 # Anyscale routes workspace and service traffic through an in-cluster Envoy
 # Gateway. Defaults match the upstream Anyscale quickstart for AKS.
 ###############################################################################
+variable "create_envoy_gateway" {
+  description = <<-EOT
+    (Optional) Install Envoy Gateway — the Helm release, the `EnvoyProxy` that
+    pins the data plane to an external Azure Standard LoadBalancer, and the
+    `GatewayClass`. Set to false to reuse an install the cluster already has,
+    and point `envoy_gateway.gateway_class_name` at the existing class.
+
+    The `Gateway` itself is always created: its HTTPS listeners reference TLS
+    Secret names derived from this cloud's `cldrsrc_…` ID, so it cannot be
+    shared between Anyscale clouds even on the same cluster.
+
+    The GatewayClass you reuse must resolve to an `EnvoyProxy` whose
+    `envoyService.type` is `LoadBalancer`. If it publishes the data plane any
+    other way, the Gateway never gets a `status.addresses` entry and the apply
+    fails at `terraform_data.wait_for_gateway_lb` — which dumps the
+    GatewayClass and its EnvoyProxy on timeout so the cause is visible.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "create_operator_namespace" {
+  description = <<-EOT
+    (Optional) Create the `anyscale_operator_namespace` Kubernetes namespace.
+    Set to false when adopting a cluster where that namespace already exists —
+    for example one that has run an Anyscale operator before — since creating
+    it again fails the apply.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
 variable "envoy_gateway" {
-  description = "(Optional) Envoy Gateway install knobs."
+  description = "(Optional) Envoy Gateway install knobs. `namespace`, `release_name` and `chart_version` apply only when create_envoy_gateway=true; `gateway_class_name` names the class to create or, when reusing, the existing one to bind the Gateway to."
   type = object({
     namespace                        = optional(string, "envoy-gateway-system")
     release_name                     = optional(string, "eg")

@@ -172,6 +172,21 @@ anyscale_platform_contributors = [
 #   gateway_lb_wait_timeout_seconds  = 600
 #   gateway_lb_poll_interval_seconds = 10
 # }
+#
+#   Reuse an Envoy Gateway install the cluster already has, rather than
+#   installing the Helm chart, EnvoyProxy and GatewayClass. The Gateway itself
+#   is always created — its listeners reference TLS Secret names derived from
+#   this cloud's cldrsrc_… ID, so it can't be shared between clouds. The class
+#   you point at must resolve to an EnvoyProxy with envoyService.type =
+#   LoadBalancer.
+# create_envoy_gateway = false
+# envoy_gateway = {
+#   gateway_class_name = "their-existing-class"
+# }
+#
+#   Skip creating the operator namespace when adopting a cluster that already
+#   has it (e.g. one that has run an Anyscale operator before).
+# create_operator_namespace = false
 
 # ---------------------------------------------------------------------------
 # CORS for blob storage (default allows Anyscale console access)

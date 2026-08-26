@@ -71,7 +71,14 @@ resource "terraform_data" "aks_credentials" {
 ###############################################################################
 # Envoy Gateway Helm release (v1.7.0 from docker.io OCI registry).
 ###############################################################################
+moved {
+  from = helm_release.envoy_gateway
+  to   = helm_release.envoy_gateway[0]
+}
+
 resource "helm_release" "envoy_gateway" {
+  count = var.create_envoy_gateway ? 1 : 0
+
   name             = var.envoy_gateway.release_name
   repository       = "oci://docker.io/envoyproxy"
   chart            = "gateway-helm"
@@ -93,7 +100,14 @@ resource "helm_release" "envoy_gateway" {
 # `azure-load-balancer-internal: "false"` forces a public LB; flip to "true"
 # if you want the Anyscale data plane reachable only from the VNet.
 ###############################################################################
+moved {
+  from = kubectl_manifest.envoy_proxy
+  to   = kubectl_manifest.envoy_proxy[0]
+}
+
 resource "kubectl_manifest" "envoy_proxy" {
+  count = var.create_envoy_gateway ? 1 : 0
+
   yaml_body = yamlencode({
     apiVersion = "gateway.envoyproxy.io/v1alpha1"
     kind       = "EnvoyProxy"
@@ -122,7 +136,14 @@ resource "kubectl_manifest" "envoy_proxy" {
 ###############################################################################
 # GatewayClass — named `eg` to match the Anyscale quickstart.
 ###############################################################################
+moved {
+  from = kubectl_manifest.gateway_class
+  to   = kubectl_manifest.gateway_class[0]
+}
+
 resource "kubectl_manifest" "gateway_class" {
+  count = var.create_envoy_gateway ? 1 : 0
+
   yaml_body = yamlencode({
     apiVersion = "gateway.networking.k8s.io/v1"
     kind       = "GatewayClass"
@@ -147,7 +168,14 @@ resource "kubectl_manifest" "gateway_class" {
 # Operator namespace (the Gateway lives here, alongside the operator the
 # AKS extension is about to install).
 ###############################################################################
+moved {
+  from = kubernetes_namespace_v1.anyscale_operator
+  to   = kubernetes_namespace_v1.anyscale_operator[0]
+}
+
 resource "kubernetes_namespace_v1" "anyscale_operator" {
+  count = var.create_operator_namespace ? 1 : 0
+
   metadata {
     name = var.anyscale_operator_namespace
   }
@@ -238,6 +266,7 @@ resource "terraform_data" "wait_for_gateway_lb" {
     poll_interval    = var.envoy_gateway.gateway_lb_poll_interval_seconds
     kubeconfig       = "${path.module}/.kubeconfig"
     gateway_manifest = kubectl_manifest.gateway.id
+    gateway_class    = var.envoy_gateway.gateway_class_name
   }
 
   provisioner "local-exec" {
@@ -256,6 +285,20 @@ resource "terraform_data" "wait_for_gateway_lb" {
         if [ "$(date +%s)" -ge "$deadline" ]; then
           echo "Timed out waiting for Gateway LB address after ${self.input.timeout_seconds}s" >&2
           kubectl describe gateway ${self.input.gateway_name} -n ${self.input.namespace} >&2 || true
+
+          # The usual cause when reusing an Envoy Gateway install
+          # (create_envoy_gateway=false) is a GatewayClass whose EnvoyProxy
+          # publishes the data plane as something other than a LoadBalancer, so
+          # status.addresses never gets populated. Surface enough to see that.
+          echo "--- GatewayClass ${self.input.gateway_class} ---" >&2
+          kubectl describe gatewayclass ${self.input.gateway_class} >&2 || true
+          ref="$(kubectl get gatewayclass ${self.input.gateway_class}             -o jsonpath='{.spec.parametersRef.namespace}/{.spec.parametersRef.name}' 2>/dev/null || true)"
+          if [ -n "$ref" ] && [ "$ref" != "/" ]; then
+            echo "--- EnvoyProxy $ref (envoyService.type must be LoadBalancer) ---" >&2
+            kubectl get envoyproxy "$${ref#*/}" -n "$${ref%/*}"               -o jsonpath='{.spec.provider.kubernetes.envoyService.type}{"\n"}' >&2 || true
+          else
+            echo "GatewayClass ${self.input.gateway_class} has no parametersRef -> no EnvoyProxy pinning the service type." >&2
+          fi
           exit 1
         fi
         sleep ${self.input.poll_interval}

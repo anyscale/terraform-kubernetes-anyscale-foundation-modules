@@ -475,3 +475,86 @@ resource "terraform_data" "anyscale_cloud_predelete" {
     azapi_resource.anyscale_platform,
   ]
 }
+
+###############################################################################
+# Manual Helm install support (install_operator_extension = false).
+#
+# When Terraform does not install the marketplace extension, the operator has
+# to be installed by hand — and every value it needs is something this apply
+# just produced (the cloud's cldrsrc_ ID, the workload identity's client ID,
+# the Envoy Gateway LB address). Transcribing those into a values.yaml by hand
+# is the step people get wrong, so write the file out instead.
+#
+# The nested structure below mirrors the flat dotted configuration_settings on
+# azurerm_kubernetes_cluster_extension.anyscale_operator above. Keep the two in
+# sync: anything added there that the operator needs at install time has to be
+# added here as well.
+#
+# Two values are easy to miss when hand-writing this file, and both are here:
+#
+#   global.auth.anyscaleCliToken   Must be present and empty so the operator
+#                                  uses the Microsoft Entra workload-identity
+#                                  exchange rather than CLI-token auth.
+#   networking.gateway             Normally baked in by the extension from the
+#                                  gateway LB address; nothing else tells the
+#                                  operator where the Gateway is.
+#
+# Note: overrides supplied through anyscale_platform.extension_configuration_
+# settings apply to the EXTENSION path only — they are flat dotted keys and are
+# not merged into this file. Edit the generated file if you need them here.
+###############################################################################
+locals {
+  anyscale_operator_helm_values = {
+    global = {
+      cloudDeploymentId = local.anyscale_cloud_resource_id
+      cloudProvider     = "azure"
+      controlPlaneURL   = var.anyscale_platform.control_plane_url
+      auth = {
+        iamIdentity      = azurerm_user_assigned_identity.anyscale_operator[0].client_id
+        audience         = var.anyscale_platform.auth_audience
+        anyscaleCliToken = ""
+      }
+    }
+    workloads = {
+      serviceAccount = { name = var.anyscale_operator_serviceaccount }
+      instanceTypes  = { enableDefaults = true }
+      accelerator = {
+        # Matches the taints aks.tf puts on the GPU pools.
+        tolerations = {
+          default = [
+            { key = "node.anyscale.com/accelerator-type", value = "GPU", effect = "NoSchedule" },
+            { key = "nvidia.com/gpu", operator = "Exists", effect = "NoSchedule" },
+          ]
+        }
+      }
+    }
+    networking = {
+      gateway = {
+        enabled    = true
+        name       = var.envoy_gateway.gateway_name
+        className  = var.envoy_gateway.gateway_class_name
+        namespace  = var.anyscale_operator_namespace
+        apiVersion = "gateway.networking.k8s.io/v1"
+        hostname   = data.external.gateway_lb.result.address
+      }
+    }
+  }
+
+  # Terraform already created the namespace unless create_operator_namespace
+  # is false, so only ask Helm to create it when it actually has to.
+  anyscale_operator_helm_command = join(" ", compact([
+    "helm install ${local.anyscale_cloud_name} anyscale/anyscale-operator",
+    "--namespace ${var.anyscale_operator_namespace}",
+    var.create_operator_namespace ? "" : "--create-namespace",
+    "--values anyscale-operator-values.yaml",
+    "--wait",
+  ]))
+}
+
+resource "local_file" "anyscale_operator_values" {
+  count = var.install_operator_extension ? 0 : 1
+
+  filename        = "${path.module}/anyscale-operator-values.yaml"
+  file_permission = "0600"
+  content         = yamlencode(local.anyscale_operator_helm_values)
+}

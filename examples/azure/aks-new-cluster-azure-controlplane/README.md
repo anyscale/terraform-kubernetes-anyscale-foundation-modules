@@ -255,7 +255,52 @@ Terraform checks all four during `plan` (see `terraform_data.existing_aks_prefli
 Two related flags work independently of `create_aks_cluster`, for creating a cluster inside infrastructure you already have:
 
 - `create_resource_group = false` — create everything except the resource group
-- `existing_node_subnet_id = "/subscriptions/…/subnets/…"` — create the cluster in an existing subnet instead of a new VNet
+- `existing_node_subnet_id = "/subscriptions/…/subnets/…"` — create the cluster in an existing subnet
+
+#### Reusing an existing Envoy Gateway install
+
+A cluster that already runs Envoy Gateway — because your platform team installed it, or because another Anyscale cloud on the same cluster brought it — doesn't need a second copy:
+
+```hcl
+create_envoy_gateway = false
+envoy_gateway = {
+  gateway_class_name = "their-existing-class"
+}
+```
+
+That skips the Helm release, the `EnvoyProxy` and the `GatewayClass`. The **`Gateway` is still created either way**: its HTTPS listeners reference TLS Secret names derived from this cloud's `cldrsrc_…` ID, so it can't be shared between Anyscale clouds even on one cluster.
+
+The class you point at must resolve to an `EnvoyProxy` whose `envoyService.type` is `LoadBalancer`. If it publishes the data plane some other way, the Gateway never gets a `status.addresses` entry, and the apply fails at `terraform_data.wait_for_gateway_lb` after `gateway_lb_wait_timeout_seconds` — the timeout handler dumps the GatewayClass and its EnvoyProxy so you can see which it is.
+
+Related, and easy to hit when adopting a cluster that has run an Anyscale operator before: `create_operator_namespace = false` skips creating the `anyscale-operator` namespace, which would otherwise fail the apply because it already exists. instead of a new VNet
+
+### Installing the operator yourself instead of via the AKS extension
+
+Set `install_operator_extension = false` and Terraform builds everything else — the cloud, storage, ACR, the workload identity, Envoy Gateway and the Gateway — but leaves the operator to you.
+
+Everything the operator needs is something the apply just produced: the cloud's `cldrsrc_…` ID, the identity's client ID, the Gateway's LB address. Rather than have you transcribe those, the apply writes a complete **`anyscale-operator-values.yaml`** (gitignored — it embeds those IDs) and prints the matching command:
+
+```bash
+az aks get-credentials --resource-group <rg> --name <cluster> --overwrite-existing   # or: terraform output aks_get_credentials_command
+
+helm repo add anyscale https://anyscale.github.io/helm-charts
+helm repo update anyscale
+
+terraform output -raw anyscale_operator_helm_command     # run what this prints
+```
+
+Then `kubectl get pods -n anyscale-operator` should show `3/3 Running`.
+
+The generated file (`local.anyscale_operator_helm_values` in `anyscale.tf`) mirrors the extension's `configuration_settings`, including two values that are easy to miss when writing it by hand:
+
+- **`global.auth.anyscaleCliToken: ""`** — must be present and empty, so the operator uses the Microsoft Entra workload-identity exchange rather than CLI-token auth.
+- **`networking.gateway`** — normally baked in by the extension from the Gateway's LB address. `envoy-gateway.tf` still provisions the Gateway and GatewayClass, but nothing else tells the operator where they are.
+
+It also carries `workloads.instanceTypes.enableDefaults` and the GPU tolerations matching the taints `aks.tf` puts on the GPU pools — omit those and GPU workloads won't schedule.
+
+Two caveats. The generated command drops `--create-namespace`, because `create_operator_namespace` defaults to `true` and Terraform already made the namespace; if you set that to `false`, the flag comes back automatically. And overrides passed through `anyscale_platform.extension_configuration_settings` apply to the **extension path only** — they're flat dotted keys and are not merged into the generated YAML, so edit the file directly if you need them.
+
+> `enable_operator_infrastructure` is a *different* flag and is **not** the one for this. See the note in `variables.tf`.
 
 ### Deployment summary file
 

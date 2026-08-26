@@ -160,7 +160,21 @@ resource "local_file" "cloud_summary" {
       service_certificate_secret = local.anyscale_gateway_service_certificate_secret_name
     }
     commands = {
-      get_credentials = "az aks get-credentials --resource-group ${local.rg_name} --name ${local.aks_name} --overwrite-existing"
+      get_credentials  = "az aks get-credentials --resource-group ${local.rg_name} --name ${local.aks_name} --overwrite-existing"
+      install_operator = var.install_operator_extension ? null : local.anyscale_operator_helm_command
     }
   })
+}
+
+###############################################################################
+# Manual Helm install outputs (install_operator_extension = false)
+###############################################################################
+output "anyscale_operator_values_file" {
+  value       = var.install_operator_extension ? null : local_file.anyscale_operator_values[0].filename
+  description = "Path to the generated Helm values file for a manual operator install. Null when install_operator_extension=true (the AKS extension installs the operator instead)."
+}
+
+output "anyscale_operator_helm_command" {
+  value       = var.install_operator_extension ? null : local.anyscale_operator_helm_command
+  description = "Ready-to-run `helm install` for the Anyscale operator, using the generated values file. Run `helm repo add anyscale https://anyscale.github.io/helm-charts && helm repo update anyscale` first. Null when install_operator_extension=true."
 }
