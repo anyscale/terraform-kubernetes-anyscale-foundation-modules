@@ -1,5 +1,8 @@
 terraform {
-  required_version = ">= 1.5.0"
+  # 1.7 for the `removed` block in anyscale.tf, which is what keeps an earlier
+  # apply's azurerm_resource_provider_registration from being destroyed (and
+  # thereby unregistering Anyscale.Platform subscription-wide) on upgrade.
+  required_version = ">= 1.7.0"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"

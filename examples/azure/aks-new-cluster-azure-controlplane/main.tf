@@ -80,6 +80,22 @@ resource "azurerm_storage_account" "sa" {
   account_tier             = "Standard"
   account_replication_type = "LRS"
 
+  # Match the account the ARM template provisions when it owns storage
+  # (enable_operator_infrastructure = false), so the two ownership modes are
+  # actually equivalent rather than merely both "working".
+  #
+  # is_hns_enabled matters most: the cloud is registered with an
+  # abfss://<container>@<account>.dfs.core.windows.net URI, which is the ADLS
+  # Gen2 endpoint. The operator's own startup check passes without it because
+  # that talks to the blob endpoint with presigned URLs, so a flat-namespace
+  # account looks healthy until a workload uses abfss.
+  #
+  # NOTE: is_hns_enabled is immutable. Adding it to a deployment that already
+  # exists forces the storage account to be REPLACED — check the plan and move
+  # any data you care about first.
+  is_hns_enabled                  = true
+  default_to_oauth_authentication = true
+
   # still blocks "anonymous blob" catches
   allow_nested_items_to_be_public = false
   tags                            = var.tags

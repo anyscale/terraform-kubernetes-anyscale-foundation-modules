@@ -247,9 +247,11 @@ variable "enable_operator_infrastructure" {
 variable "register_anyscale_resource_provider" {
   description = <<-EOT
     (Optional) Register the Anyscale.Platform resource provider on the
-    subscription via Terraform (azurerm_resource_provider_registration).
-    Set to false if the RP is already registered or your org registers
-    resource providers centrally and disallows registering them per-deploy.
+    subscription via Terraform (`az provider register`, then poll until the
+    RP reports Registered). Safe to leave true when the RP is already
+    registered — the step is a no-op in that case, and destroying does not
+    unregister it. Set to false if your org registers resource providers
+    centrally and disallows registering them per-deploy.
   EOT
   type        = bool
   nullable    = false

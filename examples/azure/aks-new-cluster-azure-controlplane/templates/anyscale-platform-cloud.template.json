@@ -143,6 +143,12 @@
       "metadata": {
         "description": "The name for the ACR role assignments nested deployment."
       }
+    },
+    "aksClusterResourceId": {
+      "type": "string",
+      "metadata": {
+        "description": "The full resource ID of the AKS cluster whose OIDC issuer the operator's federated identity credential federates against. Required when identityMode is 'managed'."
+      }
     }
   },
   "variables": {
@@ -166,7 +172,7 @@
     {
       "condition": "[equals(parameters('storageMode'), 'managed')]",
       "type": "Microsoft.Storage/storageAccounts",
-      "apiVersion": "2023-01-01",
+      "apiVersion": "2025-08-01",
       "name": "[parameters('storageAccountName')]",
       "location": "[parameters('location')]",
       "sku": {
@@ -185,7 +191,7 @@
     },
     {
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "[parameters('storageBlobServiceDeploymentName')]",
       "resourceGroup": "[variables('storageResourceGroup')]",
       "dependsOn": [
@@ -199,17 +205,17 @@
           "resources": [
             {
               "type": "Microsoft.Storage/storageAccounts/blobServices",
-              "apiVersion": "2023-01-01",
+              "apiVersion": "2025-08-01",
               "name": "[concat(parameters('storageAccountName'), '/default')]",
               "properties": {
                 "cors": {
-                  "corsRules": "[if(equals(parameters('storageMode'), 'existing'), if(contains(string(reference(variables('effectiveBlobServicesResourceId'), '2023-01-01').cors.corsRules), 'https://*.anyscale.com'), reference(variables('effectiveBlobServicesResourceId'), '2023-01-01').cors.corsRules, concat(reference(variables('effectiveBlobServicesResourceId'), '2023-01-01').cors.corsRules, createArray(createObject('allowedOrigins', createArray('https://*.anyscale.com'), 'allowedMethods', createArray('GET', 'HEAD', 'PUT', 'POST', 'DELETE'), 'allowedHeaders', createArray('*'), 'exposedHeaders', createArray('*'), 'maxAgeInSeconds', 3600)))), createArray(createObject('allowedOrigins', createArray('https://*.anyscale.com'), 'allowedMethods', createArray('GET', 'HEAD', 'PUT', 'POST', 'DELETE'), 'allowedHeaders', createArray('*'), 'exposedHeaders', createArray('*'), 'maxAgeInSeconds', 3600)))]"
+                  "corsRules": "[if(equals(parameters('storageMode'), 'existing'), if(contains(string(reference(variables('effectiveBlobServicesResourceId'), '2025-08-01').cors.corsRules), 'https://*.anyscale.com'), reference(variables('effectiveBlobServicesResourceId'), '2025-08-01').cors.corsRules, concat(reference(variables('effectiveBlobServicesResourceId'), '2025-08-01').cors.corsRules, createArray(createObject('allowedOrigins', createArray('https://*.anyscale.com'), 'allowedMethods', createArray('GET', 'HEAD', 'PUT', 'POST', 'DELETE'), 'allowedHeaders', createArray('*'), 'exposedHeaders', createArray('*'), 'maxAgeInSeconds', 3600)))), createArray(createObject('allowedOrigins', createArray('https://*.anyscale.com'), 'allowedMethods', createArray('GET', 'HEAD', 'PUT', 'POST', 'DELETE'), 'allowedHeaders', createArray('*'), 'exposedHeaders', createArray('*'), 'maxAgeInSeconds', 3600)))]"
                 }
               }
             },
             {
               "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
-              "apiVersion": "2023-01-01",
+              "apiVersion": "2025-08-01",
               "name": "[concat(parameters('storageAccountName'), '/default/', variables('containerName'))]",
               "dependsOn": [
                 "[variables('effectiveBlobServicesResourceId')]"
@@ -225,7 +231,7 @@
     {
       "condition": "[equals(parameters('identityMode'), 'managed')]",
       "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
-      "apiVersion": "2023-01-31",
+      "apiVersion": "2024-11-30",
       "name": "[parameters('workloadIdentityName')]",
       "location": "[parameters('location')]",
       "tags": "[union(if(contains(parameters('tagsByResource'), 'Microsoft.ManagedIdentity/userAssignedIdentities'), parameters('tagsByResource')['Microsoft.ManagedIdentity/userAssignedIdentities'], json('{}')), createObject('anyscale-cloud', parameters('cloudName')))]"
@@ -233,7 +239,7 @@
     {
       "condition": "[equals(parameters('identityMode'), 'managed')]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "[parameters('federatedIdentityDeploymentName')]",
       "resourceGroup": "[variables('identityResourceGroup')]",
       "properties": {
@@ -244,7 +250,7 @@
           "resources": [
             {
               "type": "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials",
-              "apiVersion": "2023-01-31",
+              "apiVersion": "2024-11-30",
               "name": "[concat(parameters('workloadIdentityName'), '/kubernetes-federated-credential')]",
               "properties": {
                 "issuer": "[reference(parameters('aksClusterResourceId'), '2025-10-01').oidcIssuerProfile.issuerUrl]",
@@ -263,7 +269,7 @@
     },
     {
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "[parameters('storageRoleAssignmentDeploymentName')]",
       "resourceGroup": "[variables('storageResourceGroup')]",
       "dependsOn": [
@@ -283,7 +289,7 @@
               "scope": "[variables('effectiveStorageResourceId')]",
               "properties": {
                 "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('storageBlobDataOwnerRoleId'))]",
-                "principalId": "[reference(variables('effectiveIdentityResourceId'), '2023-01-31').principalId]",
+                "principalId": "[reference(variables('effectiveIdentityResourceId'), '2024-11-30').principalId]",
                 "principalType": "ServicePrincipal"
               }
             }
@@ -294,7 +300,7 @@
     {
       "condition": "[not(equals(parameters('acrMode'), 'none'))]",
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "[parameters('acrRoleAssignmentsDeploymentName')]",
       "resourceGroup": "[variables('acrResourceGroup')]",
       "dependsOn": [
@@ -314,7 +320,7 @@
               "scope": "[variables('acrResourceId')]",
               "properties": {
                 "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPushRoleId'))]",
-                "principalId": "[reference(variables('effectiveIdentityResourceId'), '2023-01-31').principalId]",
+                "principalId": "[reference(variables('effectiveIdentityResourceId'), '2024-11-30').principalId]",
                 "principalType": "ServicePrincipal"
               }
             },
@@ -325,7 +331,7 @@
               "scope": "[variables('acrResourceId')]",
               "properties": {
                 "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrTaskContributorRoleId'))]",
-                "principalId": "[reference(variables('effectiveIdentityResourceId'), '2023-01-31').principalId]",
+                "principalId": "[reference(variables('effectiveIdentityResourceId'), '2024-11-30').principalId]",
                 "principalType": "ServicePrincipal"
               }
             },
@@ -348,7 +354,7 @@
     {
       "condition": "[equals(parameters('acrMode'), 'managed')]",
       "type": "Microsoft.ContainerRegistry/registries",
-      "apiVersion": "2023-07-01",
+      "apiVersion": "2025-11-01",
       "name": "[variables('acrSafeName')]",
       "location": "[parameters('location')]",
       "sku": {
@@ -387,7 +393,7 @@
         "computeStack": "K8S",
         "cloudStorageBucketName": "[variables('abfssUrl')]",
         "cloudStorageBucketEndpoint": "[variables('blobEndpoint')]",
-        "anyscaleOperatorIamIdentity": "[reference(variables('effectiveIdentityResourceId'), '2023-01-31').principalId]"
+        "anyscaleOperatorIamIdentity": "[reference(variables('effectiveIdentityResourceId'), '2024-11-30').principalId]"
       },
       "tags": "[union(if(contains(parameters('tagsByResource'), 'Anyscale.Platform/clouds/cloudResources'), parameters('tagsByResource')['Anyscale.Platform/clouds/cloudResources'], json('{}')), createObject('anyscale-cloud', parameters('cloudName')))]"
     }
@@ -403,11 +409,11 @@
     },
     "managedIdentityClientId": {
       "type": "string",
-      "value": "[reference(variables('effectiveIdentityResourceId'), '2023-01-31').clientId]"
+      "value": "[reference(variables('effectiveIdentityResourceId'), '2024-11-30').clientId]"
     },
     "managedIdentityPrincipalId": {
       "type": "string",
-      "value": "[reference(variables('effectiveIdentityResourceId'), '2023-01-31').principalId]"
+      "value": "[reference(variables('effectiveIdentityResourceId'), '2024-11-30').principalId]"
     },
     "abfssUrl": {
       "type": "string",
@@ -425,7 +431,7 @@
     "acrLoginServer": {
       "condition": "[equals(parameters('acrMode'), 'managed')]",
       "type": "string",
-      "value": "[if(equals(parameters('acrMode'), 'managed'), reference(resourceId('Microsoft.ContainerRegistry/registries', variables('acrSafeName')), '2023-07-01').loginServer, '')]"
+      "value": "[if(equals(parameters('acrMode'), 'managed'), reference(resourceId('Microsoft.ContainerRegistry/registries', variables('acrSafeName')), '2025-11-01').loginServer, '')]"
     }
   }
 }

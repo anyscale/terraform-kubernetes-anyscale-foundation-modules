@@ -70,9 +70,15 @@ locals {
 #   az rest --method GET  --url ".../Anyscale.Platform/agreements/default?api-version=..."
 #   az rest --method POST --url ".../Anyscale.Platform/agreements/default/accept?api-version=..."
 #
-# azurerm_resource_provider_registration (below) already polls internally
-# until the RP shows "Registered" (its own built-in timeout is 2h), so no
-# extra wait logic is needed for that half.
+# Both halves are done with the CLI rather than with resources that own the
+# subscription-wide state. azurerm_resource_provider_registration would be the
+# obvious fit for the first half, but it treats an already-registered RP as a
+# resource to import and fails the apply outright — and registration is
+# subscription-wide, so any subscription that has ever deployed Anyscale
+# (including a second cloud alongside a first) hits that. Its destroy would
+# also UNREGISTER the RP for every other deployment in the subscription. The
+# local-exec below is idempotent instead: it registers only if needed, polls
+# until Registered, and leaves the RP alone on destroy.
 #
 # The agreement half needs its own poll: POSTing /accept does not guarantee
 # the subscription is immediately Active afterward (same class of eventual-
@@ -92,10 +98,58 @@ locals {
 # — see that variable's description for the full text and links (terms of
 # use, privacy policy, Azure Marketplace billing/consent terms).
 ###############################################################################
-resource "azurerm_resource_provider_registration" "anyscale_platform" {
+# An earlier version of this example registered the RP with
+# azurerm_resource_provider_registration. Dropping that resource from the
+# configuration outright would make the next apply DESTROY it, and its destroy
+# unregisters Anyscale.Platform for every deployment in the subscription. This
+# forgets it instead, leaving the registration in place.
+removed {
+  from = azurerm_resource_provider_registration.anyscale_platform
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+resource "terraform_data" "anyscale_platform_rp_register" {
   count = var.register_anyscale_resource_provider ? 1 : 0
 
-  name = "Anyscale.Platform"
+  triggers_replace = {
+    subscription_id = var.azure_subscription_id
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      SUB="${var.azure_subscription_id}"
+
+      state="$(az provider show --namespace Anyscale.Platform --subscription "$SUB" \
+        --query registrationState -o tsv 2>/dev/null || echo "")"
+      echo "[anyscale] Anyscale.Platform registration state: $${state:-<none>}"
+
+      if [ "$state" != "Registered" ]; then
+        echo "[anyscale] Registering the Anyscale.Platform resource provider..."
+        az provider register --namespace Anyscale.Platform --subscription "$SUB" >/dev/null
+      fi
+
+      deadline=$(( $(date +%s) + 900 ))
+      while :; do
+        state="$(az provider show --namespace Anyscale.Platform --subscription "$SUB" \
+          --query registrationState -o tsv 2>/dev/null || echo "")"
+        if [ "$state" = "Registered" ]; then
+          echo "[anyscale] Anyscale.Platform is Registered."
+          break
+        fi
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+          echo "[anyscale] ERROR: Anyscale.Platform did not reach Registered within timeout (last state: $${state:-<none>})" >&2
+          exit 1
+        fi
+        echo "[anyscale] Waiting for Anyscale.Platform to reach Registered (current: $${state:-<none>})..."
+        sleep 10
+      done
+    EOT
+  }
 }
 
 locals {
@@ -143,7 +197,7 @@ resource "terraform_data" "anyscale_platform_agreement_accept" {
     EOT
   }
 
-  depends_on = [azurerm_resource_provider_registration.anyscale_platform]
+  depends_on = [terraform_data.anyscale_platform_rp_register]
 }
 
 # Read the agreement's current status for the output below and as a
@@ -166,7 +220,7 @@ data "external" "anyscale_platform_agreement" {
   ]
 
   depends_on = [
-    azurerm_resource_provider_registration.anyscale_platform,
+    terraform_data.anyscale_platform_rp_register,
     terraform_data.anyscale_platform_agreement_accept,
   ]
 }
@@ -208,13 +262,17 @@ resource "azapi_resource" "anyscale_platform" {
         storageAccountResourceId = { value = var.enable_operator_infrastructure ? azurerm_storage_account.sa[0].id : "" }
         storageContainerName     = { value = local.storage_container_name }
         workloadIdentityName     = { value = local.anyscale_operator_identity_name }
-        identityMode             = { value = var.enable_operator_infrastructure ? "existing" : "managed" }
-        identityResourceId       = { value = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].id : "" }
-        tagsByResource           = { value = var.anyscale_platform.tags_by_resource }
-        acrMode                  = { value = var.enable_acr ? "existing" : "none" }
-        acrName                  = { value = var.enable_acr ? azurerm_container_registry.acr[0].name : "" }
-        acrResourceId            = { value = var.enable_acr ? azurerm_container_registry.acr[0].id : "" }
-        aksKubeletPrincipalId    = { value = local.aks_kubelet_object_id }
+        # Only read when identityMode = managed, i.e. enable_operator_infrastructure
+        # = false: the template builds the federated credential's issuer from this
+        # cluster's OIDC issuer URL.
+        aksClusterResourceId  = { value = local.aks_id }
+        identityMode          = { value = var.enable_operator_infrastructure ? "existing" : "managed" }
+        identityResourceId    = { value = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].id : "" }
+        tagsByResource        = { value = var.anyscale_platform.tags_by_resource }
+        acrMode               = { value = var.enable_acr ? "existing" : "none" }
+        acrName               = { value = var.enable_acr ? azurerm_container_registry.acr[0].name : "" }
+        acrResourceId         = { value = var.enable_acr ? azurerm_container_registry.acr[0].id : "" }
+        aksKubeletPrincipalId = { value = local.aks_kubelet_object_id }
         # Terraform owns the kubelet AcrPull assignment (acr.tf). Tell the
         # ARM template not to create a duplicate one.
         manageAksKubeletAcrPullRoleAssignment = { value = false }
@@ -234,7 +292,7 @@ resource "azapi_resource" "anyscale_platform" {
     azurerm_role_assignment.anyscale_blob_contrib,
     azurerm_container_registry.acr,
     azurerm_role_assignment.kubelet_acr_pull,
-    azurerm_resource_provider_registration.anyscale_platform,
+    terraform_data.anyscale_platform_rp_register,
     terraform_data.anyscale_platform_agreement_accept,
     data.external.anyscale_platform_agreement,
   ]
