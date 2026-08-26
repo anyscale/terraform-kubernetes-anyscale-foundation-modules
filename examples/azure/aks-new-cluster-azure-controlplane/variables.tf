@@ -60,9 +60,107 @@ variable "azure_resource_group_name" {
     prompts for it interactively unless you supply it via terraform.tfvars, -var,
     or TF_VAR_azure_resource_group_name. Enter an empty value to fall back to
     "<aks_cluster_name>-rg".
+
+    The empty-value fallback only applies when Terraform creates the group. When
+    create_resource_group=false or create_aks_cluster=false this must name a
+    resource group that already exists.
   EOT
   type        = string
   nullable    = false
+}
+
+###############################################################################
+# Create-or-adopt toggles.
+#
+# The defaults reproduce this example's original behaviour: create a resource
+# group, VNet, subnet, AKS cluster and the Anyscale node pools from scratch.
+# See aks_existing.tf for how these resolve, and the README for the
+# prerequisites an adopted cluster has to meet.
+###############################################################################
+variable "create_aks_cluster" {
+  description = <<-EOT
+    (Optional) Create the AKS cluster (and its VNet/subnet). Set to false to
+    layer Anyscale onto a cluster you already run — supply
+    `existing_aks_cluster_name` and `azure_resource_group_name` in that case.
+
+    An adopted cluster must have the OIDC issuer and Microsoft Entra workload
+    identity enabled, live in an Anyscale-supported region, and still issue a
+    certificate-based kubeconfig (i.e. local accounts not disabled). Terraform
+    checks all four before it changes anything.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "existing_aks_cluster_name" {
+  description = <<-EOT
+    (Optional) Name of an existing AKS cluster to adopt, in
+    `azure_resource_group_name`. Required when create_aks_cluster=false and
+    ignored otherwise.
+  EOT
+  type        = string
+  nullable    = true
+  default     = null
+}
+
+variable "create_resource_group" {
+  description = <<-EOT
+    (Optional) Create the resource group. Set to false to place the storage
+    account, ACR and operator identity into a resource group that already
+    exists. Forced to false when create_aks_cluster=false, since an adopted
+    cluster brings its own resource group.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "existing_node_subnet_id" {
+  description = <<-EOT
+    (Optional) Full resource ID of an existing subnet to place AKS nodes in.
+    When set, Terraform skips creating the VNet and subnet (and `vnet_cidr` /
+    `nodes_subnet_cidr` are unused).
+
+    When adopting a cluster (create_aks_cluster=false) this is normally left
+    null — the subnet is read from the cluster's first agent pool. Set it
+    explicitly if that pool is not in the subnet you want new pools to use.
+
+    Note: `enable_nfs` requires the subnet to carry the `Microsoft.Storage`
+    service endpoint. Terraform adds it to subnets it creates; on a subnet you
+    supply, add it yourself.
+  EOT
+  type        = string
+  nullable    = true
+  default     = null
+}
+
+variable "create_node_pools" {
+  description = <<-EOT
+    (Optional) Create the Anyscale CPU/GPU node pools (on-demand and spot).
+    Set to false when adopting a cluster whose pools already carry the
+    `node.anyscale.com/capacity-type`, `node.anyscale.com/accelerator-type` and
+    `nvidia.com/gpu` taints that the operator tolerates — see
+    `anyscale_platform.extension_configuration_settings` to adjust those
+    tolerations to a different scheme.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "node_pool_zones" {
+  description = <<-EOT
+    (Optional) Availability zones for the node pools Terraform creates, e.g.
+    ["3"]. Leave null to let Azure place nodes without a zone constraint.
+
+    Useful when only some zones in a region have capacity or quota for the VM
+    sizes you asked for — `./scan-regional-quotas.sh` and `./select-gpu.sh`
+    help identify that.
+  EOT
+  type        = list(string)
+  nullable    = true
+  default     = null
 }
 
 variable "anyscale_cloud_name" {

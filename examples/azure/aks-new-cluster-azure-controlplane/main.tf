@@ -32,7 +32,14 @@ locals {
 ############################################
 # resource group
 ############################################
+moved {
+  from = azurerm_resource_group.rg
+  to   = azurerm_resource_group.rg[0]
+}
+
 resource "azurerm_resource_group" "rg" {
+  count = local.create_resource_group ? 1 : 0
+
   name     = coalesce(var.azure_resource_group_name, "${var.aks_cluster_name}-rg")
   location = var.azure_location
   tags     = var.tags
@@ -63,8 +70,8 @@ resource "azurerm_storage_account" "sa" {
   #checkov:skip=CKV2_AZURE_31: "Ensure VNET subnet is configured with a Network Security Group (NSG)"
 
   name                     = local.storage_account_name
-  resource_group_name      = azurerm_resource_group.rg.name
-  location                 = azurerm_resource_group.rg.location
+  resource_group_name      = local.rg_name
+  location                 = local.rg_location
   account_tier             = "Standard"
   account_replication_type = "LRS"
 
@@ -106,8 +113,8 @@ resource "azurerm_storage_account" "nfs" {
   count = var.enable_nfs ? 1 : 0
 
   name                       = local.storage_account_name_nfs
-  resource_group_name        = azurerm_resource_group.rg.name
-  location                   = azurerm_resource_group.rg.location
+  resource_group_name        = local.rg_name
+  location                   = local.rg_location
   account_kind               = "FileStorage"
   account_tier               = "Premium"
   account_replication_type   = "ZRS"
@@ -117,7 +124,7 @@ resource "azurerm_storage_account" "nfs" {
 
   network_rules {
     default_action             = "Deny"
-    virtual_network_subnet_ids = [azurerm_subnet.nodes.id]
+    virtual_network_subnet_ids = [local.node_subnet_id]
     bypass                     = ["AzureServices"]
   }
 
@@ -127,22 +134,35 @@ resource "azurerm_storage_account" "nfs" {
 ############################################
 # networking (vnet and subnet)
 ############################################
+moved {
+  from = azurerm_virtual_network.vnet
+  to   = azurerm_virtual_network.vnet[0]
+}
+
 resource "azurerm_virtual_network" "vnet" {
+  count = local.create_network ? 1 : 0
+
   name                = "${var.aks_cluster_name}-vnet"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = local.rg_location
+  resource_group_name = local.rg_name
   address_space       = [var.vnet_cidr]
   tags                = var.tags
 }
 
 # Subnet for AKS nodes
+moved {
+  from = azurerm_subnet.nodes
+  to   = azurerm_subnet.nodes[0]
+}
+
 resource "azurerm_subnet" "nodes" {
+  count = local.create_network ? 1 : 0
 
   #checkov:skip=CKV2_AZURE_31: "Ensure VNET subnet is configured with a Network Security Group (NSG)"
 
   name                 = "aks-nodes"
-  resource_group_name  = azurerm_resource_group.rg.name
-  virtual_network_name = azurerm_virtual_network.vnet.name
+  resource_group_name  = local.rg_name
+  virtual_network_name = azurerm_virtual_network.vnet[0].name
   address_prefixes     = [var.nodes_subnet_cidr]
   service_endpoints    = ["Microsoft.Storage"]
 }

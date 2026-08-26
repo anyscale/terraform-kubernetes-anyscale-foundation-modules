@@ -2,7 +2,7 @@
 # Azure infra outputs (mirrors examples/azure/aks-new_cluster)
 ###############################################################################
 output "azure_resource_group_name" {
-  value       = azurerm_resource_group.rg.name
+  value       = local.rg_name
   description = "Name of the Azure Resource Group."
 }
 
@@ -22,12 +22,12 @@ output "azure_nfs_storage_account_name" {
 }
 
 output "azure_aks_cluster_name" {
-  value       = azurerm_kubernetes_cluster.aks.name
+  value       = local.aks_name
   description = "Name of the AKS cluster."
 }
 
 output "azure_aks_oidc_issuer_url" {
-  value       = azurerm_kubernetes_cluster.aks.oidc_issuer_url
+  value       = local.aks_oidc_issuer_url
   description = "OIDC issuer URL of the AKS cluster (used by workload-identity federation)."
 }
 
@@ -70,7 +70,7 @@ output "anyscale_cloud_name" {
 }
 
 output "anyscale_cloud_arm_id" {
-  value       = "${azurerm_resource_group.rg.id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
+  value       = "${local.rg_id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
   description = "Full ARM resource ID of the Anyscale.Platform/clouds resource."
 }
 
@@ -111,7 +111,7 @@ output "gateway_service_certificate_secret_name" {
 # Convenience commands
 ###############################################################################
 output "aks_get_credentials_command" {
-  value       = "az aks get-credentials --resource-group ${azurerm_resource_group.rg.name} --name ${azurerm_kubernetes_cluster.aks.name} --overwrite-existing"
+  value       = "az aks get-credentials --resource-group ${local.rg_name} --name ${local.aks_name} --overwrite-existing"
   description = "Refresh local kubeconfig against the deployed AKS cluster."
 }
 
@@ -137,15 +137,15 @@ resource "local_file" "cloud_summary" {
     anyscale_cloud = {
       name               = local.anyscale_cloud_name
       resource_id        = local.anyscale_cloud_resource_id
-      arm_id             = "${azurerm_resource_group.rg.id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
+      arm_id             = "${local.rg_id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
       console_url        = var.anyscale_platform.control_plane_url
       operator_namespace = var.anyscale_operator_namespace
       extension_id       = var.install_operator_extension ? azurerm_kubernetes_cluster_extension.anyscale_operator[0].id : null
     }
     azure = {
-      resource_group    = azurerm_resource_group.rg.name
-      aks_cluster       = azurerm_kubernetes_cluster.aks.name
-      oidc_issuer_url   = azurerm_kubernetes_cluster.aks.oidc_issuer_url
+      resource_group    = local.rg_name
+      aks_cluster       = local.aks_name
+      oidc_issuer_url   = local.aks_oidc_issuer_url
       storage_account   = var.enable_operator_infrastructure ? azurerm_storage_account.sa[0].name : null
       storage_container = var.enable_operator_infrastructure ? azurerm_storage_container.blob[0].name : null
       acr_login_server  = var.enable_acr ? azurerm_container_registry.acr[0].login_server : null
@@ -160,7 +160,7 @@ resource "local_file" "cloud_summary" {
       service_certificate_secret = local.anyscale_gateway_service_certificate_secret_name
     }
     commands = {
-      get_credentials = "az aks get-credentials --resource-group ${azurerm_resource_group.rg.name} --name ${azurerm_kubernetes_cluster.aks.name} --overwrite-existing"
+      get_credentials = "az aks get-credentials --resource-group ${local.rg_name} --name ${local.aks_name} --overwrite-existing"
     }
   })
 }

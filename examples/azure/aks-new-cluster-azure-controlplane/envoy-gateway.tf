@@ -46,7 +46,7 @@
 ###############################################################################
 resource "terraform_data" "aks_credentials" {
   triggers_replace = {
-    cluster_id = azurerm_kubernetes_cluster.aks.id
+    cluster_id = local.aks_id
   }
 
   provisioner "local-exec" {
@@ -54,8 +54,8 @@ resource "terraform_data" "aks_credentials" {
     command     = <<-EOT
       set -euo pipefail
       az aks get-credentials \
-        --resource-group "${azurerm_resource_group.rg.name}" \
-        --name "${azurerm_kubernetes_cluster.aks.name}" \
+        --resource-group "${local.rg_name}" \
+        --name "${local.aks_name}" \
         --file "${path.module}/.kubeconfig" \
         --overwrite-existing \
         --only-show-errors

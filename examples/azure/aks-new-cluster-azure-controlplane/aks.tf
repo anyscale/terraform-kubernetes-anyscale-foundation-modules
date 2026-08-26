@@ -1,10 +1,16 @@
 ###############################################################################
 # AKS CLUSTER – control-plane + "system" pool
 ###############################################################################
+moved {
+  from = azurerm_kubernetes_cluster.aks
+  to   = azurerm_kubernetes_cluster.aks[0]
+}
+
 #trivy:ignore:avd-azu-0040
 #trivy:ignore:avd-azu-0041
 #trivy:ignore:avd-azu-0042
 resource "azurerm_kubernetes_cluster" "aks" {
+  count = var.create_aks_cluster ? 1 : 0
 
   #checkov:skip=CKV_AZURE_170: "Ensure that AKS use the Paid Sku for its SLA"
   #checkov:skip=CKV_AZURE_172: "Ensure autorotation of Secrets Store CSI Driver secrets for AKS clusters"
@@ -21,8 +27,8 @@ resource "azurerm_kubernetes_cluster" "aks" {
   #checkov:skip=CKV_AZURE_227: "Ensure that the AKS cluster encrypt temp disks, caches, and data flows between Compute and Storage resources"
 
   name                = var.aks_cluster_name
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = local.rg_location
+  resource_group_name = local.rg_name
 
   # lets kubectl talk to the API over the public FQDN
   dns_prefix = "${var.aks_cluster_name}-dns"
@@ -37,9 +43,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
   default_node_pool {
     name            = "sys"
     vm_size         = var.system_vm_size
-    vnet_subnet_id  = azurerm_subnet.nodes.id
+    vnet_subnet_id  = local.node_subnet_id
     os_disk_size_gb = 64
     type            = "VirtualMachineScaleSets"
+    zones           = var.node_pool_zones
 
     # autoscaler
     auto_scaling_enabled = true
@@ -76,18 +83,25 @@ resource "azurerm_kubernetes_cluster" "aks" {
 ###############################################################################
 # CPU NODE POOL – OnDemand
 ###############################################################################
+moved {
+  from = azurerm_kubernetes_cluster_node_pool.ondemand_cpu
+  to   = azurerm_kubernetes_cluster_node_pool.ondemand_cpu[0]
+}
+
 resource "azurerm_kubernetes_cluster_node_pool" "ondemand_cpu" {
+  count = local.create_node_pools ? 1 : 0
 
   #checkov:skip=CKV_AZURE_168: "Ensure Azure Kubernetes Cluster (AKS) nodes should use a minimum number of 50 pods"
   #checkov:skip=CKV_AZURE_227: "Ensure that the AKS cluster encrypt temp disks, caches, and data flows between Compute and Storage resources"
 
   name                        = "cpu16"
-  kubernetes_cluster_id       = azurerm_kubernetes_cluster.aks.id
+  kubernetes_cluster_id       = local.aks_id
   temporary_name_for_rotation = "cpu16tmp"
 
   vm_size        = var.cpu_vm_size
   mode           = "User"
-  vnet_subnet_id = azurerm_subnet.nodes.id
+  vnet_subnet_id = local.node_subnet_id
+  zones          = var.node_pool_zones
 
   auto_scaling_enabled = true
   min_count            = 0
@@ -107,18 +121,25 @@ resource "azurerm_kubernetes_cluster_node_pool" "ondemand_cpu" {
 ###############################################################################
 # CPU NODE POOL – Spot
 ###############################################################################
+moved {
+  from = azurerm_kubernetes_cluster_node_pool.spot_cpu
+  to   = azurerm_kubernetes_cluster_node_pool.spot_cpu[0]
+}
+
 resource "azurerm_kubernetes_cluster_node_pool" "spot_cpu" {
+  count = local.create_node_pools ? 1 : 0
 
   #checkov:skip=CKV_AZURE_168: "Ensure Azure Kubernetes Cluster (AKS) nodes should use a minimum number of 50 pods"
   #checkov:skip=CKV_AZURE_227: "Ensure that the AKS cluster encrypt temp disks, caches, and data flows between Compute and Storage resources"
 
   name                        = "cpu16spot"
-  kubernetes_cluster_id       = azurerm_kubernetes_cluster.aks.id
+  kubernetes_cluster_id       = local.aks_id
   temporary_name_for_rotation = "cpu16sptmp"
 
   vm_size        = var.cpu_vm_size
   mode           = "User"
-  vnet_subnet_id = azurerm_subnet.nodes.id
+  vnet_subnet_id = local.node_subnet_id
+  zones          = var.node_pool_zones
 
   auto_scaling_enabled = true
   min_count            = 0
@@ -152,14 +173,15 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_ondemand" {
   #checkov:skip=CKV_AZURE_168
   #checkov:skip=CKV_AZURE_227
 
-  for_each = var.gpu_pool_configs
+  for_each = local.create_node_pools ? var.gpu_pool_configs : {}
 
   name                  = each.value.name
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
+  kubernetes_cluster_id = local.aks_id
 
   vm_size        = each.value.vm_size
   mode           = "User"
-  vnet_subnet_id = azurerm_subnet.nodes.id
+  vnet_subnet_id = local.node_subnet_id
+  zones          = var.node_pool_zones
 
   # ── autoscaling (shared across all pools) ───────────────────────────────────
   auto_scaling_enabled = true
@@ -196,14 +218,15 @@ resource "azurerm_kubernetes_cluster_node_pool" "gpu_spot" {
   #checkov:skip=CKV_AZURE_168
   #checkov:skip=CKV_AZURE_227
 
-  for_each = var.gpu_pool_configs
+  for_each = local.create_node_pools ? var.gpu_pool_configs : {}
 
   name                  = "${each.value.name}spot"
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
+  kubernetes_cluster_id = local.aks_id
 
   vm_size        = each.value.vm_size
   mode           = "User"
-  vnet_subnet_id = azurerm_subnet.nodes.id
+  vnet_subnet_id = local.node_subnet_id
+  zones          = var.node_pool_zones
 
   # ── autoscaling (shared across all pools) ───────────────────────────────────
   auto_scaling_enabled = true
@@ -245,8 +268,8 @@ moved {
 resource "azurerm_user_assigned_identity" "anyscale_operator" {
   count               = var.enable_operator_infrastructure ? 1 : 0
   name                = "${var.aks_cluster_name}-anyscale-operator-mi"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = local.rg_location
+  resource_group_name = local.rg_name
 }
 
 ###############################################################################
@@ -260,10 +283,10 @@ moved {
 resource "azurerm_federated_identity_credential" "anyscale_operator_fic" {
   count               = var.enable_operator_infrastructure ? 1 : 0
   name                = "anyscale-operator-fic"
-  resource_group_name = azurerm_resource_group.rg.name
+  resource_group_name = local.rg_name
 
   parent_id = azurerm_user_assigned_identity.anyscale_operator[0].id # user assigned identity
-  issuer    = azurerm_kubernetes_cluster.aks.oidc_issuer_url         # OIDC issuer from AKS
+  issuer    = local.aks_oidc_issuer_url                              # OIDC issuer from AKS
   subject   = "system:serviceaccount:${var.anyscale_operator_namespace}:${var.anyscale_operator_serviceaccount}"
   audience  = ["api://AzureADTokenExchange"] # fixed value for AAD tokens
 }

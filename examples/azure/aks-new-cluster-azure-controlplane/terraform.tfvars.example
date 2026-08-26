@@ -46,12 +46,43 @@ tags = {
 }
 
 # ---------------------------------------------------------------------------
+# Create or adopt
+#   Defaults create a resource group, VNet, subnet, AKS cluster and node pools.
+#   To layer Anyscale onto a cluster you already run, uncomment the block
+#   below. The cluster must have the OIDC issuer and Microsoft Entra workload
+#   identity enabled, live in an Anyscale-supported region, and still issue a
+#   certificate-based kubeconfig (local accounts not disabled) — Terraform
+#   checks all four during plan. See "Use an existing AKS cluster" in README.md.
+#
+#   In this mode azure_resource_group_name must be the group holding the
+#   cluster, and azure_location is unused (the group's own region wins).
+# ---------------------------------------------------------------------------
+# create_aks_cluster        = false
+# existing_aks_cluster_name = "my-existing-aks"
+#
+#   Leave create_node_pools = true to have Terraform add the Anyscale-tainted
+#   CPU/GPU pools to the adopted cluster. Set it to false if the cluster's
+#   pools already carry those taints.
+# create_node_pools = true
+
+# ---------------------------------------------------------------------------
 # Networking (defaults are usually fine)
+#   The CIDRs below are ignored when adopting a cluster, or whenever
+#   existing_node_subnet_id is set.
 # ---------------------------------------------------------------------------
 # vnet_cidr               = "10.42.0.0/16"
 # nodes_subnet_cidr       = "10.42.1.0/24"
 # aks_cluster_subnet_cidr = "10.0.0.0/16"
 # aks_cluster_dns_address = null   # auto-derived from aks_cluster_subnet_cidr
+#
+#   Place resources in a resource group that already exists rather than
+#   creating one. Implied when create_aks_cluster = false.
+# create_resource_group   = false
+#   Use a subnet that already exists rather than creating a VNet and subnet.
+#   Add the Microsoft.Storage service endpoint to it yourself if enable_nfs.
+#   When adopting a cluster this is inferred from its first agent pool, so set
+#   it only to override that.
+# existing_node_subnet_id = "/subscriptions/.../subnets/aks-nodes"
 
 # ---------------------------------------------------------------------------
 # Storage
@@ -68,6 +99,11 @@ tags = {
 # ---------------------------------------------------------------------------
 system_vm_size = "Standard_D2s_v5"
 cpu_vm_size    = "Standard_D16s_v5"
+
+# Pin node pools to specific availability zones. Leave unset to let Azure
+# place nodes without a zone constraint. Useful when only some zones in the
+# region have capacity or quota for the VM sizes above.
+# node_pool_zones = ["3"]
 
 # GPU pools are opt-in (default is CPU-only). Each key creates one on-demand +
 # one spot pool. Easiest: run `./select-gpu.sh` to write this block for you.

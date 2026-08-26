@@ -22,7 +22,7 @@ locals {
   # ARM resource ID of the Anyscale.Platform/clouds resource the deployment
   # below creates. Used by the destroy-ordering hook so the cloud is removed
   # before the AKS cluster (see terraform_data.anyscale_cloud_predelete).
-  anyscale_cloud_arm_id = "${azurerm_resource_group.rg.id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
+  anyscale_cloud_arm_id = "${local.rg_id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
 
   anyscale_deployments = {
     top_level    = "dep-anyscale-${var.aks_cluster_name}"
@@ -176,7 +176,7 @@ data "external" "anyscale_platform_agreement" {
 resource "azapi_resource" "anyscale_platform" {
   type                      = "Microsoft.Resources/deployments@2022-09-01"
   name                      = local.anyscale_deployments.top_level
-  parent_id                 = azurerm_resource_group.rg.id
+  parent_id                 = local.rg_id
   schema_validation_enabled = false
   response_export_values = {
     cloud_deployment_id = "properties.outputs.cloudResourceId.value"
@@ -187,7 +187,7 @@ resource "azapi_resource" "anyscale_platform" {
       mode     = "Incremental"
       template = jsondecode(file("${path.module}/templates/anyscale-platform-cloud.template.json"))
       parameters = {
-        location                 = { value = azurerm_resource_group.rg.location }
+        location                 = { value = local.rg_location }
         cloudName                = { value = local.anyscale_cloud_name }
         storageAccountName       = { value = azurerm_storage_account.sa[0].name }
         storageMode              = { value = "existing" }
@@ -200,7 +200,7 @@ resource "azapi_resource" "anyscale_platform" {
         acrMode                  = { value = var.enable_acr ? "existing" : "none" }
         acrName                  = { value = var.enable_acr ? azurerm_container_registry.acr[0].name : "" }
         acrResourceId            = { value = var.enable_acr ? azurerm_container_registry.acr[0].id : "" }
-        aksKubeletPrincipalId    = { value = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id }
+        aksKubeletPrincipalId    = { value = local.aks_kubelet_object_id }
         # Terraform owns the kubelet AcrPull assignment (acr.tf). Tell the
         # ARM template not to create a duplicate one.
         manageAksKubeletAcrPullRoleAssignment = { value = false }
@@ -362,7 +362,7 @@ resource "azurerm_kubernetes_cluster_extension" "anyscale_operator" {
   count = var.install_operator_extension ? 1 : 0
 
   name              = var.anyscale_platform.extension_resource_name
-  cluster_id        = azurerm_kubernetes_cluster.aks.id
+  cluster_id        = local.aks_id
   extension_type    = "Anyscale.AKS.Operator"
   release_train     = local.anyscale_extension_release_train
   release_namespace = var.anyscale_operator_namespace
