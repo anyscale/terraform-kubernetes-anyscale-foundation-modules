@@ -27,12 +27,24 @@ locals {
   storage_account_name_base_nfs = length(local.storage_account_name_base) > 16 ? substr(local.storage_account_name_base, 0, 16) : local.storage_account_name_base
   storage_account_name          = coalesce(var.storage_account_name, "${local.storage_account_name_base_sa}sa${local.name_suffix}")
   storage_account_name_nfs      = coalesce(var.storage_account_name_nfs, "${local.storage_account_name_base_nfs}nfs${local.name_suffix}")
+
+  # Named here rather than inline on the resource because the ARM template
+  # needs the same name when it provisions the container itself
+  # (enable_operator_infrastructure = false).
+  storage_container_name = "${var.aks_cluster_name}-blob"
 }
 
 ############################################
 # resource group
 ############################################
+moved {
+  from = azurerm_resource_group.rg
+  to   = azurerm_resource_group.rg[0]
+}
+
 resource "azurerm_resource_group" "rg" {
+  count = local.create_resource_group ? 1 : 0
+
   name     = coalesce(var.azure_resource_group_name, "${var.aks_cluster_name}-rg")
   location = var.azure_location
   tags     = var.tags
@@ -63,10 +75,26 @@ resource "azurerm_storage_account" "sa" {
   #checkov:skip=CKV2_AZURE_31: "Ensure VNET subnet is configured with a Network Security Group (NSG)"
 
   name                     = local.storage_account_name
-  resource_group_name      = azurerm_resource_group.rg.name
-  location                 = azurerm_resource_group.rg.location
+  resource_group_name      = local.rg_name
+  location                 = local.rg_location
   account_tier             = "Standard"
   account_replication_type = "LRS"
+
+  # Match the account the ARM template provisions when it owns storage
+  # (enable_operator_infrastructure = false), so the two ownership modes are
+  # actually equivalent rather than merely both "working".
+  #
+  # is_hns_enabled matters most: the cloud is registered with an
+  # abfss://<container>@<account>.dfs.core.windows.net URI, which is the ADLS
+  # Gen2 endpoint. The operator's own startup check passes without it because
+  # that talks to the blob endpoint with presigned URLs, so a flat-namespace
+  # account looks healthy until a workload uses abfss.
+  #
+  # NOTE: is_hns_enabled is immutable. Adding it to a deployment that already
+  # exists forces the storage account to be REPLACED — check the plan and move
+  # any data you care about first.
+  is_hns_enabled                  = true
+  default_to_oauth_authentication = true
 
   # still blocks "anonymous blob" catches
   allow_nested_items_to_be_public = false
@@ -94,7 +122,7 @@ resource "azurerm_storage_container" "blob" {
 
   #checkov:skip=CKV2_AZURE_21: "Ensure Storage logging is enabled for Blob service for read requests"
 
-  name                  = "${var.aks_cluster_name}-blob"
+  name                  = local.storage_container_name
   storage_account_id    = azurerm_storage_account.sa[0].id
   container_access_type = "private" # blobs are private but reachable via the public endpoint
 }
@@ -106,8 +134,8 @@ resource "azurerm_storage_account" "nfs" {
   count = var.enable_nfs ? 1 : 0
 
   name                       = local.storage_account_name_nfs
-  resource_group_name        = azurerm_resource_group.rg.name
-  location                   = azurerm_resource_group.rg.location
+  resource_group_name        = local.rg_name
+  location                   = local.rg_location
   account_kind               = "FileStorage"
   account_tier               = "Premium"
   account_replication_type   = "ZRS"
@@ -117,7 +145,7 @@ resource "azurerm_storage_account" "nfs" {
 
   network_rules {
     default_action             = "Deny"
-    virtual_network_subnet_ids = [azurerm_subnet.nodes.id]
+    virtual_network_subnet_ids = [local.node_subnet_id]
     bypass                     = ["AzureServices"]
   }
 
@@ -127,22 +155,35 @@ resource "azurerm_storage_account" "nfs" {
 ############################################
 # networking (vnet and subnet)
 ############################################
+moved {
+  from = azurerm_virtual_network.vnet
+  to   = azurerm_virtual_network.vnet[0]
+}
+
 resource "azurerm_virtual_network" "vnet" {
+  count = local.create_network ? 1 : 0
+
   name                = "${var.aks_cluster_name}-vnet"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = local.rg_location
+  resource_group_name = local.rg_name
   address_space       = [var.vnet_cidr]
   tags                = var.tags
 }
 
 # Subnet for AKS nodes
+moved {
+  from = azurerm_subnet.nodes
+  to   = azurerm_subnet.nodes[0]
+}
+
 resource "azurerm_subnet" "nodes" {
+  count = local.create_network ? 1 : 0
 
   #checkov:skip=CKV2_AZURE_31: "Ensure VNET subnet is configured with a Network Security Group (NSG)"
 
   name                 = "aks-nodes"
-  resource_group_name  = azurerm_resource_group.rg.name
-  virtual_network_name = azurerm_virtual_network.vnet.name
+  resource_group_name  = local.rg_name
+  virtual_network_name = azurerm_virtual_network.vnet[0].name
   address_prefixes     = [var.nodes_subnet_cidr]
   service_endpoints    = ["Microsoft.Storage"]
 }

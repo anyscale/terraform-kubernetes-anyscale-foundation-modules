@@ -19,10 +19,15 @@
 locals {
   anyscale_cloud_name = coalesce(var.anyscale_cloud_name, "${var.aks_cluster_name}-cloud")
 
+  # Named here rather than inline on the resource because the ARM template
+  # needs the same name when it provisions the identity itself
+  # (enable_operator_infrastructure = false).
+  anyscale_operator_identity_name = "${var.aks_cluster_name}-anyscale-operator-mi"
+
   # ARM resource ID of the Anyscale.Platform/clouds resource the deployment
   # below creates. Used by the destroy-ordering hook so the cloud is removed
   # before the AKS cluster (see terraform_data.anyscale_cloud_predelete).
-  anyscale_cloud_arm_id = "${azurerm_resource_group.rg.id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
+  anyscale_cloud_arm_id = "${local.rg_id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
 
   anyscale_deployments = {
     top_level    = "dep-anyscale-${var.aks_cluster_name}"
@@ -65,9 +70,15 @@ locals {
 #   az rest --method GET  --url ".../Anyscale.Platform/agreements/default?api-version=..."
 #   az rest --method POST --url ".../Anyscale.Platform/agreements/default/accept?api-version=..."
 #
-# azurerm_resource_provider_registration (below) already polls internally
-# until the RP shows "Registered" (its own built-in timeout is 2h), so no
-# extra wait logic is needed for that half.
+# Both halves are done with the CLI rather than with resources that own the
+# subscription-wide state. azurerm_resource_provider_registration would be the
+# obvious fit for the first half, but it treats an already-registered RP as a
+# resource to import and fails the apply outright — and registration is
+# subscription-wide, so any subscription that has ever deployed Anyscale
+# (including a second cloud alongside a first) hits that. Its destroy would
+# also UNREGISTER the RP for every other deployment in the subscription. The
+# local-exec below is idempotent instead: it registers only if needed, polls
+# until Registered, and leaves the RP alone on destroy.
 #
 # The agreement half needs its own poll: POSTing /accept does not guarantee
 # the subscription is immediately Active afterward (same class of eventual-
@@ -87,10 +98,58 @@ locals {
 # — see that variable's description for the full text and links (terms of
 # use, privacy policy, Azure Marketplace billing/consent terms).
 ###############################################################################
-resource "azurerm_resource_provider_registration" "anyscale_platform" {
+# An earlier version of this example registered the RP with
+# azurerm_resource_provider_registration. Dropping that resource from the
+# configuration outright would make the next apply DESTROY it, and its destroy
+# unregisters Anyscale.Platform for every deployment in the subscription. This
+# forgets it instead, leaving the registration in place.
+removed {
+  from = azurerm_resource_provider_registration.anyscale_platform
+
+  lifecycle {
+    destroy = false
+  }
+}
+
+resource "terraform_data" "anyscale_platform_rp_register" {
   count = var.register_anyscale_resource_provider ? 1 : 0
 
-  name = "Anyscale.Platform"
+  triggers_replace = {
+    subscription_id = var.azure_subscription_id
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      SUB="${var.azure_subscription_id}"
+
+      state="$(az provider show --namespace Anyscale.Platform --subscription "$SUB" \
+        --query registrationState -o tsv 2>/dev/null || echo "")"
+      echo "[anyscale] Anyscale.Platform registration state: $${state:-<none>}"
+
+      if [ "$state" != "Registered" ]; then
+        echo "[anyscale] Registering the Anyscale.Platform resource provider..."
+        az provider register --namespace Anyscale.Platform --subscription "$SUB" >/dev/null
+      fi
+
+      deadline=$(( $(date +%s) + 900 ))
+      while :; do
+        state="$(az provider show --namespace Anyscale.Platform --subscription "$SUB" \
+          --query registrationState -o tsv 2>/dev/null || echo "")"
+        if [ "$state" = "Registered" ]; then
+          echo "[anyscale] Anyscale.Platform is Registered."
+          break
+        fi
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+          echo "[anyscale] ERROR: Anyscale.Platform did not reach Registered within timeout (last state: $${state:-<none>})" >&2
+          exit 1
+        fi
+        echo "[anyscale] Waiting for Anyscale.Platform to reach Registered (current: $${state:-<none>})..."
+        sleep 10
+      done
+    EOT
+  }
 }
 
 locals {
@@ -138,7 +197,7 @@ resource "terraform_data" "anyscale_platform_agreement_accept" {
     EOT
   }
 
-  depends_on = [azurerm_resource_provider_registration.anyscale_platform]
+  depends_on = [terraform_data.anyscale_platform_rp_register]
 }
 
 # Read the agreement's current status for the output below and as a
@@ -161,7 +220,7 @@ data "external" "anyscale_platform_agreement" {
   ]
 
   depends_on = [
-    azurerm_resource_provider_registration.anyscale_platform,
+    terraform_data.anyscale_platform_rp_register,
     terraform_data.anyscale_platform_agreement_accept,
   ]
 }
@@ -176,31 +235,44 @@ data "external" "anyscale_platform_agreement" {
 resource "azapi_resource" "anyscale_platform" {
   type                      = "Microsoft.Resources/deployments@2022-09-01"
   name                      = local.anyscale_deployments.top_level
-  parent_id                 = azurerm_resource_group.rg.id
+  parent_id                 = local.rg_id
   schema_validation_enabled = false
   response_export_values = {
     cloud_deployment_id = "properties.outputs.cloudResourceId.value"
     provisioning_state  = "properties.provisioningState"
+    # Resolved from effectiveIdentityResourceId, so these are populated whether
+    # the identity was passed in as "existing" or provisioned as "managed".
+    managed_identity_client_id    = "properties.outputs.managedIdentityClientId.value"
+    managed_identity_principal_id = "properties.outputs.managedIdentityPrincipalId.value"
   }
   body = {
     properties = {
       mode     = "Incremental"
       template = jsondecode(file("${path.module}/templates/anyscale-platform-cloud.template.json"))
       parameters = {
-        location                 = { value = azurerm_resource_group.rg.location }
-        cloudName                = { value = local.anyscale_cloud_name }
-        storageAccountName       = { value = azurerm_storage_account.sa[0].name }
-        storageMode              = { value = "existing" }
-        storageAccountResourceId = { value = azurerm_storage_account.sa[0].id }
-        storageContainerName     = { value = azurerm_storage_container.blob[0].name }
-        workloadIdentityName     = { value = azurerm_user_assigned_identity.anyscale_operator[0].name }
-        identityMode             = { value = "existing" }
-        identityResourceId       = { value = azurerm_user_assigned_identity.anyscale_operator[0].id }
-        tagsByResource           = { value = var.anyscale_platform.tags_by_resource }
-        acrMode                  = { value = var.enable_acr ? "existing" : "none" }
-        acrName                  = { value = var.enable_acr ? azurerm_container_registry.acr[0].name : "" }
-        acrResourceId            = { value = var.enable_acr ? azurerm_container_registry.acr[0].id : "" }
-        aksKubeletPrincipalId    = { value = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id }
+        location  = { value = local.rg_location }
+        cloudName = { value = local.anyscale_cloud_name }
+        # enable_operator_infrastructure decides who owns the storage account,
+        # container and workload identity. When true (the default) Terraform
+        # creates them and binds the template to them as "existing"; when false
+        # the template provisions them itself in "managed" mode, and only needs
+        # the names to use.
+        storageAccountName       = { value = local.storage_account_name }
+        storageMode              = { value = var.enable_operator_infrastructure ? "existing" : "managed" }
+        storageAccountResourceId = { value = var.enable_operator_infrastructure ? azurerm_storage_account.sa[0].id : "" }
+        storageContainerName     = { value = local.storage_container_name }
+        workloadIdentityName     = { value = local.anyscale_operator_identity_name }
+        # Only read when identityMode = managed, i.e. enable_operator_infrastructure
+        # = false: the template builds the federated credential's issuer from this
+        # cluster's OIDC issuer URL.
+        aksClusterResourceId  = { value = local.aks_id }
+        identityMode          = { value = var.enable_operator_infrastructure ? "existing" : "managed" }
+        identityResourceId    = { value = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].id : "" }
+        tagsByResource        = { value = var.anyscale_platform.tags_by_resource }
+        acrMode               = { value = var.enable_acr ? "existing" : "none" }
+        acrName               = { value = var.enable_acr ? azurerm_container_registry.acr[0].name : "" }
+        acrResourceId         = { value = var.enable_acr ? azurerm_container_registry.acr[0].id : "" }
+        aksKubeletPrincipalId = { value = local.aks_kubelet_object_id }
         # Terraform owns the kubelet AcrPull assignment (acr.tf). Tell the
         # ARM template not to create a duplicate one.
         manageAksKubeletAcrPullRoleAssignment = { value = false }
@@ -220,7 +292,7 @@ resource "azapi_resource" "anyscale_platform" {
     azurerm_role_assignment.anyscale_blob_contrib,
     azurerm_container_registry.acr,
     azurerm_role_assignment.kubelet_acr_pull,
-    azurerm_resource_provider_registration.anyscale_platform,
+    terraform_data.anyscale_platform_rp_register,
     terraform_data.anyscale_platform_agreement_accept,
     data.external.anyscale_platform_agreement,
   ]
@@ -243,6 +315,18 @@ resource "azapi_resource" "anyscale_platform" {
 locals {
   anyscale_cloud_resource_id            = azapi_resource.anyscale_platform.output.cloud_deployment_id
   anyscale_cloud_resource_id_hyphenated = replace(local.anyscale_cloud_resource_id, "_", "-")
+
+  # Who owns the operator's workload identity depends on
+  # enable_operator_infrastructure, so read its IDs from whichever side made
+  # it: the resource below, or the ARM deployment's outputs.
+  anyscale_operator_client_id = (var.enable_operator_infrastructure
+    ? azurerm_user_assigned_identity.anyscale_operator[0].client_id
+    : azapi_resource.anyscale_platform.output.managed_identity_client_id
+  )
+  anyscale_operator_principal_id = (var.enable_operator_infrastructure
+    ? azurerm_user_assigned_identity.anyscale_operator[0].principal_id
+    : azapi_resource.anyscale_platform.output.managed_identity_principal_id
+  )
 
   anyscale_gateway_certificate_secret_name         = "anyscale-${local.anyscale_cloud_resource_id_hyphenated}-certificate"
   anyscale_gateway_service_certificate_secret_name = "anyscale-svc-${local.anyscale_cloud_resource_id_hyphenated}-certificate"
@@ -362,7 +446,7 @@ resource "azurerm_kubernetes_cluster_extension" "anyscale_operator" {
   count = var.install_operator_extension ? 1 : 0
 
   name              = var.anyscale_platform.extension_resource_name
-  cluster_id        = azurerm_kubernetes_cluster.aks.id
+  cluster_id        = local.aks_id
   extension_type    = "Anyscale.AKS.Operator"
   release_train     = local.anyscale_extension_release_train
   release_namespace = var.anyscale_operator_namespace
@@ -377,7 +461,7 @@ resource "azurerm_kubernetes_cluster_extension" "anyscale_operator" {
     {
       "global.cloudDeploymentId"      = local.anyscale_cloud_resource_id
       "global.controlPlaneURL"        = var.anyscale_platform.control_plane_url
-      "global.auth.iamIdentity"       = azurerm_user_assigned_identity.anyscale_operator[0].client_id
+      "global.auth.iamIdentity"       = local.anyscale_operator_client_id
       "global.auth.audience"          = var.anyscale_platform.auth_audience
       "workloads.serviceAccount.name" = var.anyscale_operator_serviceaccount
 
@@ -474,4 +558,87 @@ resource "terraform_data" "anyscale_cloud_predelete" {
     azurerm_kubernetes_cluster_extension.anyscale_operator,
     azapi_resource.anyscale_platform,
   ]
+}
+
+###############################################################################
+# Manual Helm install support (install_operator_extension = false).
+#
+# When Terraform does not install the marketplace extension, the operator has
+# to be installed by hand — and every value it needs is something this apply
+# just produced (the cloud's cldrsrc_ ID, the workload identity's client ID,
+# the Envoy Gateway LB address). Transcribing those into a values.yaml by hand
+# is the step people get wrong, so write the file out instead.
+#
+# The nested structure below mirrors the flat dotted configuration_settings on
+# azurerm_kubernetes_cluster_extension.anyscale_operator above. Keep the two in
+# sync: anything added there that the operator needs at install time has to be
+# added here as well.
+#
+# Two values are easy to miss when hand-writing this file, and both are here:
+#
+#   global.auth.anyscaleCliToken   Must be present and empty so the operator
+#                                  uses the Microsoft Entra workload-identity
+#                                  exchange rather than CLI-token auth.
+#   networking.gateway             Normally baked in by the extension from the
+#                                  gateway LB address; nothing else tells the
+#                                  operator where the Gateway is.
+#
+# Note: overrides supplied through anyscale_platform.extension_configuration_
+# settings apply to the EXTENSION path only — they are flat dotted keys and are
+# not merged into this file. Edit the generated file if you need them here.
+###############################################################################
+locals {
+  anyscale_operator_helm_values = {
+    global = {
+      cloudDeploymentId = local.anyscale_cloud_resource_id
+      cloudProvider     = "azure"
+      controlPlaneURL   = var.anyscale_platform.control_plane_url
+      auth = {
+        iamIdentity      = local.anyscale_operator_client_id
+        audience         = var.anyscale_platform.auth_audience
+        anyscaleCliToken = ""
+      }
+    }
+    workloads = {
+      serviceAccount = { name = var.anyscale_operator_serviceaccount }
+      instanceTypes  = { enableDefaults = true }
+      accelerator = {
+        # Matches the taints aks.tf puts on the GPU pools.
+        tolerations = {
+          default = [
+            { key = "node.anyscale.com/accelerator-type", value = "GPU", effect = "NoSchedule" },
+            { key = "nvidia.com/gpu", operator = "Exists", effect = "NoSchedule" },
+          ]
+        }
+      }
+    }
+    networking = {
+      gateway = {
+        enabled    = true
+        name       = var.envoy_gateway.gateway_name
+        className  = var.envoy_gateway.gateway_class_name
+        namespace  = var.anyscale_operator_namespace
+        apiVersion = "gateway.networking.k8s.io/v1"
+        hostname   = data.external.gateway_lb.result.address
+      }
+    }
+  }
+
+  # Terraform already created the namespace unless create_operator_namespace
+  # is false, so only ask Helm to create it when it actually has to.
+  anyscale_operator_helm_command = join(" ", compact([
+    "helm install ${local.anyscale_cloud_name} anyscale/anyscale-operator",
+    "--namespace ${var.anyscale_operator_namespace}",
+    var.create_operator_namespace ? "" : "--create-namespace",
+    "--values anyscale-operator-values.yaml",
+    "--wait",
+  ]))
+}
+
+resource "local_file" "anyscale_operator_values" {
+  count = var.install_operator_extension ? 0 : 1
+
+  filename        = "${path.module}/anyscale-operator-values.yaml"
+  file_permission = "0600"
+  content         = yamlencode(local.anyscale_operator_helm_values)
 }

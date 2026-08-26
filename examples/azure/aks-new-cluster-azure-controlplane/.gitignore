@@ -11,5 +11,9 @@ diagnostics/
 # Post-apply deployment summary (embeds ARM IDs / subscription ID)
 anyscale-aks-cloud.yaml
 
+# Generated Helm values for a manual operator install (embeds the cloud's
+# cldrsrc_ ID and the workload identity client ID)
+anyscale-operator-values.yaml
+
 # Local PR write-up (not part of the example)
 PR_DESCRIPTION.md

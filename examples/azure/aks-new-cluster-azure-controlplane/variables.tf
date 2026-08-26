@@ -60,9 +60,107 @@ variable "azure_resource_group_name" {
     prompts for it interactively unless you supply it via terraform.tfvars, -var,
     or TF_VAR_azure_resource_group_name. Enter an empty value to fall back to
     "<aks_cluster_name>-rg".
+
+    The empty-value fallback only applies when Terraform creates the group. When
+    create_resource_group=false or create_aks_cluster=false this must name a
+    resource group that already exists.
   EOT
   type        = string
   nullable    = false
+}
+
+###############################################################################
+# Create-or-adopt toggles.
+#
+# The defaults reproduce this example's original behaviour: create a resource
+# group, VNet, subnet, AKS cluster and the Anyscale node pools from scratch.
+# See aks_existing.tf for how these resolve, and the README for the
+# prerequisites an adopted cluster has to meet.
+###############################################################################
+variable "create_aks_cluster" {
+  description = <<-EOT
+    (Optional) Create the AKS cluster (and its VNet/subnet). Set to false to
+    layer Anyscale onto a cluster you already run — supply
+    `existing_aks_cluster_name` and `azure_resource_group_name` in that case.
+
+    An adopted cluster must have the OIDC issuer and Microsoft Entra workload
+    identity enabled, live in an Anyscale-supported region, and still issue a
+    certificate-based kubeconfig (i.e. local accounts not disabled). Terraform
+    checks all four before it changes anything.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "existing_aks_cluster_name" {
+  description = <<-EOT
+    (Optional) Name of an existing AKS cluster to adopt, in
+    `azure_resource_group_name`. Required when create_aks_cluster=false and
+    ignored otherwise.
+  EOT
+  type        = string
+  nullable    = true
+  default     = null
+}
+
+variable "create_resource_group" {
+  description = <<-EOT
+    (Optional) Create the resource group. Set to false to place the storage
+    account, ACR and operator identity into a resource group that already
+    exists. Forced to false when create_aks_cluster=false, since an adopted
+    cluster brings its own resource group.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "existing_node_subnet_id" {
+  description = <<-EOT
+    (Optional) Full resource ID of an existing subnet to place AKS nodes in.
+    When set, Terraform skips creating the VNet and subnet (and `vnet_cidr` /
+    `nodes_subnet_cidr` are unused).
+
+    When adopting a cluster (create_aks_cluster=false) this is normally left
+    null — the subnet is read from the cluster's first agent pool. Set it
+    explicitly if that pool is not in the subnet you want new pools to use.
+
+    Note: `enable_nfs` requires the subnet to carry the `Microsoft.Storage`
+    service endpoint. Terraform adds it to subnets it creates; on a subnet you
+    supply, add it yourself.
+  EOT
+  type        = string
+  nullable    = true
+  default     = null
+}
+
+variable "create_node_pools" {
+  description = <<-EOT
+    (Optional) Create the Anyscale CPU/GPU node pools (on-demand and spot).
+    Set to false when adopting a cluster whose pools already carry the
+    `node.anyscale.com/capacity-type`, `node.anyscale.com/accelerator-type` and
+    `nvidia.com/gpu` taints that the operator tolerates — see
+    `anyscale_platform.extension_configuration_settings` to adjust those
+    tolerations to a different scheme.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "node_pool_zones" {
+  description = <<-EOT
+    (Optional) Availability zones for the node pools Terraform creates, e.g.
+    ["3"]. Leave null to let Azure place nodes without a zone constraint.
+
+    Useful when only some zones in a region have capacity or quota for the VM
+    sizes you asked for — `./scan-regional-quotas.sh` and `./select-gpu.sh`
+    help identify that.
+  EOT
+  type        = list(string)
+  nullable    = true
+  default     = null
 }
 
 variable "anyscale_cloud_name" {
@@ -119,9 +217,27 @@ variable "enable_blob_driver" {
 
 variable "enable_operator_infrastructure" {
   description = <<-EOT
-    (Optional) Enable blob storage, managed identity, federated identity credential,
-    role assignment, and output registration/helm commands for the Anyscale operator.
-    Set to false when using the Azure control plane, which provisions these via ARM templates.
+    (Optional) Decides who provisions the operator's blob storage, workload
+    identity, federated identity credential and storage role assignment.
+
+    true (default) — Terraform creates them, and the Anyscale.Platform ARM
+    deployment binds to them with storageMode/identityMode = "existing". You
+    keep them in Terraform state, so they are visible in the plan, tagged with
+    var.tags, and removed by `terraform destroy`.
+
+    false — the ARM template provisions them itself in "managed" mode, using
+    the same names Terraform would have used. They belong to the
+    Anyscale.Platform/clouds resource rather than to Terraform, so they do not
+    appear as separate resources in the plan. Their IDs are still surfaced:
+    the operator's client and principal IDs are read back from the ARM
+    deployment's outputs, so the outputs and the operator install work the
+    same either way.
+
+    Either mode produces the same working cloud. Prefer true unless you
+    specifically want the Anyscale RP to own that infrastructure's lifecycle.
+
+    Note this is NOT the flag for installing the operator yourself instead of
+    via the AKS marketplace extension — that is `install_operator_extension`.
   EOT
   type        = bool
   nullable    = false
@@ -131,9 +247,11 @@ variable "enable_operator_infrastructure" {
 variable "register_anyscale_resource_provider" {
   description = <<-EOT
     (Optional) Register the Anyscale.Platform resource provider on the
-    subscription via Terraform (azurerm_resource_provider_registration).
-    Set to false if the RP is already registered or your org registers
-    resource providers centrally and disallows registering them per-deploy.
+    subscription via Terraform (`az provider register`, then poll until the
+    RP reports Registered). Safe to leave true when the RP is already
+    registered — the step is a no-op in that case, and destroying does not
+    unregister it. Set to false if your org registers resource providers
+    centrally and disallows registering them per-deploy.
   EOT
   type        = bool
   nullable    = false
@@ -440,8 +558,42 @@ variable "assign_current_user_platform_roles" {
 # Anyscale routes workspace and service traffic through an in-cluster Envoy
 # Gateway. Defaults match the upstream Anyscale quickstart for AKS.
 ###############################################################################
+variable "create_envoy_gateway" {
+  description = <<-EOT
+    (Optional) Install Envoy Gateway — the Helm release, the `EnvoyProxy` that
+    pins the data plane to an external Azure Standard LoadBalancer, and the
+    `GatewayClass`. Set to false to reuse an install the cluster already has,
+    and point `envoy_gateway.gateway_class_name` at the existing class.
+
+    The `Gateway` itself is always created: its HTTPS listeners reference TLS
+    Secret names derived from this cloud's `cldrsrc_…` ID, so it cannot be
+    shared between Anyscale clouds even on the same cluster.
+
+    The GatewayClass you reuse must resolve to an `EnvoyProxy` whose
+    `envoyService.type` is `LoadBalancer`. If it publishes the data plane any
+    other way, the Gateway never gets a `status.addresses` entry and the apply
+    fails at `terraform_data.wait_for_gateway_lb` — which dumps the
+    GatewayClass and its EnvoyProxy on timeout so the cause is visible.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "create_operator_namespace" {
+  description = <<-EOT
+    (Optional) Create the `anyscale_operator_namespace` Kubernetes namespace.
+    Set to false when adopting a cluster where that namespace already exists —
+    for example one that has run an Anyscale operator before — since creating
+    it again fails the apply.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
 variable "envoy_gateway" {
-  description = "(Optional) Envoy Gateway install knobs."
+  description = "(Optional) Envoy Gateway install knobs. `namespace`, `release_name` and `chart_version` apply only when create_envoy_gateway=true; `gateway_class_name` names the class to create or, when reusing, the existing one to bind the Gateway to."
   type = object({
     namespace                        = optional(string, "envoy-gateway-system")
     release_name                     = optional(string, "eg")

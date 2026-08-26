@@ -20,8 +20,8 @@ resource "azurerm_container_registry" "acr" {
   count = var.enable_acr ? 1 : 0
 
   name                = local.acr_name
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
+  resource_group_name = local.rg_name
+  location            = local.rg_location
   sku                 = var.acr_sku
   admin_enabled       = false
   # Public network access — match the example's overall public-networking
@@ -46,5 +46,5 @@ resource "azurerm_role_assignment" "kubelet_acr_pull" {
 
   scope                = azurerm_container_registry.acr[0].id
   role_definition_name = "AcrPull"
-  principal_id         = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
+  principal_id         = local.aks_kubelet_object_id
 }

@@ -1,5 +1,8 @@
 terraform {
-  required_version = ">= 1.5.0"
+  # 1.7 for the `removed` block in anyscale.tf, which is what keeps an earlier
+  # apply's azurerm_resource_provider_registration from being destroyed (and
+  # thereby unregistering Anyscale.Platform subscription-wide) on upgrade.
+  required_version = ">= 1.7.0"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -69,25 +72,25 @@ provider "azapi" {
 # context (old cluster, Lens proxy, etc.) can never be picked up. True single
 # `terraform apply`, no `az aks get-credentials` for the providers.
 provider "kubernetes" {
-  host                   = azurerm_kubernetes_cluster.aks.kube_config[0].host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].cluster_ca_certificate)
+  host                   = local.aks_kube_config.host
+  client_certificate     = base64decode(local.aks_kube_config.client_certificate)
+  client_key             = base64decode(local.aks_kube_config.client_key)
+  cluster_ca_certificate = base64decode(local.aks_kube_config.cluster_ca_certificate)
 }
 
 provider "helm" {
   kubernetes = {
-    host                   = azurerm_kubernetes_cluster.aks.kube_config[0].host
-    client_certificate     = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_certificate)
-    client_key             = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_key)
-    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].cluster_ca_certificate)
+    host                   = local.aks_kube_config.host
+    client_certificate     = base64decode(local.aks_kube_config.client_certificate)
+    client_key             = base64decode(local.aks_kube_config.client_key)
+    cluster_ca_certificate = base64decode(local.aks_kube_config.cluster_ca_certificate)
   }
 }
 
 provider "kubectl" {
-  host                   = azurerm_kubernetes_cluster.aks.kube_config[0].host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].cluster_ca_certificate)
+  host                   = local.aks_kube_config.host
+  client_certificate     = base64decode(local.aks_kube_config.client_certificate)
+  client_key             = base64decode(local.aks_kube_config.client_key)
+  cluster_ca_certificate = base64decode(local.aks_kube_config.cluster_ca_certificate)
   load_config_file       = false
 }

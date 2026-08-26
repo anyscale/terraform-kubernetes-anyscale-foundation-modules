@@ -2,17 +2,17 @@
 # Azure infra outputs (mirrors examples/azure/aks-new_cluster)
 ###############################################################################
 output "azure_resource_group_name" {
-  value       = azurerm_resource_group.rg.name
+  value       = local.rg_name
   description = "Name of the Azure Resource Group."
 }
 
 output "azure_storage_account_name" {
-  value       = var.enable_operator_infrastructure ? azurerm_storage_account.sa[0].name : null
+  value       = local.storage_account_name
   description = "Name of the Azure Storage Account."
 }
 
 output "azure_storage_container_name" {
-  value       = var.enable_operator_infrastructure ? azurerm_storage_container.blob[0].name : null
+  value       = local.storage_container_name
   description = "Name of the Azure Storage Container."
 }
 
@@ -22,12 +22,12 @@ output "azure_nfs_storage_account_name" {
 }
 
 output "azure_aks_cluster_name" {
-  value       = azurerm_kubernetes_cluster.aks.name
+  value       = local.aks_name
   description = "Name of the AKS cluster."
 }
 
 output "azure_aks_oidc_issuer_url" {
-  value       = azurerm_kubernetes_cluster.aks.oidc_issuer_url
+  value       = local.aks_oidc_issuer_url
   description = "OIDC issuer URL of the AKS cluster (used by workload-identity federation)."
 }
 
@@ -47,12 +47,12 @@ output "acr_login_server" {
 }
 
 output "anyscale_operator_client_id" {
-  value       = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].client_id : null
+  value       = local.anyscale_operator_client_id
   description = "Client ID of the Anyscale operator user-assigned managed identity."
 }
 
 output "anyscale_operator_principal_id" {
-  value       = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].principal_id : null
+  value       = local.anyscale_operator_principal_id
   description = "Principal ID of the Anyscale operator user-assigned managed identity."
 }
 
@@ -70,7 +70,7 @@ output "anyscale_cloud_name" {
 }
 
 output "anyscale_cloud_arm_id" {
-  value       = "${azurerm_resource_group.rg.id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
+  value       = "${local.rg_id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
   description = "Full ARM resource ID of the Anyscale.Platform/clouds resource."
 }
 
@@ -111,7 +111,7 @@ output "gateway_service_certificate_secret_name" {
 # Convenience commands
 ###############################################################################
 output "aks_get_credentials_command" {
-  value       = "az aks get-credentials --resource-group ${azurerm_resource_group.rg.name} --name ${azurerm_kubernetes_cluster.aks.name} --overwrite-existing"
+  value       = "az aks get-credentials --resource-group ${local.rg_name} --name ${local.aks_name} --overwrite-existing"
   description = "Refresh local kubeconfig against the deployed AKS cluster."
 }
 
@@ -137,22 +137,22 @@ resource "local_file" "cloud_summary" {
     anyscale_cloud = {
       name               = local.anyscale_cloud_name
       resource_id        = local.anyscale_cloud_resource_id
-      arm_id             = "${azurerm_resource_group.rg.id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
+      arm_id             = "${local.rg_id}/providers/Anyscale.Platform/clouds/${local.anyscale_cloud_name}"
       console_url        = var.anyscale_platform.control_plane_url
       operator_namespace = var.anyscale_operator_namespace
       extension_id       = var.install_operator_extension ? azurerm_kubernetes_cluster_extension.anyscale_operator[0].id : null
     }
     azure = {
-      resource_group    = azurerm_resource_group.rg.name
-      aks_cluster       = azurerm_kubernetes_cluster.aks.name
-      oidc_issuer_url   = azurerm_kubernetes_cluster.aks.oidc_issuer_url
-      storage_account   = var.enable_operator_infrastructure ? azurerm_storage_account.sa[0].name : null
-      storage_container = var.enable_operator_infrastructure ? azurerm_storage_container.blob[0].name : null
+      resource_group    = local.rg_name
+      aks_cluster       = local.aks_name
+      oidc_issuer_url   = local.aks_oidc_issuer_url
+      storage_account   = local.storage_account_name
+      storage_container = local.storage_container_name
       acr_login_server  = var.enable_acr ? azurerm_container_registry.acr[0].login_server : null
     }
     operator_identity = {
-      client_id    = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].client_id : null
-      principal_id = var.enable_operator_infrastructure ? azurerm_user_assigned_identity.anyscale_operator[0].principal_id : null
+      client_id    = local.anyscale_operator_client_id
+      principal_id = local.anyscale_operator_principal_id
     }
     gateway = {
       lb_hostname                = data.external.gateway_lb.result.address
@@ -160,7 +160,21 @@ resource "local_file" "cloud_summary" {
       service_certificate_secret = local.anyscale_gateway_service_certificate_secret_name
     }
     commands = {
-      get_credentials = "az aks get-credentials --resource-group ${azurerm_resource_group.rg.name} --name ${azurerm_kubernetes_cluster.aks.name} --overwrite-existing"
+      get_credentials  = "az aks get-credentials --resource-group ${local.rg_name} --name ${local.aks_name} --overwrite-existing"
+      install_operator = var.install_operator_extension ? null : local.anyscale_operator_helm_command
     }
   })
+}
+
+###############################################################################
+# Manual Helm install outputs (install_operator_extension = false)
+###############################################################################
+output "anyscale_operator_values_file" {
+  value       = var.install_operator_extension ? null : local_file.anyscale_operator_values[0].filename
+  description = "Path to the generated Helm values file for a manual operator install. Null when install_operator_extension=true (the AKS extension installs the operator instead)."
+}
+
+output "anyscale_operator_helm_command" {
+  value       = var.install_operator_extension ? null : local.anyscale_operator_helm_command
+  description = "Ready-to-run `helm install` for the Anyscale operator, using the generated values file. Run `helm repo add anyscale https://anyscale.github.io/helm-charts && helm repo update anyscale` first. Null when install_operator_extension=true."
 }

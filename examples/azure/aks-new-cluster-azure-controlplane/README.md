@@ -139,6 +139,8 @@ MIN_CPU_VCPUS=12 ./select-region.sh   # lower the deployable threshold
 
 `./select-region.sh` checks regional vCPU and CPU-family headroom for you across the supported regions. For a standalone, full quota report (CPU + per-GPU-family across all or specific regions) use `./scan-regional-quotas.sh` directly — e.g. `NODE_VM_SIZE=Standard_D16s_v5 ./scan-regional-quotas.sh`.
 
+Quota and capacity can also vary *within* a region. If only some availability zones can serve the VM sizes you picked, pin the pools with `node_pool_zones = ["3"]` (unset by default, which lets Azure place nodes without a zone constraint).
+
 #### Worked example — minimum quota to try this out
 
 The default `system_vm_size` (`Standard_D2s_v5`) and `cpu_vm_size` belong to the **DSv5** family, so both draw from the same *Standard DSv5 Family vCPUs* quota **and** the *Total Regional vCPUs* quota in your region. A minimal CPU-only deployment (no GPU pools) needs roughly:
@@ -222,6 +224,99 @@ terraform output anyscale_cloud_resource_id   # cldrsrc_…
 terraform output gateway_lb_hostname          # the public LB IP
 terraform output aks_get_credentials_command  # refresh kubeconfig manually
 ```
+
+### Use an existing AKS cluster
+
+By default this example creates the resource group, VNet, subnet, AKS cluster and node pools. To layer Anyscale onto a cluster you already run, set:
+
+```hcl
+create_aks_cluster        = false
+existing_aks_cluster_name = "my-existing-aks"
+azure_resource_group_name = "the-group-holding-that-cluster"
+```
+
+Everything else is unchanged — storage, ACR, the operator identity and federated credential, the Anyscale cloud, Envoy Gateway and the operator extension are all created against the adopted cluster.
+
+**The cluster must already have:**
+
+| Requirement | Why | Fix |
+| --- | --- | --- |
+| OIDC issuer enabled | The operator's federated identity credential federates against it | `az aks update -g <rg> -n <cluster> --enable-oidc-issuer --enable-workload-identity` |
+| Microsoft Entra workload identity enabled | The operator authenticates to the control plane with a workload-identity token, not a CLI token | same command |
+| Local accounts enabled | The `kubernetes`/`helm`/`kubectl` providers in `versions.tf` authenticate with the cluster's client certificate, which Azure only issues when local accounts are on | `az aks update -g <rg> -n <cluster> --enable-local-accounts`, or fork `versions.tf` to use an `exec` block running `kubelogin get-token` |
+| A region where `Anyscale.Platform/clouds` exists | The cloud, storage account, ACR and operator identity are all deployed there | move the cluster, or pick a different one |
+
+Terraform checks all four during `plan` (see `terraform_data.existing_aks_preflight` in `aks_existing.tf`) and fails with the relevant `az` command in the error, before creating anything.
+
+**Node pools.** `create_node_pools` defaults to `true`, so Terraform adds the Anyscale CPU and GPU pools to the adopted cluster, carrying the `node.anyscale.com/capacity-type`, `node.anyscale.com/accelerator-type` and `nvidia.com/gpu` taints the operator tolerates. Their subnet is read from the cluster's first agent pool; override with `existing_node_subnet_id`. Set `create_node_pools = false` if the cluster's own pools already carry those taints — if they carry a *different* taint scheme, override the tolerations via `anyscale_platform.extension_configuration_settings` instead, or Anyscale workloads will land on your system nodes.
+
+**Other notes for this mode.** `azure_location`, `vnet_cidr`, `nodes_subnet_cidr` and `aks_cluster_subnet_cidr` are unused — the adopted resource group's region and the cluster's own network win. `enable_nfs` needs the node subnet to carry the `Microsoft.Storage` service endpoint; Terraform adds it to subnets it creates, but not to one you bring. `terraform destroy` removes only what Terraform created: the Anyscale cloud, operator extension, gateway, storage, ACR, identity and any node pools it added. The cluster, its resource group and its network are left alone.
+
+Two related flags work independently of `create_aks_cluster`, for creating a cluster inside infrastructure you already have:
+
+- `create_resource_group = false` — create everything except the resource group
+- `existing_node_subnet_id = "/subscriptions/…/subnets/…"` — create the cluster in an existing subnet
+
+#### Reusing an existing Envoy Gateway install
+
+A cluster that already runs Envoy Gateway — because your platform team installed it, or because another Anyscale cloud on the same cluster brought it — doesn't need a second copy:
+
+```hcl
+create_envoy_gateway = false
+envoy_gateway = {
+  gateway_class_name = "their-existing-class"
+}
+```
+
+That skips the Helm release, the `EnvoyProxy` and the `GatewayClass`. The **`Gateway` is still created either way**: its HTTPS listeners reference TLS Secret names derived from this cloud's `cldrsrc_…` ID, so it can't be shared between Anyscale clouds even on one cluster.
+
+The class you point at must resolve to an `EnvoyProxy` whose `envoyService.type` is `LoadBalancer`. If it publishes the data plane some other way, the Gateway never gets a `status.addresses` entry, and the apply fails at `terraform_data.wait_for_gateway_lb` after `gateway_lb_wait_timeout_seconds` — the timeout handler dumps the GatewayClass and its EnvoyProxy so you can see which it is.
+
+Related, and easy to hit when adopting a cluster that has run an Anyscale operator before: `create_operator_namespace = false` skips creating the `anyscale-operator` namespace, which would otherwise fail the apply because it already exists. instead of a new VNet
+
+### Installing the operator yourself instead of via the AKS extension
+
+Set `install_operator_extension = false` and Terraform builds everything else — the cloud, storage, ACR, the workload identity, Envoy Gateway and the Gateway — but leaves the operator to you.
+
+Everything the operator needs is something the apply just produced: the cloud's `cldrsrc_…` ID, the identity's client ID, the Gateway's LB address. Rather than have you transcribe those, the apply writes a complete **`anyscale-operator-values.yaml`** (gitignored — it embeds those IDs) and prints the matching command:
+
+```bash
+az aks get-credentials --resource-group <rg> --name <cluster> --overwrite-existing   # or: terraform output aks_get_credentials_command
+
+helm repo add anyscale https://anyscale.github.io/helm-charts
+helm repo update anyscale
+
+terraform output -raw anyscale_operator_helm_command     # run what this prints
+```
+
+Then `kubectl get pods -n anyscale-operator` should show `3/3 Running`.
+
+The generated file (`local.anyscale_operator_helm_values` in `anyscale.tf`) mirrors the extension's `configuration_settings`, including two values that are easy to miss when writing it by hand:
+
+- **`global.auth.anyscaleCliToken: ""`** — must be present and empty, so the operator uses the Microsoft Entra workload-identity exchange rather than CLI-token auth.
+- **`networking.gateway`** — normally baked in by the extension from the Gateway's LB address. `envoy-gateway.tf` still provisions the Gateway and GatewayClass, but nothing else tells the operator where they are.
+
+It also carries `workloads.instanceTypes.enableDefaults` and the GPU tolerations matching the taints `aks.tf` puts on the GPU pools — omit those and GPU workloads won't schedule.
+
+Two caveats. The generated command drops `--create-namespace`, because `create_operator_namespace` defaults to `true` and Terraform already made the namespace; if you set that to `false`, the flag comes back automatically. And overrides passed through `anyscale_platform.extension_configuration_settings` apply to the **extension path only** — they're flat dotted keys and are not merged into the generated YAML, so edit the file directly if you need them.
+
+> `enable_operator_infrastructure` is a *different* flag and is **not** the one for this — see below.
+
+### Who owns the operator's storage and identity
+
+`enable_operator_infrastructure` picks which side provisions the operator's blob storage, workload identity, federated credential and storage role assignment. Both modes produce the same working cloud.
+
+| | `true` (default) | `false` |
+| --- | --- | --- |
+| Created by | Terraform | the Anyscale.Platform ARM template |
+| ARM `storageMode` / `identityMode` | `existing` | `managed` |
+| Visible in the plan | yes | no — owned by the cloud resource |
+| Tagged with `var.tags` | yes | no |
+| Removed by `terraform destroy` | yes | with the cloud |
+
+Names are identical either way (`local.storage_account_name`, `local.storage_container_name`, `local.anyscale_operator_identity_name` are shared by both paths), and the operator's client and principal IDs are read back from the ARM deployment's outputs when the template owns them — so `anyscale_operator_client_id`, the generated Helm values and the operator install behave the same in both modes.
+
+Prefer `true` unless you specifically want the Anyscale resource provider to own that infrastructure's lifecycle.
 
 ### Deployment summary file
 
