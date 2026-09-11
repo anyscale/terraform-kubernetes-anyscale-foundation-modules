@@ -103,7 +103,7 @@ carrying the quality bar of the Anyscale reference example:
 | Stack | What it is |
 |---|---|
 | [`pauldotyu/awesome-aks` → `2026-07-15-anyscale-on-aks-automatic`](https://github.com/pauldotyu/awesome-aks/tree/main/2026-07-15-anyscale-on-aks-automatic) | Upstream demo. AKS Automatic, ~950 lines of HCL, hardcoded names, manual `kubectl apply` of the gateway, no destroy handling. |
-| `examples/azure/anyscale-on-azure-new-aks` (this repo) | The polished reference. **Standard** AKS, one-apply UX, BYO VNet, feature switches, helper scripts, destroy-ordering hook, production-readiness guidance. |
+| `examples/azure/anyscale-on-azure` (this repo) | The polished reference. **Standard** AKS, one-apply UX, BYO VNet, feature switches, helper scripts, destroy-ordering hook, production-readiness guidance. |
 | `AKS-Anyscale-Private-Cluster-Sample` | The private/hardened lab built on top of the reference. |
 
 The goal is a fourth stack: **the `new-aks` example re-cut onto AKS Automatic**, living beside its
@@ -116,9 +116,9 @@ a re-cut, not a copy.
 
 ## Part 1 — Comparison
 
-### `anyscale-on-azure-new-aks` (Standard) vs. this example (Automatic)
+### `anyscale-on-azure` (Standard) vs. this example (Automatic)
 
-| Concern | `anyscale-on-azure-new-aks` | `anyscale-on-azure-aks-automatic` |
+| Concern | `anyscale-on-azure` | `anyscale-on-azure-aks-automatic` |
 |---|---|---|
 | Cluster resource | `azurerm_kubernetes_cluster`, SKU Free/Standard | `azurerm_kubernetes_automatic_cluster` (azurerm **≥ 4.81.0**, released 2026-07-14) |
 | Compute | 5 hand-managed pools: `sys`, `cpu16`, `cpu16spot`, `gpu×N`, `gpuspot×N` | **Karpenter/NAP only.** Managed system pool + default NodePool are built in; we add GPU/spot `NodePool` + `AKSNodeClass` CRs |

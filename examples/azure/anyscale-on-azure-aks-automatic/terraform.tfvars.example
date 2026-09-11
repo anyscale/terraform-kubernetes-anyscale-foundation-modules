@@ -8,7 +8,7 @@ azure_subscription_id = "00000000-0000-0000-0000-000000000000"
 
 # ── common ──────────────────────────────────────────────────────────────────
 # Must be supported by BOTH Anyscale and AKS Automatic. Run ./select-region.sh.
-# NOTE: westcentralus is valid in the `anyscale-on-azure-new-aks` sibling but
+# NOTE: westcentralus is valid in the `anyscale-on-azure` sibling but
 # NOT here — Anyscale supports it, AKS Automatic does not.
 # azure_location    = "westus2"
 aks_cluster_name = "anyscale-auto"

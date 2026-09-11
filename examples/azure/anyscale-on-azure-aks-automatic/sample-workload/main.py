@@ -11,7 +11,7 @@ thing that is broken:
      in response to a pending Ray task.
   3. Optionally, that a GPU node came up with working AKS-managed NVIDIA
      drivers — the replacement for the GPU operator chart in the
-     `anyscale-on-azure-new-aks` sibling.
+     `anyscale-on-azure` sibling.
 
 Run it with `anyscale job submit -f job.yaml --wait`, or from a workspace
 terminal with `python main.py`.

@@ -21,7 +21,7 @@ variable "azure_location" {
     westeurope, swedencentral, uksouth, australiaeast, southeastasia,
     northeurope.
 
-    NOTE FOR USERS COMING FROM `anyscale-on-azure-new-aks`: `westcentralus` is
+    NOTE FOR USERS COMING FROM `anyscale-on-azure`: `westcentralus` is
     valid there but NOT here — Anyscale supports it, AKS Automatic does not.
 
     Tip: run `./select-region.sh` to print the supported regions, scan your
@@ -237,7 +237,7 @@ variable "gpu_nodepool_configs" {
     Each entry renders an `AKSNodeClass` (with the AKS-managed GPU driver tag)
     plus an on-demand `NodePool`, and a spot `NodePool` when `enable_spot` is
     true. Nodes carry the same Anyscale taints as the static GPU pools in the
-    `anyscale-on-azure-new-aks` sibling, so operator tolerations are identical.
+    `anyscale-on-azure` sibling, so operator tolerations are identical.
 
     The map key is a logical label (e.g. "T4", "A100"). `name` is used for the
     AKSNodeClass and NodePool object names; the spot pool appends "spot".

@@ -2,7 +2,7 @@
 
 One `terraform apply` stands up an **AKS Automatic** cluster and registers it as an Anyscale cloud on the Azure-hosted control plane (`https://console.azure.anyscale.com`) — infrastructure, cloud registration, operator, and gateway in a single pass.
 
-This is the [`anyscale-on-azure-new-aks`](../anyscale-on-azure-new-aks) reference example re-cut onto AKS Automatic. Automatic removes a large chunk of what that example configures by hand — node pools, the Envoy Gateway chart, the NVIDIA GPU operator — and imposes constraints of its own: Entra-only cluster auth, enforced deployment safeguards, and a three-subnet BYO VNet.
+This is the [`anyscale-on-azure`](../anyscale-on-azure) reference example re-cut onto AKS Automatic. Automatic removes a large chunk of what that example configures by hand — node pools, the Envoy Gateway chart, the NVIDIA GPU operator — and imposes constraints of its own: Entra-only cluster auth, enforced deployment safeguards, and a three-subnet BYO VNet.
 
 ## What gets deployed
 
@@ -22,9 +22,9 @@ This is the [`anyscale-on-azure-new-aks`](../anyscale-on-azure-new-aks) referenc
 | In-cluster | Karpenter `AKSNodeClass` + GPU `NodePool`s with AKS-managed drivers (opt-in) | `gpu.tf` |
 | Observability | Azure Monitor workspace + managed Prometheus DCE/DCR/recording rules; Log Analytics + Container Insights | `monitoring.tf`, `prometheus.tf` |
 
-## Part 1 — How this differs from `anyscale-on-azure-new-aks`
+## Part 1 — How this differs from `anyscale-on-azure`
 
-| Concern | `anyscale-on-azure-new-aks` (Standard) | This example (Automatic) |
+| Concern | `anyscale-on-azure` (Standard) | This example (Automatic) |
 |---|---|---|
 | Cluster resource | `azurerm_kubernetes_cluster`, SKU Free/Standard | `azurerm_kubernetes_automatic_cluster` (azurerm **≥ 4.81.0**) |
 | Compute | 5 hand-managed pools: `sys`, `cpu16`, `cpu16spot`, `gpu×N`, `gpuspot×N` | **Karpenter/NAP only.** Managed system pool + built-in default NodePool; we add GPU `NodePool` + `AKSNodeClass` CRs |
@@ -202,7 +202,7 @@ This example optimizes for a fast, single-command first deploy. AKS Automatic al
 
 | Evaluation default | Hardening step |
 |---|---|
-| Public AKS API server | `api_server_authorized_ip_ranges` (include your egress IP). A fully private API server is **out of scope here** — the bootstrap needs data-plane reach; use [`anyscale-on-azure-private-aks`](../anyscale-on-azure-private-aks) instead |
+| Public AKS API server | `api_server_authorized_ip_ranges` (include your egress IP). A fully private API server is **out of scope here** — the bootstrap needs data-plane reach; a private-API-server variant is tracked separately and is not in this repo yet |
 | Public gateway LB | `internal_gateway = true` (VNet-only data plane) |
 | Public storage / ACR endpoints | Private endpoints; ACR needs `acr_sku = "Premium"` |
 | Anyscale namespace excluded from safeguards | Keep the exclusion as narrow as the operator actually needs; audit workload pods against the safeguards rules |
