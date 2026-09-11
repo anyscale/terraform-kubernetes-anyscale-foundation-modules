@@ -40,6 +40,29 @@ That hostname is baked directly into the operator extension's `networking.gatewa
 | `internal_gateway` | `false` | Internal Standard LB — VNet-only data plane; falls back to LB polling |
 | `enable_nfs` | `false` | Premium NFS FileStorage account locked to the node subnet |
 | `enable_acr` | `true` | Customer-owned ACR + pull/push/tasks role assignments |
+| `register_anyscale_resource_provider` | `true` | Register the `Anyscale.Platform` RP on the subscription (one-time) |
+| `accept_anyscale_platform_agreement` | `true` | Accept the `Anyscale.Platform` subscription agreement (one-time) — **consents on your behalf**, see `variables.tf` |
+| `install_operator_extension` | `true` | `false` skips the AKS extension so you can `helm install` the operator yourself |
+
+## Subscription onboarding
+
+`Anyscale.Platform/clouds` cannot be created until the subscription has the
+resource provider registered **and** the Anyscale agreement accepted. Both are
+one-time, per-subscription, and both are on by default:
+
+```
+register_anyscale_resource_provider → az provider register --namespace Anyscale.Platform
+accept_anyscale_platform_agreement  → POST Anyscale.Platform/agreements/default/accept
+```
+
+The agreement step checks current status first, accepts only if needed, then
+polls until `Active` (acceptance is not immediately consistent). Set either to
+`false` if your org does these centrally or requires human sign-off — the cloud
+resource carries a precondition that fails the plan with the exact `az` command
+to run if the agreement still isn't `Active`.
+
+Both API versions are pinned by `var.anyscale_platform` (`clouds_api_version`,
+`agreements_api_version`) and default to `2026-09-01`, the GA version.
 
 ## Prerequisites
 
