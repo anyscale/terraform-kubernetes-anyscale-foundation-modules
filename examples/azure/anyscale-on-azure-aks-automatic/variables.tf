@@ -490,7 +490,8 @@ variable "log_analytics_retention_days" {
 variable "register_anyscale_resource_provider" {
   description = <<-EOT
     (Optional) Register the Anyscale.Platform resource provider on the
-    subscription via Terraform (azurerm_resource_provider_registration).
+    subscription (`az provider register`, run by Terraform and polled until
+    the provider reports Registered).
     Set to false if the RP is already registered or your org registers
     resource providers centrally and disallows registering them per-deploy.
   EOT

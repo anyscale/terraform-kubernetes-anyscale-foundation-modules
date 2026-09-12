@@ -201,6 +201,22 @@ resource "azurerm_subnet" "system_nodes" {
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = [var.system_nodes_subnet_cidr]
   service_endpoints    = ["Microsoft.Storage"]
+
+  # AKS Automatic delegates THIS subnet to itself during cluster creation, even
+  # though nothing here asked it to. Leave the block out and the stack stops
+  # being idempotent: the second plan against a live deployment shows
+  #   - delegation { name = "aks-delegation" -> null ... }
+  # and Azure ACCEPTS the removal under a running cluster — no error, the
+  # control plane still reports Succeeded. Found by resuming an apply: the
+  # delegation was stripped in 5s. Declaring exactly what AKS sets keeps
+  # Terraform agreeing with the cluster instead of quietly undoing it.
+  delegation {
+    name = "aks-delegation"
+    service_delegation {
+      name    = "Microsoft.ContainerService/managedClusters"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+    }
+  }
 }
 
 ###############################################################################

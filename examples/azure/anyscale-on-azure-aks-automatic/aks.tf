@@ -373,7 +373,13 @@ resource "azapi_update_resource" "deployment_safeguards" {
     properties = {
       # Pinned, not a variable. See the comment above: "Warning" is the one
       # value Microsoft calls unsupported on AKS Automatic.
-      level = "Enforcement"
+      #
+      # "Enforce", NOT "Enforcement". The API accepts both on write but stores
+      # and returns "Enforce", so sending "Enforcement" produces a permanent
+      # `level = "Enforce" -> "Enforcement"` diff on every plan after the
+      # first — a no-op PATCH that also re-serializes behind the cluster's
+      # other ARM writes. Found by re-planning against a live deployment.
+      level = "Enforce"
       excludedNamespaces = distinct(concat(
         [var.anyscale_operator_namespace],
         var.deployment_safeguards_excluded_namespaces,
