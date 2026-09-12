@@ -62,11 +62,10 @@ locals {
 #   az rest --method GET  --url ".../Anyscale.Platform/agreements/default?api-version=..."
 #   az rest --method POST --url ".../Anyscale.Platform/agreements/default/accept?api-version=..."
 #
-# azurerm_resource_provider_registration (below) already polls internally
-# until the RP shows "Registered" (its own built-in timeout is 2h), so no
-# extra wait logic is needed for that half.
+# Both halves poll: `az provider register` returns as soon as the request is
+# accepted, and registration then takes a minute or two to reach "Registered".
 #
-# The agreement half needs its own poll: POSTing /accept does not guarantee
+# The agreement half needs its own poll too: POSTing /accept does not guarantee
 # the subscription is immediately Active afterward (same class of eventual-
 # consistency lag as the Entra principal-replication retries in
 # terraform_data.anyscale_platform_self_grant below), so this checks current
@@ -80,10 +79,61 @@ locals {
 # — see that variable's description for the full text and links (terms of
 # use, privacy policy, Azure Marketplace billing/consent terms).
 ###############################################################################
-resource "azurerm_resource_provider_registration" "anyscale_platform" {
+# NOT azurerm_resource_provider_registration, for two reasons — both found by
+# running this against a subscription that had already been onboarded once:
+#
+#   1. It is a CREATE, not an ensure. On a subscription where the RP is already
+#      registered the apply dies with
+#        "a resource with the ID …/providers/Anyscale.Platform already exists -
+#         to be managed via Terraform this resource needs to be imported"
+#      That is the common case, not the edge case: every re-deploy after the
+#      first, and every org that registers providers centrally.
+#
+#   2. Its delete UNREGISTERS the provider for the WHOLE SUBSCRIPTION. Taking a
+#      subscription-wide singleton into a per-deployment state file means
+#      tearing down this example would break every other Anyscale deployment in
+#      the subscription.
+#
+# `az provider register` is idempotent and owns nothing, which is what "make
+# sure this is registered" actually wants. Same shape as the agreement step
+# below, so the two onboarding halves read alike.
+resource "terraform_data" "anyscale_platform_rp_register" {
   count = var.register_anyscale_resource_provider ? 1 : 0
 
-  name = "Anyscale.Platform"
+  triggers_replace = {
+    subscription = var.azure_subscription_id
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      SUB="${var.azure_subscription_id}"
+
+      state="$(az provider show --namespace Anyscale.Platform --subscription "$SUB" --query registrationState -o tsv 2>/dev/null || echo "")"
+      echo "[anyscale] Anyscale.Platform registrationState: $${state:-<none>}"
+
+      if [ "$state" != "Registered" ]; then
+        echo "[anyscale] Registering Anyscale.Platform..."
+        az provider register --namespace Anyscale.Platform --subscription "$SUB" >/dev/null
+      fi
+
+      deadline=$(( $(date +%s) + 600 ))
+      while :; do
+        state="$(az provider show --namespace Anyscale.Platform --subscription "$SUB" --query registrationState -o tsv 2>/dev/null || echo "")"
+        if [ "$state" = "Registered" ]; then
+          echo "[anyscale] Anyscale.Platform is Registered."
+          break
+        fi
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+          echo "[anyscale] ERROR: Anyscale.Platform did not reach Registered within timeout (last state: $${state:-<none>})" >&2
+          exit 1
+        fi
+        echo "[anyscale] Waiting for Anyscale.Platform registration (current: $${state:-<none>})..."
+        sleep 10
+      done
+    EOT
+  }
 }
 
 locals {
@@ -131,7 +181,7 @@ resource "terraform_data" "anyscale_platform_agreement_accept" {
     EOT
   }
 
-  depends_on = [azurerm_resource_provider_registration.anyscale_platform]
+  depends_on = [terraform_data.anyscale_platform_rp_register]
 }
 
 # Read the agreement's current status, for the output below and as the
@@ -155,7 +205,7 @@ data "external" "anyscale_platform_agreement" {
   ]
 
   depends_on = [
-    azurerm_resource_provider_registration.anyscale_platform,
+    terraform_data.anyscale_platform_rp_register,
     terraform_data.anyscale_platform_agreement_accept,
   ]
 }
