@@ -221,7 +221,9 @@ anyscale job submit -f job.yaml \
   --cloud "$(cd .. && terraform output -raw anyscale_cloud_cli_name)" --wait
 ```
 
-The workload fans out slot-holding tasks that the head pod cannot drain alone, then compares the hostnames that ran them against the head's own. It **exits non-zero if nothing ran off-head**, so a green run is real evidence of scale-out rather than a claim about it. Expect it to take a few minutes: a real deploy went Nominated → NodeReady in 46s, and the fan-out deliberately outlasts that.
+The workload queues more work than the head can take, **waits for a Ray worker to actually join** (up to 15 minutes), pins a task to that node, and checks where it ran. It **exits non-zero if no worker joins**, so a green run is real evidence of scale-out rather than a claim about it.
+
+Expect the job to take several minutes, and don't size expectations off node readiness. A Karpenter node reaches `NodeReady` in under a minute, but a *usable Ray worker* on a fresh node also has to pull the `anyscaled` image (~400 MB) and then the multi-GB Ray runtime image. An earlier version of this script held tasks for a fixed 25 seconds against the one-minute number; the head drained every task before the first worker finished pulling images, and the run failed.
 
 > **The `--cloud` value is not the cloud's Azure name.** The Anyscale control plane registers the cloud under its **full ARM resource ID, lowercased** — so `--cloud anyscale-auto-t1-cloud` fails with `API Exception (404) ... "Cloud with name ... does not exist."` Use the `anyscale_cloud_cli_name` output, which renders the correct value. Note also that `anyscale_cloud_resource_id` (`cldrsrc_…`) and the CLI's cloud ID (`cld_…`) are **different identifiers**; `anyscale cloud list` shows the `cld_…` one.
 
