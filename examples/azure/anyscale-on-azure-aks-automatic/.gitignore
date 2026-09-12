@@ -30,5 +30,8 @@ nvidia-nodepool.yaml
 # Scheduling diagnostics written by diagnose-head-pod.sh
 diagnostics/
 
+# End-to-end validation transcripts (embed subscription IDs and ARM paths)
+e2e-logs/
+
 # OS
 .DS_Store
