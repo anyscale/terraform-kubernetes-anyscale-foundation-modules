@@ -58,6 +58,21 @@ tags = {
 # reach to the API server. For a private API server use the
 # anyscale-on-azure-private-aks example instead.
 
+# ── subscription onboarding (one-time, per subscription) ────────────────────
+# Both default to true. The RP registration and the marketplace-style
+# agreement are prerequisites for Anyscale.Platform/clouds; leave them on for
+# a first deploy, or turn them off if your org handles either centrally.
+# Read accept_anyscale_platform_agreement's description in variables.tf
+# before leaving it at true — it consents on your behalf.
+# register_anyscale_resource_provider = true
+# accept_anyscale_platform_agreement  = true
+
+# ── operator install ────────────────────────────────────────────────────────
+# false = skip the AKS extension and run `helm install` yourself (custom
+# values, staged rollout, pinned chart version). The identity, federated
+# credential and role assignments are created either way.
+# install_operator_extension = true
+
 # ── registry ────────────────────────────────────────────────────────────────
 enable_acr = true
 acr_sku    = "Standard" # Premium required for Private Link

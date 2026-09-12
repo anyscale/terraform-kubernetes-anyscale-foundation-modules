@@ -110,7 +110,7 @@ variable "anyscale_operator_serviceaccount" {
 ###############################################################################
 # Networking
 #
-# AKS Automatic with a BYO VNet needs THREE subnets (the `new-aks` sibling
+# AKS Automatic with a BYO VNet needs THREE subnets (the `anyscale-on-azure` sibling
 # needs one). Azure CNI overlay is Automatic's default, so pods do not consume
 # addresses from any of them.
 ###############################################################################
@@ -309,24 +309,21 @@ variable "deployment_safeguards_excluded_namespaces" {
   description = <<-EOT
     (Optional) Extra namespaces to exclude from deployment safeguards, on top of
     `anyscale_operator_namespace` (which is always included). Widen this if a
-    real workload run turns up pods being rejected in another namespace —
-    preferable to dropping the safeguards level cluster-wide.
+    real workload run turns up pods being rejected in another namespace.
+
+    This is the ONLY supported lever. The safeguards level itself is pinned to
+    "Enforcement" in aks.tf and is not a variable: Microsoft documents changing
+    the cluster-wide level as unsupported on AKS Automatic, so the alternative
+    ("Warning") is not a choice this example should offer.
+
+    Note that exclusion is all-or-nothing PER NAMESPACE — `excludedNamespaces`
+    exempts a namespace from every safeguards policy, not from the individual
+    one that rejected a pod. That breadth is an AKS API limitation, not a
+    choice made here. Keep the list as short as the workload actually needs.
   EOT
   type        = list(string)
   nullable    = false
   default     = []
-}
-
-variable "deployment_safeguards_level" {
-  description = "(Optional) Deployment safeguards level for namespaces that are NOT excluded. \"Enforcement\" (the AKS Automatic default) or \"Warning\"."
-  type        = string
-  nullable    = false
-  default     = "Enforcement"
-
-  validation {
-    condition     = contains(["Enforcement", "Warning"], var.deployment_safeguards_level)
-    error_message = "deployment_safeguards_level must be \"Enforcement\" or \"Warning\"."
-  }
 }
 
 variable "deployment_safeguards_api_version" {
@@ -490,6 +487,64 @@ variable "log_analytics_retention_days" {
 ###############################################################################
 # Anyscale platform (Azure-managed control plane)
 ###############################################################################
+variable "register_anyscale_resource_provider" {
+  description = <<-EOT
+    (Optional) Register the Anyscale.Platform resource provider on the
+    subscription via Terraform (azurerm_resource_provider_registration).
+    Set to false if the RP is already registered or your org registers
+    resource providers centrally and disallows registering them per-deploy.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "accept_anyscale_platform_agreement" {
+  description = <<-EOT
+    (Optional) Accept the Anyscale.Platform marketplace-style subscription
+    agreement via Terraform (required once per subscription before
+    Anyscale.Platform/clouds can be deployed). Set to false if the agreement
+    has already been accepted, or if your org requires a human to review and
+    accept it out-of-band rather than have Terraform accept it automatically.
+
+    Terms of use:   https://catalogartifact.azureedge.net/publicartifacts/anyscale1750870039553.anyscale-operator-aks-73ba5252-dbbc-41fc-9f44-9a2171d23019/Artifacts/Documents/TermsOfUse.txt
+    Privacy policy: https://www.anyscale.com/privacy-policy
+
+    This mirrors the consent normally given by clicking "Create" on the
+    Marketplace offer in the Azure portal: "By clicking Create, I (a) agree
+    to the legal terms and privacy statement(s) associated with the
+    Marketplace offering(s) listed above; (b) authorize Microsoft to bill my
+    current payment method for the fees associated with the offering(s),
+    with the same billing frequency as my Azure subscription; and (c) agree
+    that Microsoft may share my contact, usage and transactional information
+    with the provider(s) of the offering(s) for support, billing and other
+    transactional activities. Microsoft does not provide rights for
+    third-party offerings." See the Azure Marketplace Terms for additional
+    details: https://azure.microsoft.com/support/legal/marketplace-terms/
+
+    Review all of the above before leaving this at its default (true) —
+    setting it to true means Terraform gives this consent on your behalf,
+    non-interactively, whenever the agreement isn't already Active.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
+variable "install_operator_extension" {
+  description = <<-EOT
+    (Optional) Install the Anyscale.AKS.Operator AKS extension via Terraform
+    (azurerm_kubernetes_cluster_extension). Set to false to skip this and install
+    the Anyscale operator manually via `helm install` instead — useful if you want
+    to control the Helm release yourself (custom values, staged rollout, pinned
+    chart version). The managed identity, federated credential and role
+    assignments the operator needs are provisioned either way.
+  EOT
+  type        = bool
+  nullable    = false
+  default     = true
+}
+
 variable "anyscale_platform" {
   description = "(Optional) Tunables for the Anyscale.Platform/clouds resources and the Anyscale.AKS.Operator AKS extension."
   type = object({
@@ -501,7 +556,8 @@ variable "anyscale_platform" {
     plan_publisher                   = optional(string, "anyscale1750870039553")
     plan_product                     = optional(string, "anyscale-operator-aks")
     release_train                    = optional(string, "stable")
-    clouds_api_version               = optional(string, "2026-02-01-preview")
+    clouds_api_version               = optional(string, "2026-09-01")
+    agreements_api_version           = optional(string, "2026-09-01")
   })
   default = {}
 }

@@ -2,7 +2,7 @@
 # AKS AUTOMATIC CLUSTER
 #
 # `azurerm_kubernetes_automatic_cluster` (azurerm >= 4.81.0) is a deliberately
-# small resource, because AKS Automatic decides most of what the `new-aks`
+# small resource, because AKS Automatic decides most of what the `anyscale-on-azure`
 # sibling configures by hand:
 #
 #   * Azure CNI overlay + Cilium dataplane and network policy — always on.
@@ -28,7 +28,7 @@ locals {
 
   # AKS Automatic ships the app-routing Istio Gateway API implementation; the
   # GatewayClass it registers is named `approuting-istio`. This replaces the
-  # Envoy Gateway Helm release + custom `GatewayClass eg` from `new-aks`.
+  # Envoy Gateway Helm release + custom `GatewayClass eg` from `anyscale-on-azure`.
   app_routing_gateway_class_name = "approuting-istio"
 }
 
@@ -330,20 +330,30 @@ resource "azapi_update_resource" "monitoring" {
 # PATCH 2 — DEPLOYMENT SAFEGUARDS EXCLUSION.  ← DO NOT SKIP THIS.
 #
 # AKS Automatic turns on Azure Policy with deployment safeguards in
-# **Enforcement** level. Among other things that mutates/denies workloads that
-# do not set resource limits, run as non-root, or use `latest` tags.
+# **Enforcement** level, which also applies the BASELINE Pod Security Standards
+# through AKS-managed ValidatingAdmissionPolicies.
 #
-# The Anyscale operator does not satisfy those constraints: it runs an init
-# container with elevated capabilities, and the Ray pods it creates are shaped
-# by the Anyscale control plane, not by this Terraform. Left in Enforcement
-# over the Anyscale namespaces, admission rejects the operator's pods and the
-# cloud never becomes usable — the failure surfaces as an operator deployment
-# stuck at 0/1 replicas, not as a policy error, so it is easy to misdiagnose.
+# What actually blocks the Anyscale operator, verified on a real deploy, is one
+# policy: `aks-managed-baseline-privileged-containers`. The operator pod carries
+# a privileged init container (`azwi-proxy-init`, Microsoft's workload-identity
+# proxy, injected by the chart's `azure.workload.identity/inject-proxy-sidecar`
+# annotation) and the Ray container requests SYS_PTRACE. Without the exclusion,
+# admission denies the operator and the cloud never becomes usable — the symptom
+# is a Deployment stuck at 0/1 replicas, not a policy error, so it is easy to
+# misdiagnose.
 #
-# This PATCHes the existing safeguards object (AKS Automatic always creates
-# one) to exclude the Anyscale namespaces. If a first real workload run turns
-# up other namespaces being rejected, widen the list via the variable rather
-# than dropping the safeguards level.
+# (Two things safeguards do NOT do here, despite the folklore: running as root
+# is a *restricted*-profile rule and Automatic enforces *baseline*, so it never
+# applies; and missing resource limits are MUTATED to a default, not denied.)
+#
+# This PATCHes the existing safeguards object (AKS Automatic always creates one)
+# to exclude the Anyscale namespaces. The level stays pinned at "Enforcement":
+# Microsoft documents changing the cluster-wide level as unsupported on
+# Automatic, so namespace exclusion is the only supported lever — and it is
+# all-or-nothing per namespace, exempting that namespace from all ~20 enforcing
+# policies rather than only the one that rejected the pod. That breadth is an
+# AKS API limitation. If a real workload run turns up another namespace being
+# rejected, widen `deployment_safeguards_excluded_namespaces`.
 #
 # NOTE ON THE RESOURCE SHAPE: `deploymentSafeguards` is an EXTENSION resource,
 # not a child of managedClusters — the RP lists it as a root-level type, so it
@@ -361,7 +371,9 @@ resource "azapi_update_resource" "deployment_safeguards" {
 
   body = {
     properties = {
-      level = var.deployment_safeguards_level
+      # Pinned, not a variable. See the comment above: "Warning" is the one
+      # value Microsoft calls unsupported on AKS Automatic.
+      level = "Enforcement"
       excludedNamespaces = distinct(concat(
         [var.anyscale_operator_namespace],
         var.deployment_safeguards_excluded_namespaces,

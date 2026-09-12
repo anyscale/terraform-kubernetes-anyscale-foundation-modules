@@ -15,13 +15,13 @@
 #
 # DRIVERS: the `EnableManagedGPUExperience` tag on the AKSNodeClass asks AKS to
 # install and manage the driver, container toolkit, and device plugin. That
-# replaces the entire NVIDIA GPU operator Helm release from the `new-aks`
+# replaces the entire NVIDIA GPU operator Helm release from the `anyscale-on-azure`
 # sibling (and its toleration gymnastics). It requires the preview feature:
 #
 #   az feature register --namespace Microsoft.ContainerService --name ManagedGPUExperiencePreview
 #   az provider register --namespace Microsoft.ContainerService
 #
-# TAINTS: identical to the static GPU pools in `new-aks`, so the operator's
+# TAINTS: identical to the static GPU pools in `anyscale-on-azure`, so the operator's
 # `workloads.accelerator.tolerations.default[*]` settings in anyscale.tf match
 # unchanged and Anyscale workloads schedule the same way on either stack.
 ###############################################################################

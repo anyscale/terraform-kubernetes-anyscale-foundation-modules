@@ -134,7 +134,7 @@ resource "azurerm_storage_account" "nfs" {
 ###############################################################################
 # NETWORKING — BYO VNet, THREE subnets.
 #
-# This is the biggest structural difference from the `new-aks` sibling, which
+# This is the biggest structural difference from the `anyscale-on-azure` sibling, which
 # needs a single node subnet. AKS Automatic with a customer-owned VNet
 # ("hosted system" mode) requires all three:
 #

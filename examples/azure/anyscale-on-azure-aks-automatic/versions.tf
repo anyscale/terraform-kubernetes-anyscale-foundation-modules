@@ -42,7 +42,7 @@ terraform {
 ###############################################################################
 # NO helm / kubernetes / kubectl PROVIDERS.
 #
-# The `new-aks` sibling authenticates those providers from the cluster's
+# The `anyscale-on-azure` sibling authenticates those providers from the cluster's
 # `kube_config` client certificate. AKS Automatic does not issue one: local
 # accounts are disabled and Entra RBAC is enforced, so the only way in is an
 # Entra token via `kubelogin`. Terraform providers cannot drive that exec

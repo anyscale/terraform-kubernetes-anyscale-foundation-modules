@@ -16,8 +16,7 @@ resource "azurerm_user_assigned_identity" "anyscale_operator" {
 # FEDERATED‑IDENTITY CREDENTIAL  (ServiceAccount --> User‑Assigned Identity)
 ###############################################################################
 resource "azurerm_federated_identity_credential" "anyscale_operator_fic" {
-  name                = "anyscale-operator-fic"
-  resource_group_name = azurerm_resource_group.rg.name
+  name = "anyscale-operator-fic"
 
   parent_id = azurerm_user_assigned_identity.anyscale_operator.id      # user assigned identity
   issuer    = azurerm_kubernetes_automatic_cluster.aks.oidc_issuer_url # OIDC issuer from AKS

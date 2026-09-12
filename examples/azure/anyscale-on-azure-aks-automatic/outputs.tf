@@ -93,8 +93,8 @@ output "anyscale_cloud_sso_url" {
 }
 
 output "anyscale_extension_resource_id" {
-  value       = azurerm_kubernetes_cluster_extension.anyscale_operator.id
-  description = "Full resource ID of the Anyscale.AKS.Operator AKS extension."
+  value       = var.install_operator_extension ? azurerm_kubernetes_cluster_extension.anyscale_operator[0].id : null
+  description = "Full resource ID of the Anyscale.AKS.Operator AKS extension, or null when install_operator_extension is false."
 }
 
 output "anyscale_operator_namespace" {
@@ -208,7 +208,7 @@ resource "local_file" "cloud_summary" {
       location           = local.anyscale_cloud_location
       console_url        = var.anyscale_platform.control_plane_url
       operator_namespace = var.anyscale_operator_namespace
-      extension_id       = azurerm_kubernetes_cluster_extension.anyscale_operator.id
+      extension_id       = var.install_operator_extension ? azurerm_kubernetes_cluster_extension.anyscale_operator[0].id : null
     }
     azure = {
       resource_group      = azurerm_resource_group.rg.name

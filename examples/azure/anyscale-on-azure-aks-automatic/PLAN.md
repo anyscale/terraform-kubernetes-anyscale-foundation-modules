@@ -19,7 +19,7 @@ Deviations from the plan as written, discovered while implementing:
   `gpu_nodepool_configs` adds `enable_spot`, `max_gpus`, `image_family`, `os_disk_size_gb`.
 - Added beyond the plan: `api_server_authorized_ip_ranges`,
   `aks_cluster_admin_principal_ids`, `enable_default_nginx_ingress_controller`,
-  `deployment_safeguards_level`, `deployment_safeguards_api_version`,
+  `deployment_safeguards_api_version`,
   `gateway.api_ready_timeout_seconds`.
 
 ---
@@ -85,7 +85,7 @@ NodePool to host it — so on-demand provisioning is proven, not just the NodePo
   a CUDA-capable image (`RUN_GPU_CHECK=1` plus an `image_uri`), which this run did not build.
   The `EnableManagedGPUExperience` tag path is therefore still unproven end to end.
 - `internal_gateway = true`, `enable_nfs`, `enable_otlp_app_insights` — all left at defaults.
-  `internal_gateway` in particular is inherited from the `new-aks` sibling and has a known
+  `internal_gateway` in particular is inherited from the `anyscale-on-azure` sibling and has a known
   gap here: it registers a private LB IP but this example creates no private DNS zones for
   the `*.i/*.s.azure.anyscaleuserdata.com` wildcards that `private-aks` considered necessary.
 - Only one region (westus2) and one GPU SKU (T4). Note that eastus2/westus3/southcentralus
@@ -106,8 +106,8 @@ carrying the quality bar of the Anyscale reference example:
 | `examples/azure/anyscale-on-azure` (this repo) | The polished reference. **Standard** AKS, one-apply UX, BYO VNet, feature switches, helper scripts, destroy-ordering hook, production-readiness guidance. |
 | `AKS-Anyscale-Private-Cluster-Sample` | The private/hardened lab built on top of the reference. |
 
-The goal is a fourth stack: **the `new-aks` example re-cut onto AKS Automatic**, living beside its
-siblings so all three can be compared directly. Automatic removes a large chunk of what `new-aks`
+The goal is a fourth stack: **the `anyscale-on-azure` example re-cut onto AKS Automatic**, living beside its
+siblings so all three can be compared directly. Automatic removes a large chunk of what `anyscale-on-azure`
 configures by hand (node pools, Envoy Gateway, GPU operator, the NAP toggle) and imposes constraints of
 its own (Entra-only cluster auth, enforced deployment safeguards, a delegated API-server subnet). This is
 a re-cut, not a copy.
@@ -162,7 +162,7 @@ trick, the deployment-safeguards namespace exclusion, the managed-GPU `AKSNodeCl
 
 1. **Typed cluster resource.** `azurerm_kubernetes_automatic_cluster` covers `hosted_system`
    (`node_subnet_id` + `system_node_subnet_id`), `api_server_access.subnet_id`, `private_cluster`, and
-   `web_app_routing_ingress { istio_enabled = true }`. This preserves the `new-aks` philosophy — typed GA
+   `web_app_routing_ingress { istio_enabled = true }`. This preserves the `anyscale-on-azure` philosophy — typed GA
    resource, azapi only for what the schema can't reach. Upstream used a raw azapi body because the typed
    resource did not exist yet.
    *Fallback:* if 4.81.0 proves flaky, swap in upstream's
@@ -186,7 +186,7 @@ trick, the deployment-safeguards namespace exclusion, the managed-GPU `AKSNodeCl
    `node.anyscale.com/capacity-type`) that the operator's existing
    `anyscale_extension_configuration_defaults` tolerations in `anyscale.tf` already match. Optional spot
    NodePool per entry. CPU capacity comes from Automatic's built-in default NodePool — no CPU pools to define.
-6. **Dropped from `new-aks`:** `gpu.tf`'s GPU-operator Helm release and its toleration block, every
+6. **Dropped from `anyscale-on-azure`:** `gpu.tf`'s GPU-operator Helm release and its toleration block, every
    `azurerm_kubernetes_cluster_node_pool`, the `helm` / `kubernetes` / `kubectl` providers, and the
    `enable_node_auto_provisioning`, `gpu_driver_mode`, `gpu_operator_chart_version`, `nap_gpu_sku_name`,
    `system_vm_size`, `cpu_vm_size`, `envoy_gateway` variables. NAP is always on; drivers are always
@@ -196,27 +196,27 @@ trick, the deployment-safeguards namespace exclusion, the managed-GPU `AKSNodeCl
 
 | File | Source | Work |
 |---|---|---|
-| `versions.tf` | `new-aks` | azurerm `>= 4.81.0, < 5.0.0`; keep azapi, random, local, external. Delete the helm / kubernetes / kubectl provider blocks (they authenticate with certs that Automatic does not issue) |
-| `main.tf` | `new-aks` | Keep RG, `random_string` suffix + name locals, storage account (HNS + CORS + container), optional NFS. **Rewrite the network section:** 3 subnets — `apiserver` (delegated, `/28`), `nodes`, `systemnodes` — plus a cluster UAMI and `Network Contributor` on the VNet. NFS `network_rules` point at the `nodes` subnet as before |
+| `versions.tf` | `anyscale-on-azure` | azurerm `>= 4.81.0, < 5.0.0`; keep azapi, random, local, external. Delete the helm / kubernetes / kubectl provider blocks (they authenticate with certs that Automatic does not issue) |
+| `main.tf` | `anyscale-on-azure` | Keep RG, `random_string` suffix + name locals, storage account (HNS + CORS + container), optional NFS. **Rewrite the network section:** 3 subnets — `apiserver` (delegated, `/28`), `nodes`, `systemnodes` — plus a cluster UAMI and `Network Contributor` on the VNet. NFS `network_rules` point at the `nodes` subnet as before |
 | `aks.tf` | rewrite | Typed automatic cluster; the two azapi patches; the azapi data read for kubelet identity; `Azure Kubernetes Service RBAC Cluster Admin` self-assignment so the bootstrap's `kubectl` is authorized |
-| `gateway.tf` | rewrite | Render `anyscale-gateway.yaml` — namespace + `Gateway` on `approuting-istio`, 3 listeners (HTTP, `*.i.…`, `*.s.…`), DNS-label annotation under `spec.infrastructure.annotations` (upstream's placement; `new-aks` puts it on the `EnvoyProxy`). Plus the bootstrap local-exec. Keep the `internal_gateway` LB-polling path from `new-aks` — the `kubectl` machinery is already present |
+| `gateway.tf` | rewrite | Render `anyscale-gateway.yaml` — namespace + `Gateway` on `approuting-istio`, 3 listeners (HTTP, `*.i.…`, `*.s.…`), DNS-label annotation under `spec.infrastructure.annotations` (upstream's placement; `anyscale-on-azure` puts it on the `EnvoyProxy`). Plus the bootstrap local-exec. Keep the `internal_gateway` LB-polling path from `anyscale-on-azure` — the `kubectl` machinery is already present |
 | `gpu.tf` | rewrite | Render `nvidia-nodepool.yaml` from `gpu_nodepool_configs` |
-| `anyscale.tf` | `new-aks`, near-verbatim | Change `networking.gateway.className` → `approuting-istio`; `depends_on` the bootstrap instead of `kubectl_manifest.gateway`. Keep cloud + `cloudResources`, contributor grants, self-grant, and the **pre-delete destroy hook** unchanged |
-| `acr.tf` | `new-aks` | Copy; repoint `kubelet_acr_pull` at the azapi-read kubelet object ID |
-| `identity.tf` | `new-aks` | Copy; `issuer` comes from the automatic cluster's `oidc_issuer_url` |
-| `monitoring.tf`, `prometheus.tf` | `new-aks` | Copy as-is; retarget the cluster reference in the Prometheus DCR association |
-| `variables.tf` | `new-aks` | Prune the six variables listed in decision 6. Add `apiserver_subnet_cidr`, `system_nodes_subnet_cidr`, `gpu_nodepool_configs`, `deployment_safeguards_excluded_namespaces`, `anyscale_cloud_location`. Narrow the `azure_location` validation list to the Anyscale ∩ Automatic-GA intersection |
-| `outputs.tf` | `new-aks` + upstream | Keep all; add the OTLP endpoints (upstream has them as top-level outputs) and the gateway hostname. Keep the `anyscale-aks-cloud.yaml` summary file |
+| `anyscale.tf` | `anyscale-on-azure`, near-verbatim | Change `networking.gateway.className` → `approuting-istio`; `depends_on` the bootstrap instead of `kubectl_manifest.gateway`. Keep cloud + `cloudResources`, contributor grants, self-grant, and the **pre-delete destroy hook** unchanged |
+| `acr.tf` | `anyscale-on-azure` | Copy; repoint `kubelet_acr_pull` at the azapi-read kubelet object ID |
+| `identity.tf` | `anyscale-on-azure` | Copy; `issuer` comes from the automatic cluster's `oidc_issuer_url` |
+| `monitoring.tf`, `prometheus.tf` | `anyscale-on-azure` | Copy as-is; retarget the cluster reference in the Prometheus DCR association |
+| `variables.tf` | `anyscale-on-azure` | Prune the six variables listed in decision 6. Add `apiserver_subnet_cidr`, `system_nodes_subnet_cidr`, `gpu_nodepool_configs`, `deployment_safeguards_excluded_namespaces`, `anyscale_cloud_location`. Narrow the `azure_location` validation list to the Anyscale ∩ Automatic-GA intersection |
+| `outputs.tf` | `anyscale-on-azure` + upstream | Keep all; add the OTLP endpoints (upstream has them as top-level outputs) and the gateway hostname. Keep the `anyscale-aks-cloud.yaml` summary file |
 | `README.md` | new | Both comparison tables above + prereqs, deploy, verify, destroy, production-readiness |
-| `terraform.tfvars.example`, `.gitignore` | `new-aks` | `.gitignore` adds the rendered `anyscale-gateway.yaml` / `nvidia-nodepool.yaml` |
-| `azure-login.sh`, `select-region.sh`, `select-gpu.sh`, `diagnose-head-pod.sh` | `new-aks` | Copy. `select-region.sh` region list → the intersection; `select-gpu.sh` writes `gpu_nodepool_configs` instead of `gpu_pool_configs` |
+| `terraform.tfvars.example`, `.gitignore` | `anyscale-on-azure` | `.gitignore` adds the rendered `anyscale-gateway.yaml` / `nvidia-nodepool.yaml` |
+| `azure-login.sh`, `select-region.sh`, `select-gpu.sh`, `diagnose-head-pod.sh` | `anyscale-on-azure` | Copy. `select-region.sh` region list → the intersection; `select-gpu.sh` writes `gpu_nodepool_configs` instead of `gpu_pool_configs` |
 | `sample-workload/{job.yaml,main.py}` | upstream | Copy |
 
 ### New prerequisites to document
 
 - `kubelogin` (`az aks install-cli` installs both it and `kubectl`).
 - Azure CLI ≥ 2.86.
-- `Microsoft.PolicyInsights` registered, on top of the providers `new-aks` already lists.
+- `Microsoft.PolicyInsights` registered, on top of the providers `anyscale-on-azure` already lists.
 - `ManagedGPUExperiencePreview` registered when using GPU NodePools.
 - The deploying principal needs `Azure Kubernetes Service RBAC Cluster Admin` — the stack self-assigns it.
 

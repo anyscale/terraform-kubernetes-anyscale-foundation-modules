@@ -16,8 +16,9 @@ This is the [`anyscale-on-azure`](../anyscale-on-azure) reference example re-cut
 | Azure infra | Entra RBAC grants (`RBAC Cluster Admin`, `Cluster User`) for the deploying principal | `aks.tf` |
 | Azure infra | User-assigned identity + federated credential + `Storage Blob Data Contributor` | `identity.tf` |
 | Azure infra | ACR + kubelet `AcrPull` + operator `AcrPush` / `Container Registry Tasks Contributor` | `acr.tf` |
-| Anyscale | `Anyscale.Platform/clouds` + `clouds/cloudResources/default` (native azapi) | `anyscale.tf` |
-| Anyscale | `Anyscale.AKS.Operator` marketplace extension (Entra workload-identity auth) | `anyscale.tf` |
+| Anyscale | Subscription onboarding: `Anyscale.Platform` RP registration + agreement acceptance (one-time, both opt-out) | `anyscale.tf` |
+| Anyscale | `Anyscale.Platform/clouds` + `clouds/cloudResources/default` (native azapi, **GA `2026-09-01`**) | `anyscale.tf` |
+| Anyscale | `Anyscale.AKS.Operator` marketplace extension (Entra workload-identity auth, opt-out) | `anyscale.tf` |
 | In-cluster | Operator namespace + 3-listener `Gateway` on `approuting-istio`, applied via `kubectl` | `gateway.tf` |
 | In-cluster | Karpenter `AKSNodeClass` + GPU `NodePool`s with AKS-managed drivers (opt-in) | `gpu.tf` |
 | Observability | Azure Monitor workspace + managed Prometheus DCE/DCR/recording rules; Log Analytics + Container Insights | `monitoring.tf`, `prometheus.tf` |
@@ -38,7 +39,7 @@ This is the [`anyscale-on-azure`](../anyscale-on-azure) reference example re-cut
 | Policy | none | Azure Policy + **deployment safeguards in Enforcement** → the Anyscale namespace must be excluded or the operator's pods are rejected at admission |
 | Monitoring | `oms_agent` / `monitor_metrics` blocks on the typed resource | Typed resource exposes no monitoring blocks → `azapi_update_resource` patch |
 | Regions | Anyscale-supported list (12) | Anyscale ∩ Automatic-GA (11) — **`westcentralus` drops out** |
-| Unchanged | Anyscale cloud + `cloudResources` via azapi, operator extension on workload identity, deterministic `<cldrsrc-id>.<region>.cloudapp.azure.com` hostname, storage / ACR / identity / prometheus | same |
+| Unchanged | Subscription onboarding (`register_anyscale_resource_provider`, `accept_anyscale_platform_agreement`), Anyscale cloud + `cloudResources` via azapi on GA `2026-09-01`, optional operator extension (`install_operator_extension`) on workload identity, deterministic `<cldrsrc-id>.<region>.cloudapp.azure.com` hostname, storage / ACR / identity / prometheus | same |
 
 ### Variables that no longer exist
 
@@ -67,13 +68,19 @@ Upstream: [`pauldotyu/awesome-aks` → `2026-07-15-anyscale-on-aks-automatic`](h
 ## Prerequisites
 
 - **Azure CLI ≥ 2.86** logged in (`./azure-login.sh`), **Terraform ≥ 1.5**, and the **Anyscale CLI** for verification.
-- **`kubectl` and `kubelogin`** — both required, unlike the `new-aks` sibling where kubectl is optional. Automatic issues no admin certificate, so the bootstrap authenticates with an Entra token:
+- **`kubectl` and `kubelogin`** — both required, unlike the `anyscale-on-azure` sibling where kubectl is optional. Automatic issues no admin certificate, so the bootstrap authenticates with an Entra token:
   ```bash
   az aks install-cli    # installs kubectl AND kubelogin
   ```
-- A subscription with these resource providers registered: `Anyscale.Platform`, `Microsoft.Authorization`, `Microsoft.ContainerRegistry`, `Microsoft.ContainerService`, `Microsoft.Insights`, `Microsoft.ManagedIdentity`, `Microsoft.Monitor`, `Microsoft.Network`, `Microsoft.OperationalInsights`, `Microsoft.PolicyInsights`, `Microsoft.Resources`, `Microsoft.Storage`
+- A subscription with these resource providers registered. `Anyscale.Platform` is handled for you by `register_anyscale_resource_provider` (default true); the rest are not: `Anyscale.Platform`, `Microsoft.Authorization`, `Microsoft.ContainerRegistry`, `Microsoft.ContainerService`, `Microsoft.Insights`, `Microsoft.ManagedIdentity`, `Microsoft.Monitor`, `Microsoft.Network`, `Microsoft.OperationalInsights`, `Microsoft.PolicyInsights`, `Microsoft.Resources`, `Microsoft.Storage`
   (`az provider register --namespace <name>`; the azurerm provider is configured with `resource_provider_registrations = "none"`).
-  `Microsoft.PolicyInsights` is the one the `new-aks` sibling does not need — deployment safeguards depend on it.
+  `Microsoft.PolicyInsights` is the one the `anyscale-on-azure` sibling does not need — deployment safeguards depend on it.
+- **The Anyscale.Platform subscription agreement** must be Active before `Anyscale.Platform/clouds` can be created. `accept_anyscale_platform_agreement` (default true) accepts it for you — read that variable's description in `variables.tf` first, since it gives marketplace consent non-interactively. To handle it yourself, set the variable to false and run:
+  ```bash
+  az rest --method POST \
+    --url "https://management.azure.com/subscriptions/<sub>/providers/Anyscale.Platform/agreements/default/accept?api-version=2026-09-01"
+  ```
+  Either way, the cloud resource carries a precondition that fails with an actionable message rather than letting the RP reject the PUT mid-apply.
 - A region in the Anyscale ∩ AKS-Automatic intersection — `./select-region.sh` scans quota and writes `azure_location` for you.
 - The deploying principal needs `Azure Kubernetes Service RBAC Cluster Admin` on the cluster. **The stack self-assigns it** (`assign_current_principal_cluster_access`, default true), which requires permission to create role assignments — i.e. Owner or User Access Administrator on the resource group.
 - **Required preview features.** The Gateway API surface is preview, and without both of these the gateway bootstrap fails with `no matches for kind "Gateway"`:
@@ -154,12 +161,44 @@ That hostname is baked directly into the operator extension's `networking.gatewa
 | `enable_nfs` | `false` | Premium NFS FileStorage account locked to the node subnet |
 | `enable_acr` | `true` | Customer-owned ACR + pull/push/tasks role assignments |
 | `gpu_nodepool_configs` | `{}` | Karpenter GPU NodePools with AKS-managed drivers |
+| `register_anyscale_resource_provider` | `true` | Registers the `Anyscale.Platform` RP on the subscription (one-time) |
+| `accept_anyscale_platform_agreement` | `true` | Accepts the Anyscale.Platform subscription agreement (one-time). **Read the variable's description first** — Terraform gives marketplace consent on your behalf |
+| `install_operator_extension` | `true` | `false` skips the AKS extension so you can `helm install` the operator yourself; the identity, federated credential and role assignments are created either way |
+
+### Subscription onboarding
+
+Identical to the `anyscale-on-azure` sibling. `Anyscale.Platform/clouds` cannot be created until the subscription has the resource provider registered **and** the Anyscale agreement accepted. Both are one-time, per-subscription, and both are on by default:
+
+```
+register_anyscale_resource_provider → az provider register --namespace Anyscale.Platform
+accept_anyscale_platform_agreement  → POST Anyscale.Platform/agreements/default/accept
+```
+
+The agreement step checks current status first, accepts only if needed, then polls until `Active` (acceptance is not immediately consistent). Set either to `false` if your org does these centrally or requires human sign-off — the cloud resource carries a precondition that fails with the exact `az` command to run if the agreement still isn't `Active`.
+
+Both API versions are pinned by `var.anyscale_platform` (`clouds_api_version`, `agreements_api_version`) and default to `2026-09-01`, the GA version.
 
 ### About deployment safeguards
 
-AKS Automatic runs Azure Policy deployment safeguards at **Enforcement** level, which rejects pods without resource limits, running as root, or using `latest` tags. The Anyscale operator does not satisfy those constraints — it runs an init container with elevated capabilities, and the Ray pods it creates are shaped by the Anyscale control plane, not by this Terraform.
+AKS Automatic runs Azure Policy deployment safeguards at **Enforcement** level, which also applies the **baseline** Pod Security Standards through AKS-managed `ValidatingAdmissionPolicy` objects.
 
-Without the exclusion patch, the operator's pods are denied at admission and the symptom is a Deployment stuck at `0/1` replicas, not an obvious policy error. If a real workload turns up rejections in another namespace, widen `deployment_safeguards_excluded_namespaces` rather than dropping `deployment_safeguards_level` cluster-wide.
+Exactly one of those policies blocks the Anyscale operator, confirmed on a real deploy by removing the exclusion and watching the Deployment go to zero pods:
+
+```
+ValidatingAdmissionPolicy 'aks-managed-baseline-privileged-containers' denied request:
+Privileged init containers are disallowed
+```
+
+The privileged init container is `azwi-proxy-init` — **Microsoft's** workload-identity proxy, injected by the `azure.workload.identity/inject-proxy-sidecar` annotation on the operator chart, not something Anyscale ships. The Ray container additionally requests `SYS_PTRACE`, which is a baseline capability violation but not a privileged-container one.
+
+Two things safeguards do **not** do here, despite the common shorthand:
+
+- *Running as root* is a **restricted**-profile rule. Automatic enforces **baseline**, so it never applies.
+- *Missing resource limits* are **mutated** to a default (500m / 2048Mi), not denied.
+
+Without the exclusion patch, the operator's pods are denied at admission and the symptom is a Deployment stuck at `0/1` replicas, not an obvious policy error.
+
+**The exclusion is broader than the problem, and that is an AKS limitation.** `excludedNamespaces` is all-or-nothing per namespace: exempting `anyscale-operator` exempts it from all ~20 enforcing policies, even though only two containers violate only two of them. There is no way to exempt just the privileged-containers policy and keep the other eleven. The safeguards **level** is deliberately not a variable — Microsoft documents changing it cluster-wide as unsupported on Automatic, so namespace exclusion is the only supported lever. If a real workload turns up rejections in another namespace, widen `deployment_safeguards_excluded_namespaces`.
 
 ## Verify
 
@@ -182,6 +221,8 @@ anyscale job submit -f job.yaml \
   --cloud "$(cd .. && terraform output -raw anyscale_cloud_cli_name)" --wait
 ```
 
+The workload fans out slot-holding tasks that the head pod cannot drain alone, then compares the hostnames that ran them against the head's own. It **exits non-zero if nothing ran off-head**, so a green run is real evidence of scale-out rather than a claim about it. Expect it to take a few minutes: a real deploy went Nominated → NodeReady in 46s, and the fan-out deliberately outlasts that.
+
 > **The `--cloud` value is not the cloud's Azure name.** The Anyscale control plane registers the cloud under its **full ARM resource ID, lowercased** — so `--cloud anyscale-auto-t1-cloud` fails with `API Exception (404) ... "Cloud with name ... does not exist."` Use the `anyscale_cloud_cli_name` output, which renders the correct value. Note also that `anyscale_cloud_resource_id` (`cldrsrc_…`) and the CLI's cloud ID (`cld_…`) are **different identifiers**; `anyscale cloud list` shows the `cld_…` one.
 
 The Gateway's HTTPS listeners report `Programmed=False` until the Anyscale operator creates the TLS Secrets they reference. That is expected immediately after apply — the load balancer and its DNS label are allocated as soon as the Gateway exists, which is what the extension needs.
@@ -198,14 +239,14 @@ Destroy ordering is handled automatically: a destroy-time hook deletes the Anysc
 
 ## Production readiness
 
-This example optimizes for a fast, single-command first deploy. AKS Automatic already covers several things the `new-aks` sibling leaves to you — Entra-only cluster auth, node auto-upgrade and OS patching, Azure Policy, a Standard-tier SLA — so the remaining gap is narrower. Before running real workloads:
+This example optimizes for a fast, single-command first deploy. AKS Automatic already covers several things the `anyscale-on-azure` sibling leaves to you — Entra-only cluster auth, node auto-upgrade and OS patching, Azure Policy, a Standard-tier SLA — so the remaining gap is narrower. Before running real workloads:
 
 | Evaluation default | Hardening step |
 |---|---|
 | Public AKS API server | `api_server_authorized_ip_ranges` (include your egress IP). A fully private API server is **out of scope here** — the bootstrap needs data-plane reach; a private-API-server variant is tracked separately and is not in this repo yet |
 | Public gateway LB | `internal_gateway = true` (VNet-only data plane) |
 | Public storage / ACR endpoints | Private endpoints; ACR needs `acr_sku = "Premium"` |
-| Anyscale namespace excluded from safeguards | Keep the exclusion as narrow as the operator actually needs; audit workload pods against the safeguards rules |
+| Anyscale namespace excluded from safeguards | Cannot be narrowed further — `excludedNamespaces` is all-or-nothing per namespace (see [About deployment safeguards](#about-deployment-safeguards)). Keep the namespace list short, and audit workload pods against the safeguards rules yourself since admission no longer does it for you |
 | Local Terraform state | Remote backend (e.g. the `azurerm` backend with a state storage account) |
 | LRS storage, single zone | ZRS/GRS replication; Karpenter NodePools with zone spread requirements |
 | No NetworkPolicy objects | Cilium is enforcing-capable out of the box — write policies for the Anyscale namespace |
@@ -213,7 +254,7 @@ This example optimizes for a fast, single-command first deploy. AKS Automatic al
 ## Known risks
 
 - `azurerm_kubernetes_automatic_cluster` is a recent addition. If it proves unreliable, the fallback is upstream's raw `azapi_resource … managedClusters` body — everything downstream reads through locals, so only `aks.tf` changes.
-- The deployment-safeguards child resource, the managed-GPU experience, the App Insights OTLP API, and Anyscale on Azure itself are all preview surface. API versions are variables (`deployment_safeguards_api_version`, `anyscale_platform.clouds_api_version`) precisely because they will move.
+- The managed-GPU experience, the App Insights OTLP API, and the Gateway API surface are preview. The Anyscale.Platform `clouds`, `clouds/cloudResources` and `agreements` APIs default to **GA `2026-09-01`**, exercised against a real apply. API versions stay variables (`deployment_safeguards_api_version`, `anyscale_platform.clouds_api_version`, `anyscale_platform.agreements_api_version`) because they will keep moving.
 - The default nginx ingress controller is created during cluster creation and removed by a patch immediately after, so a first apply briefly allocates a public IP that is then deleted.
 
 ## License

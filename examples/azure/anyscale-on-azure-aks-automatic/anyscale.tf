@@ -17,7 +17,7 @@
 #      authenticates to the control plane via Microsoft Entra workload
 #      identity, NOT a CLI token.
 #
-# This file is near-identical to its `new-aks` counterpart. AKS Automatic
+# This file is near-identical to its `anyscale-on-azure` counterpart. AKS Automatic
 # changes exactly two things: the gateway class name, and the fact that the
 # in-cluster prerequisites arrive via the bootstrap local-exec rather than the
 # kubectl provider.
@@ -31,7 +31,7 @@ locals {
 
   # Common operator-side extension settings. The toleration defaults match the
   # taints set by the Karpenter GPU NodePools in gpu.tf — the same taints the
-  # `new-aks` sibling puts on its static GPU node pools, so this block is
+  # `anyscale-on-azure` sibling puts on its static GPU node pools, so this block is
   # unchanged between the two stacks.
   anyscale_extension_configuration_defaults = {
     "workloads.accelerator.tolerations.default[0].key"      = "node.anyscale.com/accelerator-type"
@@ -47,6 +47,117 @@ locals {
     local.anyscale_extension_configuration_defaults,
     var.anyscale_platform.extension_configuration_settings,
   )
+}
+
+###############################################################################
+# Step 0: onboard the subscription to the Anyscale.Platform resource provider.
+#
+# A subscription that has never used Anyscale.Platform needs two one-time
+# things before Step 1 below can create the Anyscale.Platform/clouds resource:
+# the RP registered, and its marketplace-style subscription agreement
+# accepted. This mirrors the manual bootstrap:
+#   az provider register --namespace Anyscale.Platform --subscription <sub>
+#   az provider show --namespace Anyscale.Platform --subscription <sub> \
+#     --query registrationState -o tsv   # repeat until "Registered"
+#   az rest --method GET  --url ".../Anyscale.Platform/agreements/default?api-version=..."
+#   az rest --method POST --url ".../Anyscale.Platform/agreements/default/accept?api-version=..."
+#
+# azurerm_resource_provider_registration (below) already polls internally
+# until the RP shows "Registered" (its own built-in timeout is 2h), so no
+# extra wait logic is needed for that half.
+#
+# The agreement half needs its own poll: POSTing /accept does not guarantee
+# the subscription is immediately Active afterward (same class of eventual-
+# consistency lag as the Entra principal-replication retries in
+# terraform_data.anyscale_platform_self_grant below), so this checks current
+# status, accepts only if needed, then polls GET until Active or timeout.
+#
+# Both steps are gated behind their own variables so you can skip either if
+# your org handles them centrally or requires human sign-off.
+#
+# Accepting the agreement (var.accept_anyscale_platform_agreement, default
+# true) means Terraform gives this consent on your behalf, non-interactively
+# — see that variable's description for the full text and links (terms of
+# use, privacy policy, Azure Marketplace billing/consent terms).
+###############################################################################
+resource "azurerm_resource_provider_registration" "anyscale_platform" {
+  count = var.register_anyscale_resource_provider ? 1 : 0
+
+  name = "Anyscale.Platform"
+}
+
+locals {
+  anyscale_platform_agreement_base_url   = "https://management.azure.com/subscriptions/${var.azure_subscription_id}/providers/Anyscale.Platform/agreements/default"
+  anyscale_platform_agreement_url        = "${local.anyscale_platform_agreement_base_url}?api-version=${var.anyscale_platform.agreements_api_version}"
+  anyscale_platform_agreement_accept_url = "${local.anyscale_platform_agreement_base_url}/accept?api-version=${var.anyscale_platform.agreements_api_version}"
+}
+
+resource "terraform_data" "anyscale_platform_agreement_accept" {
+  count = var.accept_anyscale_platform_agreement ? 1 : 0
+
+  triggers_replace = {
+    url = local.anyscale_platform_agreement_url
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      GET_URL="${local.anyscale_platform_agreement_url}"
+      ACCEPT_URL="${local.anyscale_platform_agreement_accept_url}"
+
+      status="$(az rest --method GET --url "$GET_URL" --query properties.status -o tsv 2>/dev/null || echo "")"
+      echo "[anyscale] Agreement status: $${status:-<none>}"
+
+      if [ "$status" != "Active" ]; then
+        echo "[anyscale] Accepting Anyscale.Platform subscription agreement..."
+        az rest --method POST --url "$ACCEPT_URL" >/dev/null
+      fi
+
+      deadline=$(( $(date +%s) + 300 ))
+      while :; do
+        status="$(az rest --method GET --url "$GET_URL" --query properties.status -o tsv 2>/dev/null || echo "")"
+        if [ "$status" = "Active" ]; then
+          echo "[anyscale] Agreement is Active."
+          break
+        fi
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+          echo "[anyscale] ERROR: agreement did not reach Active within timeout (last status: $${status:-<none>})" >&2
+          exit 1
+        fi
+        echo "[anyscale] Waiting for agreement to reach Active (current: $${status:-<none>})..."
+        sleep 10
+      done
+    EOT
+  }
+
+  depends_on = [azurerm_resource_provider_registration.anyscale_platform]
+}
+
+# Read the agreement's current status, for the output below and as the
+# fail-fast backstop feeding the precondition on the cloud resource — which
+# is what catches accept_anyscale_platform_agreement=false on a subscription
+# where the agreement was never accepted out-of-band.
+#
+# This deliberately shells out instead of using a `data "azapi_resource"`:
+# on a subscription that has never accepted the agreement, GET
+# .../Anyscale.Platform/agreements/default returns
+# `422 Unprocessable Entity / ResourceReadFailed` rather than 404, which a
+# data source surfaces as a hard "Failed to retrieve resource" error and
+# aborts the run before the accept step can do anything about it — and
+# before the precondition can render its message. Here a failed read is
+# simply reported as an empty status.
+data "external" "anyscale_platform_agreement" {
+  program = ["/bin/bash", "-c", <<-EOT
+    status="$(az rest --method GET --url "${local.anyscale_platform_agreement_url}" --query properties.status -o tsv 2>/dev/null || true)"
+    printf '{"status":"%s"}\n' "$${status:-}"
+  EOT
+  ]
+
+  depends_on = [
+    azurerm_resource_provider_registration.anyscale_platform,
+    terraform_data.anyscale_platform_agreement_accept,
+  ]
 }
 
 ###############################################################################
@@ -73,8 +184,26 @@ resource "azapi_resource" "anyscale_cloud" {
     "properties.ssoUrl",
   ]
 
+  # Gate cloud registration on an accepted Anyscale agreement. Fails the apply
+  # up front with an actionable message rather than letting the RP reject the
+  # cloud PUT with an opaque error. Reached when the agreement was never
+  # accepted and accept_anyscale_platform_agreement is false.
+  lifecycle {
+    precondition {
+      condition     = try(data.external.anyscale_platform_agreement.result.status, "") == "Active"
+      error_message = <<-EOT
+        The Anyscale.Platform agreement for subscription ${var.azure_subscription_id} is not Active.
+
+        Either set accept_anyscale_platform_agreement = true to have Terraform
+        accept it, or accept it out-of-band first:
+          az rest --method POST --url "${local.anyscale_platform_agreement_accept_url}"
+      EOT
+    }
+  }
+
   depends_on = [
     azurerm_kubernetes_automatic_cluster.aks,
+    data.external.anyscale_platform_agreement,
   ]
 }
 
@@ -217,7 +346,7 @@ resource "terraform_data" "anyscale_platform_self_grant" {
 #
 # `networking.gateway.className` is the one Automatic-specific value here:
 # `approuting-istio`, the GatewayClass AKS registers for us, in place of the
-# `eg` class the `new-aks` sibling creates alongside its Envoy Gateway chart.
+# `eg` class the `anyscale-on-azure` sibling creates alongside its Envoy Gateway chart.
 #
 # IMPORTANT: configuration_protected_settings explicitly sets the CLI token to
 # the empty string. Omitting the key entirely is NOT enough — the AKS extension
@@ -228,6 +357,8 @@ resource "terraform_data" "anyscale_platform_self_grant" {
 # operator principal by the cloudResources child).
 ###############################################################################
 resource "azurerm_kubernetes_cluster_extension" "anyscale_operator" {
+  count = var.install_operator_extension ? 1 : 0
+
   name              = var.anyscale_platform.extension_resource_name
   cluster_id        = azurerm_kubernetes_automatic_cluster.aks.id
   extension_type    = "Anyscale.AKS.Operator"

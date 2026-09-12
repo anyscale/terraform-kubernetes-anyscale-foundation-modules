@@ -6,14 +6,14 @@
 # load balancer. The Anyscale operator (installed by anyscale.tf) creates the
 # TLS Secret resources the HTTPS listeners reference.
 #
-# WHAT AUTOMATIC REMOVES: the `new-aks` sibling installs the Envoy Gateway Helm
+# WHAT AUTOMATIC REMOVES: the `anyscale-on-azure` sibling installs the Envoy Gateway Helm
 # chart, an `EnvoyProxy` config object, and a `GatewayClass eg`. None of that
 # exists here — `web_app_routing_ingress { istio_enabled = true }` on the
 # cluster (aks.tf) makes AKS install and manage the Istio Gateway API
 # controller and register the `approuting-istio` GatewayClass. Only the
 # namespace and the `Gateway` itself are ours to create.
 #
-# THE HOSTNAME TRICK (kept from upstream awesome-aks and from `new-aks`): the
+# THE HOSTNAME TRICK (kept from upstream awesome-aks and from `anyscale-on-azure`): the
 # gateway's LB service carries a `service.beta.kubernetes.io/azure-dns-label-name`
 # annotation derived from the Anyscale cloud resource ID, so its public
 # hostname is DETERMINISTIC:
@@ -63,17 +63,25 @@ locals {
   # module (gitignored) so they can be inspected, diffed, and re-applied by hand
   # during triage. The bootstrap below applies them in order.
   ###############################################################################
+  # NOTE: no `pod-security.kubernetes.io/enforce` label here, deliberately.
+  #
+  # An earlier cut of this example set it to `privileged`, reasoning that the
+  # operator's elevated init container would otherwise be rejected. It would
+  # not: AKS Automatic enforces the baseline Pod Security Standards through
+  # AKS-managed ValidatingAdmissionPolicies, NOT through the upstream PSA
+  # admission controller, and those policies do not read the PSA namespace
+  # label. Verified on a real deploy — with the label in place and the
+  # namespace removed from `excludedNamespaces`, the operator was still denied
+  # by `aks-managed-baseline-privileged-containers`.
+  #
+  # The deployment-safeguards exclusion below is the only thing that actually
+  # exempts this namespace. A PSA label alongside it reads like a second
+  # privilege grant while doing nothing, which is worse than no config at all.
   namespace_manifest = yamlencode({
     apiVersion = "v1"
     kind       = "Namespace"
     metadata = {
       name = var.anyscale_operator_namespace
-      # The Anyscale operator runs an init container that needs elevated
-      # capabilities, so the namespace must sit on the privileged Pod Security
-      # profile. Baseline/restricted blocks the operator pod at admission.
-      labels = {
-        "pod-security.kubernetes.io/enforce" = "privileged"
-      }
     }
   })
 
@@ -152,7 +160,7 @@ resource "local_file" "gateway_manifest" {
 ###############################################################################
 # THE BOOTSTRAP — one local-exec, three kubectl applies.
 #
-# `new-aks` does this with the kubernetes/kubectl/helm providers authenticated
+# `anyscale-on-azure` does this with the kubernetes/kubectl/helm providers authenticated
 # from the cluster's admin client certificate. AKS Automatic issues no such
 # certificate: local accounts are disabled, Entra RBAC is enforced. So:
 #
