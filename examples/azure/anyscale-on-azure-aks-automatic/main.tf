@@ -156,6 +156,54 @@ resource "azurerm_virtual_network" "vnet" {
   resource_group_name = azurerm_resource_group.rg.name
   address_space       = [var.vnet_cidr]
   tags                = var.tags
+
+  # AKS strips these. See azapi_update_resource.vnet_tags below, which owns them.
+  lifecycle {
+    ignore_changes = [tags]
+  }
+}
+
+# The VNet's tags, re-applied after the last ARM write to the cluster.
+#
+# The AKS resource provider (AzureContainerService) PUTs the whole VNet back
+# with no `tags` field, wiping every tag set above. It does so during cluster
+# creation, and again during a later managedClusters write if the VNet has
+# changed since AKS last wrote it — so re-tagging straight after the cluster
+# exists loses a race with the app-routing PATCH (observed: tags written at
+# 02:00:12, VNet re-PUT without them at 02:00:26). Hence the depends_on below
+# covers every resource that writes to the cluster, not just the cluster.
+#
+# Any later cluster update (an ingress or monitoring change, say) can strip
+# them again. That shows up as a diff on this resource and the next apply
+# restores them; it is AKS's drift, not the example's.
+#
+# This writes the VNet's Microsoft.Resources/tags singleton, which carries only
+# the tags — it does not re-send the VNet body, as an update on the VNet itself
+# would (GET + merge + PUT of the full VNet, subnets and delegations included,
+# under a running cluster). azapi_update_resource, not azapi_resource: the
+# `tags/default` singleton always exists (GET returns 200, empty tags), so a
+# create fails with "Resource already exists", from empty state as well.
+resource "azapi_update_resource" "vnet_tags" {
+  type        = "Microsoft.Resources/tags@2021-04-01"
+  resource_id = "${azurerm_virtual_network.vnet.id}/providers/Microsoft.Resources/tags/default"
+
+  body = {
+    properties = {
+      tags = var.tags
+    }
+  }
+
+  # The default (true) hides exactly the drift this resource exists to catch:
+  # stripped tags come back as `properties: {}`, a "missing property", so the
+  # plan stays empty while the VNet has no tags at all.
+  ignore_missing_property = false
+
+  depends_on = [
+    azapi_update_resource.app_routing,
+    azapi_update_resource.monitoring,
+    azapi_update_resource.deployment_safeguards,
+    azurerm_kubernetes_cluster_extension.anyscale_operator,
+  ]
 }
 
 # API Server VNet Integration subnet. The delegation is what tells Azure it may
