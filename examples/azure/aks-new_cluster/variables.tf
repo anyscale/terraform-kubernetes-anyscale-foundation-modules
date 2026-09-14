@@ -43,10 +43,24 @@ variable "vnet_cidr" {
 }
 
 variable "nodes_subnet_cidr" {
-  description = "(Optional) CIDR block for the AKS nodes subnet."
+  description = <<-EOT
+    (Optional) CIDR block for the AKS nodes subnet.
+
+    Every node pool in this example shares this one subnet, and the cluster runs
+    Azure CNI in node-subnet mode (network_plugin = "azure" with no
+    network_plugin_mode), so each node reserves max_pods + 1 addresses from it --
+    31 at the AKS default max_pods of 30. Size it for the largest the cluster will
+    ever autoscale to, not for its steady state; the subnet cannot be shrunk and a
+    cluster that exhausts it fails to add nodes with no quota or capacity error to
+    explain why.
+
+    The default is a /18: 16,379 usable addresses, about 528 nodes. It leaves
+    10.42.64.0/18 and 10.42.128.0/17 free inside the default /16 vnet for any
+    additional subnets.
+  EOT
   type        = string
   nullable    = false
-  default     = "10.42.1.0/24"
+  default     = "10.42.0.0/18"
 }
 
 variable "aks_cluster_subnet_cidr" {
