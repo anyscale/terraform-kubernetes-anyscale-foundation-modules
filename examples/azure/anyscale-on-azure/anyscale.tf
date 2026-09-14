@@ -409,12 +409,17 @@ resource "azurerm_kubernetes_cluster_extension" "anyscale_operator" {
     product   = var.anyscale_platform.plan_product
   }
 
+  # operator.serviceAccount.name is the SA the chart creates and runs the operator
+  # as; the federated credential in identity.tf trusts var.anyscale_operator_serviceaccount,
+  # so the two must match. workloads.serviceAccount.name puts Ray pods on the same SA:
+  # left empty, they get the namespace's `default` SA and no Azure identity.
   configuration_settings = merge(
     {
       "global.cloudDeploymentId"      = local.anyscale_cloud_resource_id
       "global.controlPlaneURL"        = var.anyscale_platform.control_plane_url
       "global.auth.iamIdentity"       = azurerm_user_assigned_identity.anyscale_operator.client_id
       "global.auth.audience"          = var.anyscale_platform.auth_audience
+      "operator.serviceAccount.name"  = var.anyscale_operator_serviceaccount
       "workloads.serviceAccount.name" = var.anyscale_operator_serviceaccount
 
       # Envoy Gateway integration — these come from gateway.tf.
