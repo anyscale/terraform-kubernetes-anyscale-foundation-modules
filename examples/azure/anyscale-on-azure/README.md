@@ -113,6 +113,16 @@ anyscale cloud list              # the cloud from `terraform output anyscale_clo
 
 > **`--cloud` is not the cloud's Azure name.** The Anyscale control plane registers the cloud under its **full ARM resource ID, lowercased**, so `anyscale job submit --cloud <anyscale_cloud_name>` returns `404 ... Cloud with name ... does not exist`. Pass `--cloud "$(terraform output -raw anyscale_cloud_cli_name)"` instead.
 
+To prove the cloud runs work end to end, submit the sample job. It queues more work than the head can take, waits (up to 15 minutes) for the cluster autoscaler to bring up a worker node, pins a task to it, and exits non-zero if no worker joins:
+
+```bash
+cd sample-workload
+anyscale job submit -f job.yaml \
+  --cloud "$(cd .. && terraform output -raw anyscale_cloud_cli_name)" --wait
+```
+
+A job submitted in the first couple of minutes after `apply` can fail with `No CPU instance types found for this cloud` while the operator registers instance types with the control plane. Retry.
+
 A summary of every ID you need lands in `anyscale-aks-cloud.yaml` (gitignored) after apply. If a workspace pod won't schedule, run `./diagnose-head-pod.sh`.
 
 ## Destroy
