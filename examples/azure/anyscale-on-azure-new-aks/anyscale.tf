@@ -42,6 +42,24 @@ locals {
 }
 
 ###############################################################################
+# Step 1 (pre): the Anyscale terms & conditions agreement.
+#
+# `Anyscale.Platform/agreements/default` is a subscription-scoped agreement
+# that must be ACCEPTED before a cloud can be provisioned. Acceptance happens
+# out-of-band via ARM (POST .../agreements/default/accept) — this stack does
+# NOT accept on your behalf. We only READ it here so cloud registration
+# depends on it and fails fast with a clear message if it hasn't been signed.
+###############################################################################
+data "azapi_resource" "anyscale_agreement" {
+  type        = "Anyscale.Platform/agreements@${var.anyscale_platform.agreements_api_version}"
+  resource_id = "/subscriptions/${var.azure_subscription_id}/providers/Anyscale.Platform/agreements/default"
+
+  response_export_values = [
+    "properties.status",
+  ]
+}
+
+###############################################################################
 # Step 1a: the Anyscale.Platform/clouds resource.
 ###############################################################################
 resource "azapi_resource" "anyscale_cloud" {
@@ -65,8 +83,19 @@ resource "azapi_resource" "anyscale_cloud" {
     "properties.ssoUrl",
   ]
 
+  # Gate cloud registration on an accepted Anyscale agreement (accepted via ARM
+  # out-of-band). Fails the apply up front with a clear message rather than
+  # letting the RP reject the cloud PUT with an opaque error.
+  lifecycle {
+    precondition {
+      condition     = try(data.azapi_resource.anyscale_agreement.output.properties.status, "") == "Active"
+      error_message = "The Anyscale agreement for this subscription is not accepted. Accept it via ARM (POST Anyscale.Platform/agreements/default/accept) before deploying."
+    }
+  }
+
   depends_on = [
     azurerm_kubernetes_cluster.aks,
+    data.azapi_resource.anyscale_agreement,
   ]
 }
 
