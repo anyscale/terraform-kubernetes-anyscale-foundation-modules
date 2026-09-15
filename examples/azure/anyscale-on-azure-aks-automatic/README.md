@@ -77,8 +77,9 @@ Upstream: [`pauldotyu/awesome-aks` → `2026-07-15-anyscale-on-aks-automatic`](h
   `Microsoft.PolicyInsights` is the one the `anyscale-on-azure` sibling does not need — deployment safeguards depend on it.
 - **The Anyscale.Platform subscription agreement** must be Active before `Anyscale.Platform/clouds` can be created. `accept_anyscale_platform_agreement` (default true) accepts it for you — read that variable's description in `variables.tf` first, since it gives marketplace consent non-interactively. To handle it yourself, set the variable to false and run:
   ```bash
-  az rest --method POST \
-    --url "https://management.azure.com/subscriptions/<sub>/providers/Anyscale.Platform/agreements/default/accept?api-version=2026-09-01"
+  az rest --method PUT \
+    --url "https://management.azure.com/subscriptions/<sub>/providers/Anyscale.Platform/agreements/default?api-version=2026-09-01" \
+    --body '{"properties":{}}'
   ```
   Either way, the cloud resource carries a precondition that fails with an actionable message rather than letting the RP reject the PUT mid-apply.
 - A region in the Anyscale ∩ AKS-Automatic intersection — `./select-region.sh` scans quota and writes `azure_location` for you.
@@ -171,7 +172,7 @@ Identical to the `anyscale-on-azure` sibling. `Anyscale.Platform/clouds` cannot 
 
 ```
 register_anyscale_resource_provider → az provider register --namespace Anyscale.Platform
-accept_anyscale_platform_agreement  → POST Anyscale.Platform/agreements/default/accept
+accept_anyscale_platform_agreement  → PUT  Anyscale.Platform/agreements/default  {"properties":{}}
 ```
 
 The agreement step checks current status first, accepts only if needed, then polls until `Active` (acceptance is not immediately consistent). Set either to `false` if your org does these centrally or requires human sign-off — the cloud resource carries a precondition that fails with the exact `az` command to run if the agreement still isn't `Active`.
