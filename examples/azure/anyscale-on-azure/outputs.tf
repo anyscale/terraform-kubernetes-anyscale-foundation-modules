@@ -54,6 +54,15 @@ output "anyscale_cloud_arm_id" {
   description = "Full ARM resource ID of the Anyscale.Platform/clouds resource."
 }
 
+# The Anyscale control plane registers the cloud under its full ARM resource
+# ID, lowercased, not under the Azure resource name, so `--cloud
+# <anyscale_cloud_name>` returns 404. Use this output for `anyscale job submit
+# --cloud`, `anyscale service deploy --cloud`, etc.
+output "anyscale_cloud_cli_name" {
+  value       = lower(local.anyscale_cloud_arm_id)
+  description = "Cloud name to pass to the Anyscale CLI's --cloud flag (the lowercased ARM resource ID, which is what the control plane registers as the cloud's name)."
+}
+
 output "anyscale_cloud_resource_id" {
   value       = local.anyscale_cloud_resource_id
   description = "Anyscale cloud resource ID (`cldrsrc_…`). Surfaced in the Anyscale console's cloud settings page."
@@ -65,8 +74,8 @@ output "anyscale_cloud_sso_url" {
 }
 
 output "anyscale_extension_resource_id" {
-  value       = azurerm_kubernetes_cluster_extension.anyscale_operator.id
-  description = "Full resource ID of the Anyscale.AKS.Operator AKS extension."
+  value       = var.install_operator_extension ? azurerm_kubernetes_cluster_extension.anyscale_operator[0].id : null
+  description = "Full resource ID of the Anyscale.AKS.Operator AKS extension, or null when install_operator_extension is false."
 }
 
 output "anyscale_operator_namespace" {
@@ -143,11 +152,12 @@ resource "local_file" "cloud_summary" {
   content = yamlencode({
     anyscale_cloud = {
       name               = local.anyscale_cloud_name
+      cli_name           = lower(local.anyscale_cloud_arm_id)
       resource_id        = local.anyscale_cloud_resource_id
       arm_id             = local.anyscale_cloud_arm_id
       console_url        = var.anyscale_platform.control_plane_url
       operator_namespace = var.anyscale_operator_namespace
-      extension_id       = azurerm_kubernetes_cluster_extension.anyscale_operator.id
+      extension_id       = var.install_operator_extension ? azurerm_kubernetes_cluster_extension.anyscale_operator[0].id : null
     }
     azure = {
       resource_group    = azurerm_resource_group.rg.name

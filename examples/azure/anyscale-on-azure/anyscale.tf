@@ -42,6 +42,171 @@ locals {
 }
 
 ###############################################################################
+# Step 0: onboard the subscription to the Anyscale.Platform resource provider.
+#
+# A subscription that has never used Anyscale.Platform needs two one-time
+# things before Step 1 below can create the Anyscale.Platform/clouds resource:
+# the RP registered, and its marketplace-style subscription agreement
+# accepted. This mirrors the manual bootstrap:
+#   az provider register --namespace Anyscale.Platform --subscription <sub>
+#   az provider show --namespace Anyscale.Platform --subscription <sub> \
+#     --query registrationState -o tsv   # repeat until "Registered"
+#   az rest --method GET  --url ".../Anyscale.Platform/agreements/default?api-version=..."
+#   az rest --method PUT  --url ".../Anyscale.Platform/agreements/default?api-version=..." \
+#     --body '{"properties":{}}'
+#
+# Both halves poll: `az provider register` returns as soon as the request is
+# accepted, and registration then takes a minute or two to reach "Registered".
+#
+# The agreement is accepted with a PUT on the agreement resource itself, not a
+# POST to .../default/accept: on a subscription whose agreement is still
+# Pending, POST /accept at api-version 2026-09-01 is rejected with
+# HttpPayloadAPISpecValidationFailed (it only works on 2026-08-01-preview),
+# while PUT .../agreements/default with {"properties":{}} works on GA.
+#
+# The agreement half needs its own poll too: accepting does not guarantee
+# the subscription is immediately Active afterward (same class of eventual-
+# consistency lag as the Entra principal-replication retries in
+# terraform_data.anyscale_platform_self_grant below), so this checks current
+# status, accepts only if needed, then polls GET until Active or timeout.
+#
+# Both steps are gated behind their own variables so you can skip either if
+# your org handles them centrally or requires human sign-off.
+#
+# Accepting the agreement (var.accept_anyscale_platform_agreement, default
+# true) means Terraform gives this consent on your behalf, non-interactively
+# — see that variable's description for the full text and links (terms of
+# use, privacy policy, Azure Marketplace billing/consent terms).
+###############################################################################
+# NOT azurerm_resource_provider_registration, for two reasons — both found by
+# running this against a subscription that had already been onboarded once:
+#
+#   1. It is a CREATE, not an ensure. On a subscription where the RP is already
+#      registered the apply dies with
+#        "a resource with the ID …/providers/Anyscale.Platform already exists -
+#         to be managed via Terraform this resource needs to be imported"
+#      That is the common case, not the edge case: every re-deploy after the
+#      first, and every org that registers providers centrally.
+#
+#   2. Its delete UNREGISTERS the provider for the WHOLE SUBSCRIPTION. Taking a
+#      subscription-wide singleton into a per-deployment state file means
+#      tearing down this example would break every other Anyscale deployment in
+#      the subscription.
+#
+# `az provider register` is idempotent and owns nothing, which is what "make
+# sure this is registered" actually wants. Same shape as the agreement step
+# below, so the two onboarding halves read alike.
+resource "terraform_data" "anyscale_platform_rp_register" {
+  count = var.register_anyscale_resource_provider ? 1 : 0
+
+  triggers_replace = {
+    subscription = var.azure_subscription_id
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      SUB="${var.azure_subscription_id}"
+
+      state="$(az provider show --namespace Anyscale.Platform --subscription "$SUB" --query registrationState -o tsv 2>/dev/null || echo "")"
+      echo "[anyscale] Anyscale.Platform registrationState: $${state:-<none>}"
+
+      if [ "$state" != "Registered" ]; then
+        echo "[anyscale] Registering Anyscale.Platform..."
+        az provider register --namespace Anyscale.Platform --subscription "$SUB" >/dev/null
+      fi
+
+      deadline=$(( $(date +%s) + 600 ))
+      while :; do
+        state="$(az provider show --namespace Anyscale.Platform --subscription "$SUB" --query registrationState -o tsv 2>/dev/null || echo "")"
+        if [ "$state" = "Registered" ]; then
+          echo "[anyscale] Anyscale.Platform is Registered."
+          break
+        fi
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+          echo "[anyscale] ERROR: Anyscale.Platform did not reach Registered within timeout (last state: $${state:-<none>})" >&2
+          exit 1
+        fi
+        echo "[anyscale] Waiting for Anyscale.Platform registration (current: $${state:-<none>})..."
+        sleep 10
+      done
+    EOT
+  }
+}
+
+locals {
+  anyscale_platform_agreement_url = "https://management.azure.com/subscriptions/${var.azure_subscription_id}/providers/Anyscale.Platform/agreements/default?api-version=${var.anyscale_platform.agreements_api_version}"
+}
+
+resource "terraform_data" "anyscale_platform_agreement_accept" {
+  count = var.accept_anyscale_platform_agreement ? 1 : 0
+
+  triggers_replace = {
+    url = local.anyscale_platform_agreement_url
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      URL="${local.anyscale_platform_agreement_url}"
+
+      status="$(az rest --method GET --url "$URL" --query properties.status -o tsv 2>/dev/null || echo "")"
+      echo "[anyscale] Agreement status: $${status:-<none>}"
+
+      if [ "$status" != "Active" ]; then
+        echo "[anyscale] Accepting Anyscale.Platform subscription agreement..."
+        az rest --method PUT --url "$URL" --body '{"properties":{}}' >/dev/null
+      fi
+
+      deadline=$(( $(date +%s) + 300 ))
+      while :; do
+        status="$(az rest --method GET --url "$URL" --query properties.status -o tsv 2>/dev/null || echo "")"
+        if [ "$status" = "Active" ]; then
+          echo "[anyscale] Agreement is Active."
+          break
+        fi
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+          echo "[anyscale] ERROR: agreement did not reach Active within timeout (last status: $${status:-<none>})" >&2
+          exit 1
+        fi
+        echo "[anyscale] Waiting for agreement to reach Active (current: $${status:-<none>})..."
+        sleep 10
+      done
+    EOT
+  }
+
+  depends_on = [terraform_data.anyscale_platform_rp_register]
+}
+
+# Read the agreement's current status, for the output below and as the
+# fail-fast backstop feeding the precondition on the cloud resource — which
+# is what catches accept_anyscale_platform_agreement=false on a subscription
+# where the agreement was never accepted out-of-band.
+#
+# This deliberately shells out instead of using a `data "azapi_resource"`:
+# on a subscription that has never accepted the agreement, GET
+# .../Anyscale.Platform/agreements/default returns
+# `422 Unprocessable Entity / ResourceReadFailed` rather than 404, which a
+# data source surfaces as a hard "Failed to retrieve resource" error and
+# aborts the run before the accept step can do anything about it — and
+# before the precondition can render its message. Here a failed read is
+# simply reported as an empty status.
+data "external" "anyscale_platform_agreement" {
+  program = ["/bin/bash", "-c", <<-EOT
+    status="$(az rest --method GET --url "${local.anyscale_platform_agreement_url}" --query properties.status -o tsv 2>/dev/null || true)"
+    printf '{"status":"%s"}\n' "$${status:-}"
+  EOT
+  ]
+
+  depends_on = [
+    terraform_data.anyscale_platform_rp_register,
+    terraform_data.anyscale_platform_agreement_accept,
+  ]
+}
+
+###############################################################################
 # Step 1a: the Anyscale.Platform/clouds resource.
 ###############################################################################
 resource "azapi_resource" "anyscale_cloud" {
@@ -65,8 +230,26 @@ resource "azapi_resource" "anyscale_cloud" {
     "properties.ssoUrl",
   ]
 
+  # Gate cloud registration on an accepted Anyscale agreement. Fails the apply
+  # up front with an actionable message rather than letting the RP reject the
+  # cloud PUT with an opaque error. Reached when the agreement was never
+  # accepted and accept_anyscale_platform_agreement is false.
+  lifecycle {
+    precondition {
+      condition     = try(data.external.anyscale_platform_agreement.result.status, "") == "Active"
+      error_message = <<-EOT
+        The Anyscale.Platform agreement for subscription ${var.azure_subscription_id} is not Active.
+
+        Either set accept_anyscale_platform_agreement = true to have Terraform
+        accept it, or accept it out-of-band first:
+          az rest --method PUT --url "${local.anyscale_platform_agreement_url}" --body '{"properties":{}}'
+      EOT
+    }
+  }
+
   depends_on = [
     azurerm_kubernetes_cluster.aks,
+    data.external.anyscale_platform_agreement,
   ]
 }
 
@@ -84,9 +267,14 @@ resource "azapi_resource" "anyscale_cloud_resource" {
 
   body = {
     properties = {
-      provider                    = "Azure"
-      computeStack                = "K8S"
-      cloudStorageBucketEndpoint  = azurerm_storage_account.sa.primary_blob_endpoint
+      provider     = "Azure"
+      computeStack = "K8S"
+      # No trailing slash. primary_blob_endpoint ends in "/", and the data plane
+      # derives the storage account name by trimming ".blob.core.windows.net"
+      # off the end: with the slash, Vector gets account_name
+      # "<acct>.blob.core.windows.net/" and no logs reach the bucket, so
+      # `anyscale job logs` comes back empty.
+      cloudStorageBucketEndpoint  = trimsuffix(azurerm_storage_account.sa.primary_blob_endpoint, "/")
       cloudStorageBucketName      = "abfss://${azurerm_storage_container.blob.name}@${azurerm_storage_account.sa.primary_dfs_host}"
       anyscaleOperatorIamIdentity = azurerm_user_assigned_identity.anyscale_operator.principal_id
     }
@@ -216,6 +404,8 @@ resource "terraform_data" "anyscale_platform_self_grant" {
 # registered as the cloud's operator principal by the cloudResources child).
 ###############################################################################
 resource "azurerm_kubernetes_cluster_extension" "anyscale_operator" {
+  count = var.install_operator_extension ? 1 : 0
+
   name              = var.anyscale_platform.extension_resource_name
   cluster_id        = azurerm_kubernetes_cluster.aks.id
   extension_type    = "Anyscale.AKS.Operator"
@@ -228,12 +418,17 @@ resource "azurerm_kubernetes_cluster_extension" "anyscale_operator" {
     product   = var.anyscale_platform.plan_product
   }
 
+  # operator.serviceAccount.name is the SA the chart creates and runs the operator
+  # as; the federated credential in identity.tf trusts var.anyscale_operator_serviceaccount,
+  # so the two must match. workloads.serviceAccount.name puts Ray pods on the same SA:
+  # left empty, they get the namespace's `default` SA and no Azure identity.
   configuration_settings = merge(
     {
       "global.cloudDeploymentId"      = local.anyscale_cloud_resource_id
       "global.controlPlaneURL"        = var.anyscale_platform.control_plane_url
       "global.auth.iamIdentity"       = azurerm_user_assigned_identity.anyscale_operator.client_id
       "global.auth.audience"          = var.anyscale_platform.auth_audience
+      "operator.serviceAccount.name"  = var.anyscale_operator_serviceaccount
       "workloads.serviceAccount.name" = var.anyscale_operator_serviceaccount
 
       # Envoy Gateway integration — these come from gateway.tf.

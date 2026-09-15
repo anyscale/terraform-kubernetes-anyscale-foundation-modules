@@ -16,13 +16,16 @@ resource "azurerm_user_assigned_identity" "anyscale_operator" {
 # FEDERATED‑IDENTITY CREDENTIAL  (ServiceAccount --> User‑Assigned Identity)
 ###############################################################################
 resource "azurerm_federated_identity_credential" "anyscale_operator_fic" {
-  name                = "anyscale-operator-fic"
-  resource_group_name = azurerm_resource_group.rg.name
+  name = "anyscale-operator-fic"
 
-  parent_id = azurerm_user_assigned_identity.anyscale_operator.id # user assigned identity
-  issuer    = azurerm_kubernetes_cluster.aks.oidc_issuer_url      # OIDC issuer from AKS
-  subject   = "system:serviceaccount:${var.anyscale_operator_namespace}:${var.anyscale_operator_serviceaccount}"
-  audience  = ["api://AzureADTokenExchange"] # fixed value for AAD tokens
+  # `parent_id` is the older spelling of this argument and is deprecated in
+  # azurerm 4.x (removed in 5.0), same as the `resource_group_name` that used
+  # to sit above it. Both only surface at APPLY time, not in the plan.
+  user_assigned_identity_id = azurerm_user_assigned_identity.anyscale_operator.id
+
+  issuer   = azurerm_kubernetes_cluster.aks.oidc_issuer_url # OIDC issuer from AKS
+  subject  = "system:serviceaccount:${var.anyscale_operator_namespace}:${var.anyscale_operator_serviceaccount}"
+  audience = ["api://AzureADTokenExchange"] # fixed value for AAD tokens
 }
 
 ###############################################################################

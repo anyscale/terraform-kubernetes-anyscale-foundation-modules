@@ -40,6 +40,29 @@ That hostname is baked directly into the operator extension's `networking.gatewa
 | `internal_gateway` | `false` | Internal Standard LB — VNet-only data plane; falls back to LB polling |
 | `enable_nfs` | `false` | Premium NFS FileStorage account locked to the node subnet |
 | `enable_acr` | `true` | Customer-owned ACR + pull/push/tasks role assignments |
+| `register_anyscale_resource_provider` | `true` | Register the `Anyscale.Platform` RP on the subscription (one-time) |
+| `accept_anyscale_platform_agreement` | `true` | Accept the `Anyscale.Platform` subscription agreement (one-time) — **consents on your behalf**, see `variables.tf` |
+| `install_operator_extension` | `true` | `false` skips the AKS extension so you can `helm install` the operator yourself |
+
+## Subscription onboarding
+
+`Anyscale.Platform/clouds` cannot be created until the subscription has the
+resource provider registered **and** the Anyscale agreement accepted. Both are
+one-time, per-subscription, and both are on by default:
+
+```
+register_anyscale_resource_provider → az provider register --namespace Anyscale.Platform
+accept_anyscale_platform_agreement  → PUT  Anyscale.Platform/agreements/default  {"properties":{}}
+```
+
+The agreement step checks current status first, accepts only if needed, then
+polls until `Active` (acceptance is not immediately consistent). Set either to
+`false` if your org does these centrally or requires human sign-off — the cloud
+resource carries a precondition that fails the plan with the exact `az` command
+to run if the agreement still isn't `Active`.
+
+Both API versions are pinned by `var.anyscale_platform` (`clouds_api_version`,
+`agreements_api_version`) and default to `2026-09-01`, the GA version.
 
 ## Prerequisites
 
@@ -85,8 +108,20 @@ kubectl get po -A                # operator + envoy-gateway pods Running
 
 export ANYSCALE_HOST=https://console.azure.anyscale.com
 anyscale login
-anyscale cloud list              # the cloud from `terraform output anyscale_cloud_name`
+anyscale cloud list              # the cloud from `terraform output anyscale_cloud_cli_name`
 ```
+
+> **`--cloud` is not the cloud's Azure name.** The Anyscale control plane registers the cloud under its **full ARM resource ID, lowercased**, so `anyscale job submit --cloud <anyscale_cloud_name>` returns `404 ... Cloud with name ... does not exist`. Pass `--cloud "$(terraform output -raw anyscale_cloud_cli_name)"` instead.
+
+To prove the cloud runs work end to end, submit the sample job. It queues more work than the head can take, waits (up to 15 minutes) for the cluster autoscaler to bring up a worker node, pins a task to it, and exits non-zero if no worker joins:
+
+```bash
+cd sample-workload
+anyscale job submit -f job.yaml \
+  --cloud "$(cd .. && terraform output -raw anyscale_cloud_cli_name)" --wait
+```
+
+A job submitted in the first couple of minutes after `apply` can fail with `No CPU instance types found for this cloud` while the operator registers instance types with the control plane. Retry.
 
 A summary of every ID you need lands in `anyscale-aks-cloud.yaml` (gitignored) after apply. If a workspace pod won't schedule, run `./diagnose-head-pod.sh`.
 
