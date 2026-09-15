@@ -1,0 +1,81 @@
+{{- range $worker := until (int .Values.ray.workerCount) }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ray-worker-{{ $worker }}
+  labels:
+    app: ray
+    role: worker
+  annotations:
+    networking.gke.io/default-interface: "eth0"
+    networking.gke.io/interfaces: |
+      [
+        {"interfaceName":"eth0","network":"default"}{{- range $i := until (int $.Values.rdma.count) }},
+        {"interfaceName":"eth{{ add $i 2 }}","network":"rdma-{{ $i }}"}{{- end }}
+      ]
+spec:
+  nodeSelector:
+    cloud.google.com/gke-accelerator: nvidia-b200
+    cloud.google.com/gke-nodepool: {{ $.Values.nodePools.gpu | quote }}
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: ray
+              role: worker
+          topologyKey: kubernetes.io/hostname
+  restartPolicy: Always
+  volumes:
+    - name: library-dir-host
+      hostPath:
+        path: /home/kubernetes/bin/nvidia
+    - name: gib
+      hostPath:
+        path: /home/kubernetes/bin/gib
+    - name: gdrdrv
+      hostPath:
+        path: /dev/gdrdrv
+        type: CharDevice
+    - name: shared-memory
+      emptyDir:
+        medium: Memory
+        sizeLimit: {{ $.Values.ray.worker.shmSize }}
+    - name: workspace
+      emptyDir:
+        sizeLimit: {{ $.Values.ray.worker.workspaceSize }}
+  containers:
+    - name: ray
+      image: {{ $.Values.ray.image | quote }}
+      imagePullPolicy: {{ $.Values.ray.imagePullPolicy }}
+      env:
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64:/usr/local/gib/lib64
+      securityContext:
+        capabilities:
+          add: ["IPC_LOCK", "SYS_PTRACE"]
+      resources:
+        limits:
+          nvidia.com/gpu: {{ $.Values.ray.worker.gpuCount }}
+      volumeMounts:
+        - name: library-dir-host
+          mountPath: /usr/local/nvidia
+        - name: gib
+          mountPath: /usr/local/gib
+        - name: gdrdrv
+          mountPath: /dev/gdrdrv
+        - name: shared-memory
+          mountPath: /dev/shm
+        - name: workspace
+          mountPath: /workspace
+      command: ["/bin/bash", "-lc"]
+      args:
+        - |
+          if [ -f /etc/ld.so.conf.d/00-cuda-compat.conf ]; then
+            mv /etc/ld.so.conf.d/00-cuda-compat.conf /etc/ld.so.conf.d/00-cuda-compat.conf.disabled
+            ldconfig
+          fi
+          source /usr/local/gib/scripts/set_nccl_env.sh
+          sleep infinity
+{{- end }}

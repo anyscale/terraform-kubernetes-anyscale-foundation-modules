@@ -1,0 +1,71 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ray-head
+spec:
+  clusterIP: None
+  selector:
+    app: ray
+    role: head
+  ports:
+    - name: gcs
+      port: 6379
+      targetPort: 6379
+    - name: dashboard
+      port: 8265
+      targetPort: 8265
+    - name: client
+      port: 10001
+      targetPort: 10001
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ray-head
+  labels:
+    app: ray
+    role: head
+spec:
+  nodeSelector:
+    cloud.google.com/gke-nodepool: {{ .Values.nodePools.cpu | quote }}
+  restartPolicy: Always
+  volumes:
+    - name: shared-memory
+      emptyDir:
+        medium: Memory
+        sizeLimit: {{ .Values.ray.head.shmSize }}
+    - name: workspace
+      emptyDir:
+        sizeLimit: {{ .Values.ray.head.workspaceSize }}
+  containers:
+    - name: ray
+      image: {{ .Values.ray.image | quote }}
+      imagePullPolicy: {{ .Values.ray.imagePullPolicy }}
+      resources:
+        requests:
+          cpu: {{ .Values.ray.head.cpuRequest | quote }}
+          memory: {{ .Values.ray.head.memoryRequest }}
+        limits:
+          cpu: {{ .Values.ray.head.cpuLimit | quote }}
+          memory: {{ .Values.ray.head.memoryLimit }}
+      ports:
+        - containerPort: 6379
+          name: gcs
+        - containerPort: 8265
+          name: dashboard
+        - containerPort: 10001
+          name: client
+      volumeMounts:
+        - name: shared-memory
+          mountPath: /dev/shm
+        - name: workspace
+          mountPath: /workspace
+      command: ["/bin/bash", "-lc"]
+      args:
+        - |
+          if [ -f /etc/ld.so.conf.d/00-cuda-compat.conf ]; then
+            mv /etc/ld.so.conf.d/00-cuda-compat.conf /etc/ld.so.conf.d/00-cuda-compat.conf.disabled
+            ldconfig
+          fi
+          sleep infinity

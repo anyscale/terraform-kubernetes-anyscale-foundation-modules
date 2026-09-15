@@ -1,0 +1,173 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ray-worker-0
+  labels:
+    app: ray
+    role: worker
+  annotations:
+    networking.gke.io/default-interface: "eth0"
+    networking.gke.io/interfaces: |
+      [
+        {"interfaceName":"eth0","network":"default"},
+        {"interfaceName":"eth2","network":"rdma-0"},
+        {"interfaceName":"eth3","network":"rdma-1"},
+        {"interfaceName":"eth4","network":"rdma-2"},
+        {"interfaceName":"eth5","network":"rdma-3"},
+        {"interfaceName":"eth6","network":"rdma-4"},
+        {"interfaceName":"eth7","network":"rdma-5"},
+        {"interfaceName":"eth8","network":"rdma-6"},
+        {"interfaceName":"eth9","network":"rdma-7"}
+      ]
+spec:
+  nodeSelector:
+    cloud.google.com/gke-accelerator: nvidia-b200
+    cloud.google.com/gke-nodepool: a4-spot
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: ray
+              role: worker
+          topologyKey: kubernetes.io/hostname
+  restartPolicy: Always
+  volumes:
+    - name: library-dir-host
+      hostPath:
+        path: /home/kubernetes/bin/nvidia
+    - name: gib
+      hostPath:
+        path: /home/kubernetes/bin/gib
+    - name: gdrdrv
+      hostPath:
+        path: /dev/gdrdrv
+        type: CharDevice
+    - name: shared-memory
+      emptyDir:
+        medium: Memory
+        sizeLimit: 250Gi
+    - name: workspace
+      emptyDir:
+        sizeLimit: 200Gi
+  containers:
+    - name: ray
+      image: nvcr.io/nvidia/pytorch:25.04-py3
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64:/usr/local/gib/lib64
+      securityContext:
+        capabilities:
+          add: ["IPC_LOCK", "SYS_PTRACE"]
+      resources:
+        limits:
+          nvidia.com/gpu: 8
+      volumeMounts:
+        - name: library-dir-host
+          mountPath: /usr/local/nvidia
+        - name: gib
+          mountPath: /usr/local/gib
+        - name: gdrdrv
+          mountPath: /dev/gdrdrv
+        - name: shared-memory
+          mountPath: /dev/shm
+        - name: workspace
+          mountPath: /workspace
+      command: ["/bin/bash", "-lc"]
+      args:
+        - |
+          if [ -f /etc/ld.so.conf.d/00-cuda-compat.conf ]; then
+            mv /etc/ld.so.conf.d/00-cuda-compat.conf /etc/ld.so.conf.d/00-cuda-compat.conf.disabled
+            ldconfig
+          fi
+          source /usr/local/gib/scripts/set_nccl_env.sh
+          sleep infinity
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ray-worker-1
+  labels:
+    app: ray
+    role: worker
+  annotations:
+    networking.gke.io/default-interface: "eth0"
+    networking.gke.io/interfaces: |
+      [
+        {"interfaceName":"eth0","network":"default"},
+        {"interfaceName":"eth2","network":"rdma-0"},
+        {"interfaceName":"eth3","network":"rdma-1"},
+        {"interfaceName":"eth4","network":"rdma-2"},
+        {"interfaceName":"eth5","network":"rdma-3"},
+        {"interfaceName":"eth6","network":"rdma-4"},
+        {"interfaceName":"eth7","network":"rdma-5"},
+        {"interfaceName":"eth8","network":"rdma-6"},
+        {"interfaceName":"eth9","network":"rdma-7"}
+      ]
+spec:
+  nodeSelector:
+    cloud.google.com/gke-accelerator: nvidia-b200
+    cloud.google.com/gke-nodepool: a4-spot
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: ray
+              role: worker
+          topologyKey: kubernetes.io/hostname
+  restartPolicy: Always
+  volumes:
+    - name: library-dir-host
+      hostPath:
+        path: /home/kubernetes/bin/nvidia
+    - name: gib
+      hostPath:
+        path: /home/kubernetes/bin/gib
+    - name: gdrdrv
+      hostPath:
+        path: /dev/gdrdrv
+        type: CharDevice
+    - name: shared-memory
+      emptyDir:
+        medium: Memory
+        sizeLimit: 250Gi
+    - name: workspace
+      emptyDir:
+        sizeLimit: 200Gi
+  containers:
+    - name: ray
+      image: nvcr.io/nvidia/pytorch:25.04-py3
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64:/usr/local/gib/lib64
+      securityContext:
+        capabilities:
+          add: ["IPC_LOCK", "SYS_PTRACE"]
+      resources:
+        limits:
+          nvidia.com/gpu: 8
+      volumeMounts:
+        - name: library-dir-host
+          mountPath: /usr/local/nvidia
+        - name: gib
+          mountPath: /usr/local/gib
+        - name: gdrdrv
+          mountPath: /dev/gdrdrv
+        - name: shared-memory
+          mountPath: /dev/shm
+        - name: workspace
+          mountPath: /workspace
+      command: ["/bin/bash", "-lc"]
+      args:
+        - |
+          if [ -f /etc/ld.so.conf.d/00-cuda-compat.conf ]; then
+            mv /etc/ld.so.conf.d/00-cuda-compat.conf /etc/ld.so.conf.d/00-cuda-compat.conf.disabled
+            ldconfig
+          fi
+          source /usr/local/gib/scripts/set_nccl_env.sh
+          sleep infinity
+

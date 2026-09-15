@@ -1,0 +1,6 @@
+resources:
+  - network-objects.yaml
+  - gdrdrv-loader-daemonset.yaml
+  - ray-head.yaml
+  - ray-workers-2.yaml
+

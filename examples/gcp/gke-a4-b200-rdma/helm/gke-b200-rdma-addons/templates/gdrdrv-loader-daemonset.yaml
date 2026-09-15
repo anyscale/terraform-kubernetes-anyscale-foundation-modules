@@ -1,0 +1,79 @@
+{{- if .Values.gdrdrvLoader.enabled }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: gdrdrv-loader
+  namespace: kube-system
+  labels:
+    app: gdrdrv-loader
+spec:
+  selector:
+    matchLabels:
+      app: gdrdrv-loader
+  template:
+    metadata:
+      labels:
+        app: gdrdrv-loader
+    spec:
+      hostPID: true
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-b200
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: loader
+          image: {{ .Values.gdrdrvLoader.image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          command: ["/bin/bash", "-lc"]
+          args:
+            - |
+              set -euo pipefail
+              driver=/host-nvidia/drivers/gdrdrv.ko
+              host_driver=/home/kubernetes/bin/nvidia/drivers/gdrdrv.ko
+              host_dummy=/home/kubernetes/bin/nvidia/drivers/nv-p2p-dummy.ko
+              echo "Waiting for ${driver} from nccl-rdma-installer"
+              for _ in $(seq 1 120); do
+                [ -f "${driver}" ] && break
+                sleep 5
+              done
+              if [ ! -f "${driver}" ]; then
+                echo "Missing ${driver}; nccl-rdma-installer may not have completed" >&2
+                exit 1
+              fi
+              if ! grep -q '^gdrdrv ' /proc/modules; then
+                if [ -f "${host_dummy}" ] && ! grep -q '^nv_p2p_dummy ' /proc/modules; then
+                  nsenter --mount=/proc/1/ns/mnt -- /sbin/insmod "${host_dummy}" || true
+                fi
+                nsenter --mount=/proc/1/ns/mnt -- /sbin/insmod "${host_driver}"
+              fi
+              if ! grep -q '^gdrdrv ' /proc/modules; then
+                echo "gdrdrv did not load" >&2
+                exit 1
+              fi
+              major=$(awk '$2 == "gdrdrv" {print $1}' /proc/devices | tail -n 1)
+              if [ -z "${major}" ]; then
+                echo "gdrdrv is loaded but no /proc/devices major was found" >&2
+                exit 1
+              fi
+              rm -f /host-dev/gdrdrv
+              mknod /host-dev/gdrdrv c "${major}" 0
+              chmod 0666 /host-dev/gdrdrv
+              ls -l /host-dev/gdrdrv
+              sleep infinity
+          volumeMounts:
+            - name: host-nvidia
+              mountPath: /host-nvidia
+              readOnly: true
+            - name: host-dev
+              mountPath: /host-dev
+      volumes:
+        - name: host-nvidia
+          hostPath:
+            path: /home/kubernetes/bin/nvidia
+        - name: host-dev
+          hostPath:
+            path: /dev
+{{- end }}

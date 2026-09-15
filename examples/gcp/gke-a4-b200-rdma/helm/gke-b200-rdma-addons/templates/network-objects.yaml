@@ -1,0 +1,62 @@
+---
+apiVersion: networking.gke.io/v1
+kind: GKENetworkParamSet
+metadata:
+  name: gvnic-1
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name | quote }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace | quote }}
+spec:
+  vpc: {{ .Values.gvnic.network | quote }}
+  vpcSubnet: {{ .Values.gvnic.subnet | quote }}
+  deviceMode: NetDevice
+---
+apiVersion: networking.gke.io/v1
+kind: Network
+metadata:
+  name: gvnic-1
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name | quote }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace | quote }}
+spec:
+  parametersRef:
+    group: networking.gke.io
+    kind: GKENetworkParamSet
+    name: gvnic-1
+  type: Device
+{{- range $i := until (int .Values.rdma.count) }}
+---
+apiVersion: networking.gke.io/v1
+kind: GKENetworkParamSet
+metadata:
+  name: rdma-{{ $i }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Service | quote }}
+  annotations:
+    meta.helm.sh/release-name: {{ $.Release.Name | quote }}
+    meta.helm.sh/release-namespace: {{ $.Release.Namespace | quote }}
+spec:
+  vpc: {{ $.Values.rdma.network | quote }}
+  vpcSubnet: {{ printf "%s-%d" $.Values.rdma.subnetPrefix $i | quote }}
+  deviceMode: RDMA
+---
+apiVersion: networking.gke.io/v1
+kind: Network
+metadata:
+  name: rdma-{{ $i }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Service | quote }}
+  annotations:
+    meta.helm.sh/release-name: {{ $.Release.Name | quote }}
+    meta.helm.sh/release-namespace: {{ $.Release.Namespace | quote }}
+spec:
+  parametersRef:
+    group: networking.gke.io
+    kind: GKENetworkParamSet
+    name: rdma-{{ $i }}
+  type: Device
+{{- end }}

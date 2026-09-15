@@ -1,0 +1,13 @@
+Install the Google nccl-rdma-installer DaemonSet before or alongside this chart:
+
+  kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/refs/heads/master/gpudirect-rdma/nccl-rdma-installer.yaml
+  kubectl rollout status daemonset/nccl-rdma-installer -n kube-system --timeout=10m
+
+This chart installs:
+
+  * GKE Network objects: gvnic-1 and rdma-0..rdma-N
+  * gdrdrv-loader in kube-system
+  * ray-head plus ray-worker-* shell pods
+
+The worker pods expect one full A4 node per pod, all 8 B200 GPUs, all 8 RDMA NICs,
+/home/kubernetes/bin/gib, /home/kubernetes/bin/nvidia, and /dev/gdrdrv.

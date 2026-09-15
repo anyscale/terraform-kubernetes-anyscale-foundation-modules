@@ -1,0 +1,26 @@
+cloud: <anyscale_cloud_name>
+zones:
+  - <efa_node_availability_zone>
+head_node:
+  instance_type: 16CPU-64GB
+worker_nodes:
+  - name: 8xh100-190cpu-1800gb
+    instance_type: P5-48XLARGE-8xH100-EFA
+    min_nodes: <min_p5_workers>
+    max_nodes: <max_p5_workers>
+    market_type: ON_DEMAND
+    advanced_instance_config:
+      spec:
+        containers:
+          - name: ray
+            resources:
+              requests:
+                cpu: 189600m
+                memory: 1798Gi
+                nvidia.com/gpu: "8"
+                vpc.amazonaws.com/efa: "32"
+              limits:
+                cpu: 189600m
+                memory: 1798Gi
+                nvidia.com/gpu: "8"
+                vpc.amazonaws.com/efa: "32"

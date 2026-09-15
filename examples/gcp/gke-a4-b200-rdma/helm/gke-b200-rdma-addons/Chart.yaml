@@ -1,0 +1,6 @@
+apiVersion: v2
+name: gke-b200-rdma-addons
+description: GKE A4/B200 GPUDirect RDMA add-ons for Ray, gdrdrv, and multi-network pods.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,8 @@
+name: <workspace_name>
+cloud: <anyscale_cloud_name>
+image_uri: anyscale/image/anyscale-ray-2.55.1-cu128-torch2.8-efa-uccl:1
+ray_version: 2.55.1
+compute_config: <compute_config_name>:1
+idle_termination_minutes: 180
+tags:
+  purpose: efa-runtime-validation

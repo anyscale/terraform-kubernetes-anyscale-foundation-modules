@@ -22,6 +22,7 @@ The examples folder has a couple common use cases that have been tested. These i
   * [anyscale-on-azure-aks-automatic](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/azure/anyscale-on-azure-aks-automatic) - Build everything on AKS Automatic - Karpenter node auto-provisioning, AKS-managed GPU drivers, built-in app-routing Istio gateway, Entra-only cluster auth
 * Anyscale - AWS & EKS
   * [eks-public](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/aws/eks-public) - Build everything - use a common name for all resources, public networking
+  * [eks-public-efa](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/aws/eks-public-efa) - Build everything - public networking with an additional P5/H100 EFA node group
   * [eks-private](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/aws/eks-private) - Build everything - use a common name for all resources, private networking
 * Anyscale - GCP & GKE
   * [gke-existing_cluster](https://github.com/anyscale/terraform-kubernetes-anyscale-foundation-modules/tree/main/examples/gcp/gke-existing_cluster) - Use an existing GKE cluster, build additional resources such as object storage, service accounts, filestore.

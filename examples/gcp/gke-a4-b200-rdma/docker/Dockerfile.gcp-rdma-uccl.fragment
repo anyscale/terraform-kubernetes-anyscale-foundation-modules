@@ -1,0 +1,80 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+SHELL ["/bin/bash", "-lc"]
+
+ARG UCCL_URL=https://github.com/uccl-project/uccl.git
+ARG UCCL_REF=v0.1.1
+ARG UCCL_FORCE_DMABUF=1
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CUDA_HOME=/usr/local/cuda
+ENV TORCH_CUDA_ARCH_LIST=10.0
+ENV EFA_HOME=/opt/gcp-no-efa
+ENV PER_EXPERT_BATCHING=1
+ENV USE_DMABUF=1
+ENV UCCL_FORCE_DMABUF=${UCCL_FORCE_DMABUF}
+ENV MAX_JOBS=16
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf \
+    automake \
+    build-essential \
+    ca-certificates \
+    curl \
+    git \
+    ibverbs-providers \
+    iproute2 \
+    libhwloc-dev \
+    libibverbs-dev \
+    libnl-3-dev \
+    libnl-route-3-dev \
+    libnuma-dev \
+    librdmacm-dev \
+    libtool \
+    perl \
+    pciutils \
+    pkg-config \
+    rdma-core \
+    wget \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
+  && python -m pip install --no-cache-dir nanobind intervaltree sortedcontainers
+
+RUN git clone "${UCCL_URL}" /opt/uccl \
+  && cd /opt/uccl \
+  && git checkout "${UCCL_REF}" \
+  && if [ "${UCCL_FORCE_DMABUF}" = "1" ] && ! grep -q "GCP_FORCE_DMABUF" ep/include/common.hpp; then \
+       perl -0pi -e 's{// Intel RDMA NIC support}{#ifndef USE_DMABUF\n#define USE_DMABUF  // GCP_FORCE_DMABUF: force DMA-BUF for GKE A4 RoCE\n#endif\n\n// Intel RDMA NIC support}' ep/include/common.hpp; \
+     fi
+
+RUN python -m pip install --no-cache-dir /opt/uccl \
+  && rm -rf /tmp/uccl_ep_build \
+  && cp -a /opt/uccl /tmp/uccl_ep_build \
+  && cd /tmp/uccl_ep_build/ep \
+  && python setup.py install \
+  && cd /tmp/uccl_ep_build/ep/deep_ep_wrapper \
+  && for name in buffer.py test_internode.py utils.py; do \
+       rm -f "deep_ep/${name}"; \
+       cp "../bench/${name}" "deep_ep/${name}"; \
+     done \
+  && python -m pip install --no-cache-dir . \
+  && rm -rf /tmp/uccl_ep_build
+
+COPY env/ /opt/gcp-middle/env/
+COPY scripts/ /opt/gcp-middle/scripts/
+
+RUN chmod +x /opt/gcp-middle/env/*.sh /opt/gcp-middle/scripts/*.sh
+
+ENV PATH=/opt/gcp-middle/scripts:/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64:/usr/local/gib/lib64:${LD_LIBRARY_PATH}
+ENV CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+ENV OMP_NUM_THREADS=8
+ENV PYTHONUNBUFFERED=1
+ENV NCCL_DEBUG=WARN
+ENV NCCL_DEBUG_SUBSYS=INIT,NET
+ENV GLOO_SOCKET_IFNAME=eth0
+ENV UCCL_SOCKET_IFNAME=eth0
+
+WORKDIR /workspace
