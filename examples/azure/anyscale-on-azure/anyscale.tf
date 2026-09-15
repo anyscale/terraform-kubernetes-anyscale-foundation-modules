@@ -52,12 +52,19 @@ locals {
 #   az provider show --namespace Anyscale.Platform --subscription <sub> \
 #     --query registrationState -o tsv   # repeat until "Registered"
 #   az rest --method GET  --url ".../Anyscale.Platform/agreements/default?api-version=..."
-#   az rest --method POST --url ".../Anyscale.Platform/agreements/default/accept?api-version=..."
+#   az rest --method PUT  --url ".../Anyscale.Platform/agreements/default?api-version=..." \
+#     --body '{"properties":{}}'
 #
 # Both halves poll: `az provider register` returns as soon as the request is
 # accepted, and registration then takes a minute or two to reach "Registered".
 #
-# The agreement half needs its own poll too: POSTing /accept does not guarantee
+# The agreement is accepted with a PUT on the agreement resource itself, not a
+# POST to .../default/accept: on a subscription whose agreement is still
+# Pending, POST /accept at api-version 2026-09-01 is rejected with
+# HttpPayloadAPISpecValidationFailed (it only works on 2026-08-01-preview),
+# while PUT .../agreements/default with {"properties":{}} works on GA.
+#
+# The agreement half needs its own poll too: accepting does not guarantee
 # the subscription is immediately Active afterward (same class of eventual-
 # consistency lag as the Entra principal-replication retries in
 # terraform_data.anyscale_platform_self_grant below), so this checks current
@@ -129,9 +136,7 @@ resource "terraform_data" "anyscale_platform_rp_register" {
 }
 
 locals {
-  anyscale_platform_agreement_base_url   = "https://management.azure.com/subscriptions/${var.azure_subscription_id}/providers/Anyscale.Platform/agreements/default"
-  anyscale_platform_agreement_url        = "${local.anyscale_platform_agreement_base_url}?api-version=${var.anyscale_platform.agreements_api_version}"
-  anyscale_platform_agreement_accept_url = "${local.anyscale_platform_agreement_base_url}/accept?api-version=${var.anyscale_platform.agreements_api_version}"
+  anyscale_platform_agreement_url = "https://management.azure.com/subscriptions/${var.azure_subscription_id}/providers/Anyscale.Platform/agreements/default?api-version=${var.anyscale_platform.agreements_api_version}"
 }
 
 resource "terraform_data" "anyscale_platform_agreement_accept" {
@@ -145,20 +150,19 @@ resource "terraform_data" "anyscale_platform_agreement_accept" {
     interpreter = ["/bin/bash", "-c"]
     command     = <<-EOT
       set -euo pipefail
-      GET_URL="${local.anyscale_platform_agreement_url}"
-      ACCEPT_URL="${local.anyscale_platform_agreement_accept_url}"
+      URL="${local.anyscale_platform_agreement_url}"
 
-      status="$(az rest --method GET --url "$GET_URL" --query properties.status -o tsv 2>/dev/null || echo "")"
+      status="$(az rest --method GET --url "$URL" --query properties.status -o tsv 2>/dev/null || echo "")"
       echo "[anyscale] Agreement status: $${status:-<none>}"
 
       if [ "$status" != "Active" ]; then
         echo "[anyscale] Accepting Anyscale.Platform subscription agreement..."
-        az rest --method POST --url "$ACCEPT_URL" >/dev/null
+        az rest --method PUT --url "$URL" --body '{"properties":{}}' >/dev/null
       fi
 
       deadline=$(( $(date +%s) + 300 ))
       while :; do
-        status="$(az rest --method GET --url "$GET_URL" --query properties.status -o tsv 2>/dev/null || echo "")"
+        status="$(az rest --method GET --url "$URL" --query properties.status -o tsv 2>/dev/null || echo "")"
         if [ "$status" = "Active" ]; then
           echo "[anyscale] Agreement is Active."
           break
@@ -238,7 +242,7 @@ resource "azapi_resource" "anyscale_cloud" {
 
         Either set accept_anyscale_platform_agreement = true to have Terraform
         accept it, or accept it out-of-band first:
-          az rest --method POST --url "${local.anyscale_platform_agreement_accept_url}"
+          az rest --method PUT --url "${local.anyscale_platform_agreement_url}" --body '{"properties":{}}'
       EOT
     }
   }

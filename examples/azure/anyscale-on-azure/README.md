@@ -52,7 +52,7 @@ one-time, per-subscription, and both are on by default:
 
 ```
 register_anyscale_resource_provider → az provider register --namespace Anyscale.Platform
-accept_anyscale_platform_agreement  → POST Anyscale.Platform/agreements/default/accept
+accept_anyscale_platform_agreement  → PUT  Anyscale.Platform/agreements/default  {"properties":{}}
 ```
 
 The agreement step checks current status first, accepts only if needed, then
@@ -108,8 +108,10 @@ kubectl get po -A                # operator + envoy-gateway pods Running
 
 export ANYSCALE_HOST=https://console.azure.anyscale.com
 anyscale login
-anyscale cloud list              # the cloud from `terraform output anyscale_cloud_name`
+anyscale cloud list              # the cloud from `terraform output anyscale_cloud_cli_name`
 ```
+
+> **`--cloud` is not the cloud's Azure name.** The Anyscale control plane registers the cloud under its **full ARM resource ID, lowercased**, so `anyscale job submit --cloud <anyscale_cloud_name>` returns `404 ... Cloud with name ... does not exist`. Pass `--cloud "$(terraform output -raw anyscale_cloud_cli_name)"` instead.
 
 A summary of every ID you need lands in `anyscale-aks-cloud.yaml` (gitignored) after apply. If a workspace pod won't schedule, run `./diagnose-head-pod.sh`.
 
