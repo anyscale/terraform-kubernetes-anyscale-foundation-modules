@@ -263,9 +263,14 @@ resource "azapi_resource" "anyscale_cloud_resource" {
 
   body = {
     properties = {
-      provider                    = "Azure"
-      computeStack                = "K8S"
-      cloudStorageBucketEndpoint  = azurerm_storage_account.sa.primary_blob_endpoint
+      provider     = "Azure"
+      computeStack = "K8S"
+      # No trailing slash. primary_blob_endpoint ends in "/", and the data plane
+      # derives the storage account name by trimming ".blob.core.windows.net"
+      # off the end: with the slash, Vector gets account_name
+      # "<acct>.blob.core.windows.net/" and no logs reach the bucket, so
+      # `anyscale job logs` comes back empty.
+      cloudStorageBucketEndpoint  = trimsuffix(azurerm_storage_account.sa.primary_blob_endpoint, "/")
       cloudStorageBucketName      = "abfss://${azurerm_storage_container.blob.name}@${azurerm_storage_account.sa.primary_dfs_host}"
       anyscaleOperatorIamIdentity = azurerm_user_assigned_identity.anyscale_operator.principal_id
     }
