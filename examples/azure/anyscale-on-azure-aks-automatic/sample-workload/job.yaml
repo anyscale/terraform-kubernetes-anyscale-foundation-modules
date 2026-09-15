@@ -1,0 +1,31 @@
+# Smoke-test job for a freshly deployed Anyscale-on-AKS-Automatic cloud.
+#
+#   export ANYSCALE_HOST=https://console.azure.anyscale.com
+#   anyscale job submit -f job.yaml \
+#     --cloud "$(cd .. && terraform output -raw anyscale_cloud_cli_name)" --wait
+#
+# NOTE: --cloud takes the cloud's FULL LOWERCASED ARM RESOURCE ID, which is what
+# the Anyscale control plane registers as its name — not the Azure resource name
+# from `anyscale_cloud_name`. Passing the latter returns a 404. The
+# `anyscale_cloud_cli_name` output renders the right value.
+#
+# A green run proves the operator was admitted (deployment safeguards
+# exclusion), Karpenter provisioned worker capacity on demand, and the cloud's
+# storage and image plumbing work.
+name: anyscale-aks-automatic-smoke-test
+
+entrypoint: python main.py
+
+working_dir: .
+
+# No image_uri: the Anyscale default runtime image already carries Ray, which
+# is all main.py needs on the CPU path. For the GPU path, point this at an
+# image with a CUDA-enabled torch build — e.g. one built from your own ACR
+# (terraform output acr_login_server).
+# image_uri: <your-acr>.azurecr.io/anyscale-gpu:latest
+
+# Fail fast rather than retrying into a misconfiguration.
+max_retries: 0
+
+# env_vars:
+#   RUN_GPU_CHECK: "1"   # requires a gpu_nodepool_configs entry
