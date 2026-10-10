@@ -1,0 +1,312 @@
+# Copy to terraform.tfvars (gitignored, auto-loaded by plan/apply) and edit.
+#
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# Everything commented out is at its default. Uncomment only what you change.
+
+###############################################################################
+# Required - no defaults
+###############################################################################
+
+# az account show --query tenantId -o tsv
+azure_tenant_id = "00000000-0000-0000-0000-000000000000"
+
+# az account show --query id -o tsv
+azure_subscription_id = "00000000-0000-0000-0000-000000000000"
+
+###############################################################################
+# Region and naming
+###############################################################################
+
+# Defaults to "West US 2". The NSG service tags are derived from it -
+# AzureCloud.<location with spaces removed> and Storage.<same> - and those cover
+# ONLY that region. Deploying elsewhere means anything the cluster reaches in
+# another region needs an explicit additional_egress_service_tags entry. See the
+# cross-region notes at the bottom of this file.
+#
+# The Private Link alias is NOT tied to this value - a private endpoint sits in
+# its own VNet's region but may target a service in any public region.
+# azure_location = "West US 2"
+
+# Names the cluster, resource group, VNet, NSG and the generated storage/ACR
+# names. Keep it short: the storage account name is the first 17 characters with
+# "sa" and a 5-character random suffix appended, capped at 24.
+# aks_cluster_name = "anyscale-private"
+
+# Null uses the region's default Kubernetes version.
+# kubernetes_version = null
+
+###############################################################################
+# Addressing
+#
+# aks_pod_cidr (10.244.0.0/16) and aks_service_cidr (10.0.0.0/16) exist only
+# inside the cluster with CNI overlay, so two deployments can reuse them. They
+# need to differ only if you peer the VNets AND switch to node-subnet CNI.
+###############################################################################
+
+# vnet_cidr                     = "10.42.0.0/16"
+# nodes_subnet_cidr             = "10.42.0.0/22"
+# private_endpoints_subnet_cidr = "10.42.8.0/24"
+
+###############################################################################
+# Node pools
+#
+# Dsv5 has no local temp disk, so ephemeral OS disks are unavailable - all
+# pools use managed Premium SSDs.
+#
+# Check quota first. Spot draws on a SEPARATE allocation from on-demand:
+#   az vm list-usage --location westus2 -o table | grep -iE "DSv5|Spot|LowPriority"
+###############################################################################
+
+# system_vm_size = "Standard_D8s_v5"
+
+# One on-demand pool (od<key>) and one spot pool (spot<key>) per entry.
+# Keys must be 7 characters or fewer - AKS caps pool names at 12, and the spot
+# pools prepend "spot" while temporary_name_for_rotation appends "t".
+# cpu_instance_types = {
+#   "8cpu"  = { vm_size = "Standard_D8s_v5" }   # 8 vCPU / 32 GiB
+#   "16cpu" = { vm_size = "Standard_D16s_v5" }  # 16 vCPU / 64 GiB
+# }
+
+# node_pool_disk_size_gb        = 256
+# system_node_pool_disk_size_gb = 128
+
+###############################################################################
+# Egress
+#
+# Leave this false for the first apply. Bring the cluster up, confirm the
+# operator registers and workloads schedule, THEN set it to true and re-verify -
+# otherwise you are debugging NSG rules and cloud registration at once, and NSG
+# failures are delayed and opaque: cached images and unexpired tokens mask them
+# for hours.
+#
+# When true, everything that is not an Azure endpoint is blocked - PyPI, Hugging
+# Face, GitHub, Docker Hub. Two consequences for installing things:
+#
+#   * `helm repo add` against kubernetes.github.io fails under
+#     `az aks command invoke`, because that runs IN-CLUSTER and uses the
+#     cluster's egress. Pull the chart locally and upload it with --file.
+#   * Images from non-Azure registries (registry.k8s.io) must come from the ACR
+#     instead - see acr_cache_rules below.
+#
+# Anyscale's own images need neither: the operator image is on
+# arcmktplaceprod.azurecr.io (an Azure endpoint), and Ray workload images come
+# from a registry served through the same Private Link endpoint as the control
+# plane.
+###############################################################################
+
+# block_public_internet_egress = false
+
+# Extra outbound service tags, on top of the built-in set
+# (AzureActiveDirectory, AzureResourceManager, MicrosoftContainerRegistry,
+# AzureFrontDoor.FirstParty, AzureCloud.<region>, Storage.<region>).
+#
+# This is the right place for a service tag. One NSG rule is generated per
+# entry, with the priority assigned automatically, so entries cannot collide
+# with each other or with the built-ins.
+# additional_egress_service_tags = ["Storage.WestUS2"]
+
+# Escape hatch for destinations a service tag CANNOT express - a specific CIDR,
+# a non-443 port, a protocol restriction. Priorities are assigned by hand here,
+# so they are validated into 1000-3899: clear of the generated service-tag rules
+# (300-999), the Anyscale storage rule (3900) and the Deny (4000). Overlapping
+# priorities fail the apply with SecurityRuleConflict.
+#
+# additional_egress_rules = {
+#   SomeSpecificHost = {
+#     priority    = 1000
+#     destination = "203.0.113.0/24"
+#     protocol    = "Tcp"
+#     ports       = "443"
+#   }
+# }
+
+###############################################################################
+# Ingress
+#
+# The ingress controller uses a PUBLIC load balancer by default. Set
+# allow_public_ingress = false if you switch it to an internal LB, in which case
+# client traffic originates inside the VNet and the AllowVnetInbound rule
+# already covers it.
+###############################################################################
+
+# allow_public_ingress = true
+
+# Who may reach the ingress. Defaults to the `Internet` tag - anyone. Narrow to
+# CIDRs to restrict; a public Standard LB does not SNAT the client, so a /32
+# matches the original caller's address.
+#
+# This gates ALL ingress, including Anyscale workspace and service URLs - anyone
+# browsing from another network gets a connection timeout, not an auth error.
+# public_ingress_source_prefixes = ["203.0.113.45/32"]
+
+# The ingress controller's SERVICE ports, not its nodePorts. AKS creates the
+# load balancing rules with backendPort == frontendPort (floating IP), so the
+# nodePorts appear only in the health probe config. Opening the nodePort range
+# instead lets probes succeed while every real request is dropped.
+# public_ingress_ports = ["80", "443"]
+
+###############################################################################
+# Storage
+#
+# Blob and dfs private endpoints are created either way. This controls whether
+# the PUBLIC endpoint also works.
+#
+# Leaving it false means log viewing in the Anyscale UI breaks - the browser
+# fetches log blobs directly from *.blob.core.windows.net, which is what the
+# cors_rule exists for, and your browser is outside the VNet.
+#
+# If the first apply fails creating the blob container with an authorization
+# error, set this true, apply, then set it back to false.
+###############################################################################
+
+# storage_public_network_access_enabled = false
+
+# Premium Files NFS account + private endpoint. Optional for Anyscale.
+# enable_nfs = false
+
+# Azure Blob CSI driver on the cluster. Required to mount blob storage in pods.
+# enable_blob_driver = false
+
+###############################################################################
+# Container registry
+#
+# Premium is forced - private endpoints require it.
+#
+# Cache rules are PULL-TRIGGERED, not a mirror job: nothing lands in the
+# registry until something asks ACR for that path. So the chart also has to
+# point its images at the ACR, or the nodes ask upstream directly, ACR is never
+# contacted, and the cache stays empty.
+#
+# The upstream fetch runs on ACR's own service infrastructure rather than your
+# subnet, which is why it works with the Deny in place.
+###############################################################################
+
+# enable_acr = true
+
+# acr_cache_rules = {
+#   "ingress-nginx-controller" = {
+#     source_repo = "registry.k8s.io/ingress-nginx/controller"
+#     target_repo = "ingress-nginx/controller"
+#   }
+#   "ingress-nginx-certgen" = {
+#     source_repo = "registry.k8s.io/ingress-nginx/kube-webhook-certgen"
+#     target_repo = "ingress-nginx/kube-webhook-certgen"
+#   }
+# }
+
+###############################################################################
+# Anyscale control plane
+#
+# The cloud and the operator are BOTH created through ARM, outside this example.
+# These two values do not install anything - they are emitted in the
+# `anyscale_operator_extension_settings` output for that flow to consume, and
+# the URL determines which hostname the Private Link records below resolve.
+#
+# Set the URL to the environment you register the cloud against. Pointing the
+# operator at a different control plane than the one holding the cloud produces
+# a cloudDeploymentId that does not exist where the operator looks, and the
+# failure gives no hint of the mismatch.
+###############################################################################
+
+# anyscale_control_plane_url = "https://console.azure.anyscale.com"
+
+# Entra token audience the operator requests. Confirm it for a non-production
+# environment - a mismatch fails at the token exchange with nothing pointing at
+# the audience.
+# anyscale_auth_audience = "api://086bc555-6989-4362-ba30-fded273e432b/.default"
+
+###############################################################################
+# Private Link to the Anyscale control plane
+#
+# Needs two things from Anyscale: the PLS alias, and the exact control plane
+# hostname with its parent zone.
+#
+# The alias does NOT have to be in azure_location. A private endpoint must sit
+# in its own VNet's region, but a Private Link service is reachable from
+# approved private endpoints in any public region.
+#
+# The connection is cross-tenant and MANUAL: the endpoint sits Pending until
+# Anyscale approves it. `terraform apply` SUCCEEDS in that state, so a clean
+# apply is not evidence the path works - verify with a lookup from inside the
+# cluster:
+#
+#   az aks command invoke -g <rg> -n <cluster> --command \
+#     "kubectl -n kube-system exec ds/csi-azurefile-node -c azurefile -- \
+#      getent hosts <control-plane-hostname>"
+#
+# Keep the wildcard record. Anyscale serves its IMAGE REGISTRY
+# (registry-<cloud-id>.<same domain>) through this same endpoint, so a
+# per-hostname record would cover the control plane but not the registry -
+# image pulls would fail while the control plane looked healthy. The zone is
+# also authoritative for its whole domain inside the VNet, so any name in it
+# without a record fails to resolve rather than falling back to public DNS.
+###############################################################################
+
+# enable_privatelink                 = true
+# anyscale_privatelink_service_alias = "<prefix>.<guid>.<region>.azure.privatelinkservice"
+# anyscale_private_dns_zone_name     = "azure.anyscale-cloud.dev"
+# anyscale_privatelink_record_names  = ["*"]
+
+###############################################################################
+# Anyscale's storage account (optional)
+#
+# Declaring it creates an explicit Storage.<their-region> allow at priority 3900
+# when the Deny is on, and is the prerequisite for a private endpoint against
+# that account.
+#
+# The private endpoint is cross-subscription and MANUAL - the owner has to
+# approve it. Leave it false unless that path is sorted: enabling it registers
+# the DNS record immediately, so the account starts resolving to a private IP
+# that carries no traffic, and pulls black-hole rather than fail cleanly.
+###############################################################################
+
+# anyscale_storage_account = {
+#   subscription_id     = "<their-subscription-id>"
+#   resource_group_name = "<their-resource-group>"
+#   name                = "<their-storage-account>"
+#   region              = "West US 2"
+# }
+
+# enable_anyscale_storage_private_endpoint = false
+
+###############################################################################
+# Deploying in a region other than the control plane's
+#
+# The .tf files are region-agnostic - set azure_location and everything
+# region-derived follows. Four things are worth knowing first:
+#
+# 1. The PLS alias does NOT have to be in azure_location. Reuse the one Anyscale
+#    gave you; ask for an in-region alias only if you want the traffic landing
+#    closer. Same for a private endpoint against their storage account.
+#
+# 2. The four GLOBAL service tags (AzureActiveDirectory, AzureResourceManager,
+#    MicrosoftContainerRegistry, AzureFrontDoor.FirstParty) carry over
+#    unchanged. Only <region>-suffixed tags move - and anything Anyscale serves
+#    from their own region does not move with you. Add it to
+#    additional_egress_service_tags, NOT additional_egress_rules: a tag belongs
+#    in the former, which assigns priorities automatically.
+#
+# 3. Compute quota is per region and starts at zero in a region you have not
+#    used. Check before applying:
+#      az vm list-usage --location <region> -o table | grep -iE "DSv5|Spot"
+#
+# 4. Give the deployment its own aks_cluster_name and its own state (a terraform
+#    workspace, or a separate directory). Every resource here is named from that
+#    variable, so a distinct name is what keeps two deployments in one
+#    subscription from colliding.
+#
+# ex, a second cluster in East US 2 against a West US 2 control plane:
+#
+#   azure_location                = "East US 2"
+#   aks_cluster_name              = "anyscale-private-eastus2"
+#   vnet_cidr                     = "10.43.0.0/16"   # off 10.42/16, so the two can peer later
+#   nodes_subnet_cidr             = "10.43.0.0/22"
+#   private_endpoints_subnet_cidr = "10.43.8.0/24"
+#
+#   block_public_internet_egress   = true
+#   additional_egress_service_tags = ["Storage.WestUS2"]
+#
+#   # unchanged - a westus2 alias is reachable from East US 2
+#   anyscale_privatelink_service_alias = "<prefix>.<guid>.westus2.azure.privatelinkservice"
+###############################################################################
