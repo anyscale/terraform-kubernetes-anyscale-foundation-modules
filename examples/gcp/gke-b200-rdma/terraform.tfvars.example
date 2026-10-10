@@ -1,0 +1,37 @@
+project_id = "my-gcp-project"
+region     = "us-central1"
+zone       = "us-central1-b"
+
+cluster_name    = "b200-rdma-gke-us-central1"
+host_network    = "gke-host-vpc"
+host_subnetwork = "gke-host-subnet"
+
+gvnic_network_name          = "b200-rdma-gvnic-us-central1"
+gvnic_subnetwork_name       = "b200-rdma-gvnic-us-central1-subnet"
+gvnic_subnetwork_cidr       = "10.1.0.0/16"
+rdma_network_name           = "b200-rdma-us-central1-b"
+rdma_subnetwork_name_prefix = "b200-rdma-us-central1-b-subnet"
+rdma_subnetwork_cidr_prefix = "172.31"
+
+worker_node_count = 2
+workload_name     = "b200-rdma"
+
+# Optional: consume a specific zonal Compute Engine reservation.
+# worker_reservation_affinity = {
+#   type   = "SPECIFIC_RESERVATION"
+#   key    = "compute.googleapis.com/reservation-name"
+#   values = ["my-b200-reservation"]
+# }
+
+# Optional: use autoscaling instead of the fixed worker_node_count.
+# worker_autoscaling = {
+#   enabled         = true
+#   min_node_count  = 0
+#   max_node_count  = 2
+#   location_policy = "ANY"
+# }
+
+resource_labels = {
+  environment = "dev"
+  workload    = "b200-rdma"
+}
