@@ -51,7 +51,7 @@ Note the Terraform outputs, which include the cloud registration and helm upgrad
 
 ### Register the Anyscale Cloud
 
-Ensure that you are logged into Anyscale with valid CLI credentials (`anyscale login`). Registration runs against the Anyscale control plane only — no cluster connectivity required — and returns a `cldrsrc_…` cloud deployment id that the next steps use.
+Ensure that you are logged into Anyscale with valid CLI credentials (`anyscale login`). Registration runs against the Anyscale control plane only — no cluster connectivity required — and returns a `cldrsrc_…` cloud deployment id that the next steps use. If your organization uses a control plane other than `https://console.anyscale.com`, set `anyscale_control_plane_url` in your tfvars and `export ANYSCALE_HOST` to the same URL before running the command below. `generated/deploy.sh` does this export for you.
 
 The `anyscale_registration_command` Terraform output expands the cloud-resource details (region, S3 bucket, PVC name, MemoryDB endpoint, zones, operator IAM identity) into a flag-based `anyscale cloud register` invocation:
 
@@ -190,11 +190,12 @@ helm upgrade nvdp nvdp/nvidia-device-plugin \
 
 ### Install the Anyscale Operator
 
-The Terraform output `helm_upgrade_command` is pre-populated with the gateway settings (`networking.gateway.name=gateway`, `networking.gateway.namespace=anyscale-operator`, `networking.gateway.apiVersion=gateway.networking.k8s.io/v1`). Substitute `<cloud-deployment-id>` (from `$CLOUD_DEPLOYMENT_ID`), `<aws_region>`, and `<gateway-nlb-hostname>` (from `$GATEWAY_HOSTNAME`):
+The Terraform output `helm_upgrade_command` is pre-populated with `global.controlPlaneURL` (from `anyscale_control_plane_url`) and the gateway settings (`networking.gateway.name=gateway`, `networking.gateway.namespace=anyscale-operator`, `networking.gateway.apiVersion=gateway.networking.k8s.io/v1`). Substitute `<anyscale_control_plane_url>`, `<cloud-deployment-id>` (from `$CLOUD_DEPLOYMENT_ID`), `<aws_region>`, and `<gateway-nlb-hostname>` (from `$GATEWAY_HOSTNAME`):
 
 ```shell
 helm repo add anyscale https://anyscale.github.io/helm-charts
 helm upgrade anyscale-operator anyscale/anyscale-operator \
+  --set-string global.controlPlaneURL=<anyscale_control_plane_url> \
   --set-string global.cloudDeploymentId=$CLOUD_DEPLOYMENT_ID \
   --set-string global.cloudProvider=aws \
   --set-string global.aws.region=<aws_region> \
@@ -274,6 +275,7 @@ Set `enable_memorydb = false` in your tfvars to skip this and avoid the ongoing 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_anyscale_cloud_name"></a> [anyscale\_cloud\_name](#input\_anyscale\_cloud\_name) | (Optional) Anyscale cloud name passed to `anyscale cloud register --name`.<br/><br/>Pick a name that is unique within your Anyscale organization.<br/><br/>ex:<pre>anyscale_cloud_name = "my-eks-public-cloud"</pre> | `string` | `"anyscale-eks-public"` | no |
+| <a name="input_anyscale_control_plane_url"></a> [anyscale\_control\_plane\_url](#input\_anyscale\_control\_plane\_url) | (Optional) Anyscale control plane URL. `generated/deploy.sh` exports it as `ANYSCALE_HOST` for `anyscale cloud register` and passes it to the operator as `global.controlPlaneURL`, so the cloud and the operator always talk to the same control plane.<br/><br/>Leave the default for production. Set it only if your Anyscale organization runs on a different control plane.<br/><br/>ex:<pre>anyscale_control_plane_url = "https://console.example.com"</pre> | `string` | `"https://console.anyscale.com"` | no |
 | <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | (Optional) The AWS region in which all resources will be created.<br/><br/>ex:<pre>aws_region = "us-east-2"</pre> | `string` | `"us-east-2"` | no |
 | <a name="input_bucket_force_destroy"></a> [bucket\_force\_destroy](#input\_bucket\_force\_destroy) | (Optional) When true, `terraform destroy` will delete the Anyscale S3 bucket<br/>even if it still contains objects (operator logs, cluster metadata, mounted<br/>PVC data, etc.). Default is `false` so accidental destroys do not wipe data.<br/><br/>Set to `true` for ephemeral dev / e2e test deployments where you want<br/>teardown to be one command. See `dev-overrides.tfvars.example` for a ready-made<br/>override file.<br/><br/>ex:<pre>bucket_force_destroy = true</pre> | `bool` | `false` | no |
 | <a name="input_eks_cluster_name"></a> [eks\_cluster\_name](#input\_eks\_cluster\_name) | (Optional) The name of the EKS cluster.<br/><br/>This will be used for naming resources created by this module including the EKS cluster and the S3 bucket.<br/><br/>ex:<pre>eks_cluster_name = "anyscale-eks-public"</pre> | `string` | `"anyscale-eks-public"` | no |
@@ -297,7 +299,7 @@ Set `enable_memorydb = false` in your tfvars to skip this and avoid the ongoing 
 | <a name="output_aws_region"></a> [aws\_region](#output\_aws\_region) | The AWS region. This is used for Helm chart values. |
 | <a name="output_deploy_script_path"></a> [deploy\_script\_path](#output\_deploy\_script\_path) | Path to a rendered shell script containing every post-terraform step in order (autoscaler, AWS LBC, Envoy Gateway + manifests, PVC, Anyscale Operator, verify). Open it to copy-paste steps, or run end-to-end after exporting CLOUD\_DEPLOYMENT\_ID. |
 | <a name="output_eks_cluster_name"></a> [eks\_cluster\_name](#output\_eks\_cluster\_name) | The name of the EKS cluster. This is used for Helm chart values. |
-| <a name="output_helm_upgrade_command"></a> [helm\_upgrade\_command](#output\_helm\_upgrade\_command) | The Anyscale Operator helm upgrade command, with gateway settings populated for the Anyscale Envoy Gateway setup. |
+| <a name="output_helm_upgrade_command"></a> [helm\_upgrade\_command](#output\_helm\_upgrade\_command) | The Anyscale Operator helm upgrade command, with the control plane URL and gateway settings populated for the Anyscale Envoy Gateway setup. |
 | <a name="output_memorydb_endpoint"></a> [memorydb\_endpoint](#output\_memorydb\_endpoint) | MemoryDB cluster configuration endpoint as host:port. Only set when `enable_memorydb = true`. |
 | <a name="output_s3_pvc_bucket_name"></a> [s3\_pvc\_bucket\_name](#output\_s3\_pvc\_bucket\_name) | Name of the S3 bucket exposed as a PVC via the Mountpoint-for-S3 CSI driver. Only set when `enable_s3_pvc = true`. |
 | <a name="output_s3_pvc_csi_driver_role_arn"></a> [s3\_pvc\_csi\_driver\_role\_arn](#output\_s3\_pvc\_csi\_driver\_role\_arn) | IAM role ARN assumed by the Mountpoint-for-S3 CSI driver pods via EKS Pod Identity. The pod identity association itself is managed by the `aws-mountpoint-s3-csi-driver` EKS managed addon. Only set when `enable_s3_pvc = true`. |
