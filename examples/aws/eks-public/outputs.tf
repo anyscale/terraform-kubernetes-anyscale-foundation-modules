@@ -96,6 +96,7 @@ locals {
 
   helm_upgrade_command_parts = [
     "helm upgrade anyscale-operator anyscale/anyscale-operator",
+    "--set-string global.controlPlaneURL=${var.anyscale_control_plane_url}",
     "--set-string global.cloudDeploymentId=<cloud-deployment-id>",
     "--set-string global.cloudProvider=aws",
     "--set-string global.aws.region=${var.aws_region}",
@@ -117,7 +118,7 @@ output "anyscale_registration_command" {
 }
 
 output "helm_upgrade_command" {
-  description = "The Anyscale Operator helm upgrade command, with gateway settings populated for the Anyscale Envoy Gateway setup."
+  description = "The Anyscale Operator helm upgrade command, with the control plane URL and gateway settings populated for the Anyscale Envoy Gateway setup."
   value       = join(" \\\n\t", local.helm_upgrade_command_parts)
 }
 
@@ -132,12 +133,13 @@ output "helm_upgrade_command" {
 resource "local_file" "deploy_script" {
   filename = "${path.module}/generated/deploy.sh"
   content = templatefile("${path.module}/deploy.sh.tftpl", {
-    eks_cluster_name     = var.eks_cluster_name
-    aws_region           = var.aws_region
-    anyscale_cloud_name  = var.anyscale_cloud_name
-    enable_s3_pvc        = var.enable_s3_pvc
-    vpc_id               = module.anyscale_vpc.vpc_id
-    registration_command = join(" \\\n      ", local.registration_command_parts)
+    eks_cluster_name           = var.eks_cluster_name
+    aws_region                 = var.aws_region
+    anyscale_cloud_name        = var.anyscale_cloud_name
+    anyscale_control_plane_url = var.anyscale_control_plane_url
+    enable_s3_pvc              = var.enable_s3_pvc
+    vpc_id                     = module.anyscale_vpc.vpc_id
+    registration_command       = join(" \\\n      ", local.registration_command_parts)
   })
   file_permission = "0755"
 }

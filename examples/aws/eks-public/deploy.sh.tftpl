@@ -6,6 +6,10 @@
 # (captured from step 1) and $GATEWAY_HOSTNAME (captured from step 5).
 set -euo pipefail
 
+# `anyscale cloud register` follows ANYSCALE_HOST, and the operator below must
+# reach the same control plane that knows this cloud.
+export ANYSCALE_HOST="${anyscale_control_plane_url}"
+
 # ------------------------------------------------------------------
 # 1. Register the Anyscale cloud  (returns a cldrsrc_... id)
 # ------------------------------------------------------------------
@@ -103,6 +107,7 @@ echo "==> Step 7/8: Installing the Anyscale Operator helm chart..."
 helm repo add anyscale https://anyscale.github.io/helm-charts 2>/dev/null || true
 helm repo update
 helm upgrade anyscale-operator anyscale/anyscale-operator \
+  --set-string global.controlPlaneURL="$ANYSCALE_HOST" \
   --set-string global.cloudDeploymentId="$CLOUD_DEPLOYMENT_ID" \
   --set-string global.cloudProvider=aws \
   --set-string global.aws.region=${aws_region} \

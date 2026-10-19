@@ -3,6 +3,7 @@ FEATURES:
 
 BUG FIXES:
 - eks-hyperpod-new_cluster: document the `hostNetwork: true` + `dnsPolicy: ClusterFirstWithHostNet` operator patch for HyperPod clusters where the pod network cannot reach IMDS (operator fails to sign its identity and CrashLoopBackOffs), including re-apply guidance after `helm upgrade`.
+- eks-public: add `anyscale_control_plane_url` (default `https://console.anyscale.com`). `generated/deploy.sh` exports it as `ANYSCALE_HOST` and passes it to the operator as `global.controlPlaneURL`, so the operator no longer ignores a non-default control plane.
 
 BREAKING CHANGES:
 

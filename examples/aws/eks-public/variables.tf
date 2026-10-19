@@ -175,6 +175,21 @@ variable "anyscale_cloud_name" {
   default     = "anyscale-eks-public"
 }
 
+variable "anyscale_control_plane_url" {
+  description = <<-EOT
+    (Optional) Anyscale control plane URL. `generated/deploy.sh` exports it as `ANYSCALE_HOST` for `anyscale cloud register` and passes it to the operator as `global.controlPlaneURL`, so the cloud and the operator always talk to the same control plane.
+
+    Leave the default for production. Set it only if your Anyscale organization runs on a different control plane.
+
+    ex:
+    ```
+    anyscale_control_plane_url = "https://console.example.com"
+    ```
+  EOT
+  type        = string
+  default     = "https://console.anyscale.com"
+}
+
 variable "enable_s3_pvc" {
   description = <<-EOT
     (Optional) Provision the IAM role + EKS Pod Identity association for the Mountpoint for Amazon S3 CSI driver, and render a `generated/pv-pvc.yaml` that mounts the Anyscale S3 bucket as a PersistentVolumeClaim used as Anyscale shared storage.
